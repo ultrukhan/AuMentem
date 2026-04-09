@@ -1,0 +1,7 @@
+from fastapi import FastAPI,Depends,HTTPException
+from backend.routers import auth
+
+app = FastAPI()
+app.include_router(auth.router)
+
+
