@@ -2,7 +2,7 @@ from pydantic import BaseModel,Field,EmailStr, field_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
-from backend.enums import QuestStatus,MoodState,ReactionType
+from backend.enums import *
 import re
 
 class AppUserCreate(BaseModel):
@@ -90,3 +90,26 @@ class UserGeoQuestResponce(BaseModel):
 class PostResponse(BaseModel):
     id: UUID
 
+class StateLogCreate(BaseModel):
+    state: MoodState
+
+class StateLogResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    state: MoodState
+    recorded_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class TimeCapsuleCreate(BaseModel):
+    message: str
+
+class TimeCapsuleResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    message: str
+    created_at: datetime
+
+class OnlyMessageResponse(BaseModel):
+    message: str
+    model_config = {"from_attributes": True}
