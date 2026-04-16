@@ -43,3 +43,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class AppUserUpdate(BaseModel):
+    nickname: Optional[str] = Field(None,min_length=1, max_length=30)
+
+
