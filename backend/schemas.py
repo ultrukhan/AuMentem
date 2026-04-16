@@ -2,6 +2,7 @@ from pydantic import BaseModel,Field,EmailStr, field_validator
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
+from backend.enums import QuestStatus,MoodState,ReactionType
 import re
 
 class AppUserCreate(BaseModel):
@@ -46,4 +47,46 @@ class Token(BaseModel):
 class AppUserUpdate(BaseModel):
     nickname: Optional[str] = Field(None,min_length=1, max_length=30)
 
+class MiniQuest(BaseModel):
+    id: UUID
+    title: str
+
+class Coordinates(BaseModel):
+    lat: float
+    lng: float
+
+class Place(BaseModel):
+    id: UUID
+    name: str
+    coordinates: Coordinates
+
+    model_config = {"from_attributes": True}
+
+class GeoQuest(BaseModel):
+    id: UUID
+    title: str
+    place_id: UUID
+    place: Place
+
+    model_config = {"from_attributes": True}
+
+class UserMiniQuestResponce(BaseModel):
+    id: UUID
+    user_id: UUID
+    user: AppUserResponse
+    mini_quest_id: UUID
+    mini_quest: MiniQuest
+    status: QuestStatus
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes" : True}
+
+class UserGeoQuestResponce(BaseModel):
+    id: UUID
+    user_id: UUID
+
+class PostResponse(BaseModel):
+    id: UUID
 

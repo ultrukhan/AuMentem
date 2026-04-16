@@ -21,5 +21,17 @@ class DBAppUser(Base):
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     verification_code = Column(String, nullable=True)
 
+class DBPost(Base):
+    __tablename__ = "post"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey("app_user.id"), nullable=False)
+    user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
+    user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
+    is_anonymous = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    mini_quest = relationship("DBUserMiniQuest")
+    geo_quest = relationship("DBUserGeoQuest")
+
 
 
