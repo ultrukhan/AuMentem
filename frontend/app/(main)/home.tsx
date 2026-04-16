@@ -9,10 +9,11 @@ import {
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav'; // Наше літаюче меню
 import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { useRouter } from 'expo-router';
 
 export default function HomeScreen() {
   const [isDark, setIsDark] = useState(false);
-  
+  const router = useRouter();
   // Витягуємо кольори та тіні з нашої дизайн-системи
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
@@ -73,7 +74,7 @@ export default function HomeScreen() {
           <View style={s.grid}>
             
             {/* Ряд 1: Квести та Геоквести */}
-            <View style={s.row}>
+            {/* <View style={s.row}>
               <Pressable style={({ pressed }) => [
                 s.halfCard, 
                 { backgroundColor: c.card, borderColor: c.border }, 
@@ -84,8 +85,21 @@ export default function HomeScreen() {
                   <Sparkles color={c.iconColor} size={32} strokeWidth={2} />
                 </View>
                 <Text style={[Typography.titleMd, { color: c.text }]}>Квести</Text>
+              </Pressable> */}
+          <View style={s.row}>
+              <Pressable 
+onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dark' : 'light' } })}                style={({ pressed }) => [
+                  s.halfCard, 
+                  { backgroundColor: c.card, borderColor: c.border }, 
+                  sh.soft,
+                  pressed && s.pressed
+              ]}>
+                <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
+                  <Sparkles color={c.iconColor} size={32} strokeWidth={2} />
+                </View>
+                <Text style={[Typography.titleMd, { color: c.text }]}>Квести</Text>
               </Pressable>
-
+{/* 
               <Pressable style={({ pressed }) => [
                 s.halfCard, 
                 { backgroundColor: c.card, borderColor: c.border }, 
@@ -96,7 +110,21 @@ export default function HomeScreen() {
                   <Map color={c.iconColor} size={32} strokeWidth={2} />
                 </View>
                 <Text style={[Typography.titleMd, { color: c.text }]}>Геоквести</Text>
+              </Pressable> */}
+              <Pressable 
+                onPress={() => router.push({ pathname: '/geoquests', params: { theme: isDark ? 'dark' : 'light' } })}
+                style={({ pressed }) => [
+                s.halfCard, 
+                { backgroundColor: c.card, borderColor: c.border }, 
+                sh.soft,
+                pressed && s.pressed
+              ]}>
+                <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
+                  <Map color={c.iconColor} size={32} strokeWidth={2} />
+                </View>
+                <Text style={[Typography.titleMd, { color: c.text }]}>Геоквести</Text>
               </Pressable>
+            
             </View>
 
             {/* Ряд 2: Анонімна стрічка */}
