@@ -1,5 +1,3 @@
-from contextlib import nullcontext
-
 from backend.models import DBAppUser,get_utc_now
 from backend.schemas import AppUserCreate, AppUserResponse,Token
 from backend.auth_utils import verify_password, create_access_token,get_password_hash,get_current_user
