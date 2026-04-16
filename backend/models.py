@@ -1,9 +1,10 @@
 from backend.database import Base
 from datetime import datetime,timezone
 import uuid
-from sqlalchemy import Column, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from backend.enums import *
 
 def get_utc_now():
     return datetime.now(timezone.utc)
@@ -26,12 +27,23 @@ class DBPost(Base):
 
     id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
     user_id = Column(Uuid, ForeignKey("app_user.id"), nullable=False)
-    user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
-    user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
-    is_anonymous = Column(Boolean, default=True)
+    #user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
+    #user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
+    is_anonymous = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
-    mini_quest = relationship("DBUserMiniQuest")
-    geo_quest = relationship("DBUserGeoQuest")
+    user = relationship("DBAppUser", backref="posts")
+    #user_mini_quest = relationship("DBUserMiniQuest", backref="posts")
+    #user_geo_quest = relationship("DBUserGeoQuest", backref="posts")
+    reactions = relationship("DBPostReaction", backref="post", cascade="all, delete-orphan")
+
+class DBPostReaction(Base):
+    __tablename__ = "post_reaction"
+
+    __table_args__ = (UniqueConstraint("post_id", "user_id","reaction_type",name ="_reaction_unique"),)
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    post_id = Column(Uuid, ForeignKey("post.id",ondelete="CASCADE"), nullable=False)
+    user_id = Column(Uuid, ForeignKey("app_user.id",ondelete="CASCADE"), nullable=False)
+    reaction_type = Column(Enum(ReactionType), nullable=False)
 
 
 
