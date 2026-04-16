@@ -19,6 +19,7 @@ class DBAppUser(Base):
     last_login_at =Column(DateTime(timezone=True))
     deleted_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    verification_code = Column(String, nullable=True)
 
 
 
