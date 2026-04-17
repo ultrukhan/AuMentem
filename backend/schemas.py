@@ -1,14 +1,23 @@
-from pydantic import BaseModel,Field,EmailStr, field_validator
-from typing import Optional
+from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
+from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
 from backend.enums import *
 import re
 
+class HobbyResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class AppUserCreate(BaseModel):
     nickname: str = Field(min_length=1, max_length=30)
     email: EmailStr
     password: str = Field(min_length=8, max_length=50)
+
+    hobby_ids: List[int] = []
 
     @field_validator('email')
     @classmethod
@@ -70,7 +79,7 @@ class GeoQuest(BaseModel):
 
     model_config = {"from_attributes": True}
 
-class UserMiniQuestResponce(BaseModel):
+class UserMiniQuestResponse(BaseModel):
     id: UUID
     user_id: UUID
     user: AppUserResponse
@@ -83,12 +92,62 @@ class UserMiniQuestResponce(BaseModel):
 
     model_config = {"from_attributes" : True}
 
-class UserGeoQuestResponce(BaseModel):
+class UserGeoQuestResponse(BaseModel):
     id: UUID
     user_id: UUID
+    user: AppUserResponse
+    geo_quest_id: UUID
+    geo_quest: GeoQuest
+    status: QuestStatus
+    photo_url: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes" : True}
+
+
+class ReactionToggle(BaseModel):
+    reaction_type: ReactionType
+
+class ReactionResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    reaction_type: ReactionType
+
+    model_config = {"from_attributes": True}
 
 class PostResponse(BaseModel):
     id: UUID
+    user_id: UUID
+    user: Optional[AppUserResponse] = None
+    user_mini_quest_id: Optional[UUID] = None
+    user_mini_quest: Optional[UserMiniQuestResponse] = None
+    user_geo_quest_id: Optional[UUID] = None
+    user_geo_quest: Optional[UserGeoQuestResponse] = None
+    is_anonymous: bool = False
+    created_at: datetime
+    reactions: list[ReactionResponse] = []
+
+    model_config = {"from_attributes" : True}
+
+class CreatePost(BaseModel):
+    user_mini_quest_id: Optional[UUID] = Field(None,gt=0)
+    user_geo_quest_id: Optional[UUID] = Field(None,gt=0)
+    is_anonymous: bool
+
+    @model_validator(mode='after')
+    def check_quest_id(self):
+        if not self.user_mini_quest_id and not self.user_geo_quest_id:
+            raise ValueError("Пост має бути прив'язаний до міні-квесту АБО гео-квесту")
+        if self.user_mini_quest_id and self.user_geo_quest_id:
+            raise ValueError("Один пост не може стосуватися двох квестів одночасно")
+        return self
+
+
+
+
+
 
 class StateLogCreate(BaseModel):
     state: MoodState
