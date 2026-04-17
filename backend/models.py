@@ -1,13 +1,34 @@
 from backend.database import Base
 from datetime import datetime,timezone
 import uuid
-from sqlalchemy import Column, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
+from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from backend.enums import *
 
 def get_utc_now():
     return datetime.now(timezone.utc)
+
+user_hobby_table = Table(
+    "user_hobby",
+    Base.metadata,
+    Column("user_id", Uuid, ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True),
+    Column("hobby_id", Integer, ForeignKey("hobby.id", ondelete="CASCADE"), primary_key=True)
+)
+
+mini_quest_hobby_table = Table(
+    "mini_quest_hobby",
+    Base.metadata,
+    Column("mini_quest_id", Uuid, ForeignKey("mini_quest.id", ondelete="CASCADE"), primary_key=True),
+    Column("hobby_id", Integer, ForeignKey("hobby.id", ondelete="CASCADE"), primary_key=True)
+)
+
+class DBHobby(Base):
+    __tablename__ = "hobby"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+
 
 class DBAppUser(Base):
     __tablename__ = "app_user"
@@ -21,6 +42,7 @@ class DBAppUser(Base):
     deleted_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     verification_code = Column(String, nullable=True)
+    hobbies = relationship("DBHobby", secondary=user_hobby_table,backref="users")
 
 class DBPost(Base):
     __tablename__ = "post"

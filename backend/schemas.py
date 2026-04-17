@@ -1,14 +1,23 @@
 from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
-from typing import Optional
+from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
 from backend.enums import *
 import re
 
+class HobbyResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class AppUserCreate(BaseModel):
     nickname: str = Field(min_length=1, max_length=30)
     email: EmailStr
     password: str = Field(min_length=8, max_length=50)
+
+    hobby_ids: List[int] = []
 
     @field_validator('email')
     @classmethod
