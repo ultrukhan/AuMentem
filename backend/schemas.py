@@ -172,3 +172,30 @@ class TimeCapsuleResponse(BaseModel):
 class OnlyMessageResponse(BaseModel):
     message: str
     model_config = {"from_attributes": True}
+
+
+class MiniQuest(BaseModel):
+    id: UUID
+    title: str
+    hobbies: List[HobbyResponse] = []
+    model_config = {"from_attributes": True}
+
+class QuestEvaluateRequest(BaseModel):
+    evaluation: QuestEvaluation
+
+class UserMiniQuestResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    user: Optional[AppUserResponse] = None
+    mini_quest_id: UUID
+    mini_quest: Optional[MiniQuest] = None
+    status: QuestStatus
+    evaluation: Optional[QuestEvaluation] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes" : True}
+
+class MiniQuestResponse(MiniQuest):
+    pass

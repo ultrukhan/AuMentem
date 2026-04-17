@@ -88,3 +88,27 @@ class DBTimeCapsule(Base):
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
 
     user = relationship("DBAppUser", backref="time_capsule")
+
+
+class DBMiniQuest(Base):
+    __tablename__ = "mini_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    hobbies = relationship("DBHobby", secondary=mini_quest_hobby_table, backref="mini_quests")
+
+
+class DBUserMiniQuest(Base):
+    __tablename__ = "user_mini_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id'), nullable=False)
+    mini_quest_id = Column(Uuid, ForeignKey('mini_quest.id'), nullable=False)
+    status = Column(Enum(QuestStatus), default=QuestStatus.IN_PROGRESS, nullable=False)
+    evaluation = Column(Enum(QuestEvaluation), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("DBAppUser", backref="user_mini_quest")
+    mini_quest = relationship("DBMiniQuest", backref="user_mini_quest")
