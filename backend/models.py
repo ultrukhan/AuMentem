@@ -4,6 +4,7 @@ import uuid
 from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy import Enum
 from backend.enums import *
 
 def get_utc_now():
@@ -67,5 +68,23 @@ class DBPostReaction(Base):
     user_id = Column(Uuid, ForeignKey("app_user.id",ondelete="CASCADE"), nullable=False)
     reaction_type = Column(Enum(ReactionType), nullable=False)
 
+class DBStateLog(Base):
+    __tablename__ = "mood_log"
 
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id'), nullable=False)
+    state = Column(Enum(MoodState), nullable=False)
+    recorded_at = Column(DateTime(timezone=True), default=get_utc_now)
 
+    user = relationship("DBAppUser", backref="mood_logs")
+
+class DBTimeCapsule(Base):
+    __tablename__ = "time_capsule"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id'), nullable=False)
+    message = Column(String, nullable=False)
+    is_viewed = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+
+    user = relationship("DBAppUser", backref="time_capsule")

@@ -5,5 +5,5 @@ app = FastAPI()
 app.include_router(auth.router)
 app.include_router(app_user.router)
 app.include_router(posts.router)
-
-
+app.include_router(tracker.router)
+app.include_router(time_capsule.router)

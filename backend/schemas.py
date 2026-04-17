@@ -149,3 +149,26 @@ class CreatePost(BaseModel):
 
 
 
+class StateLogCreate(BaseModel):
+    state: MoodState
+
+class StateLogResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    state: MoodState
+    recorded_at: datetime
+    model_config = {"from_attributes": True}
+
+
+class TimeCapsuleCreate(BaseModel):
+    message: str
+
+class TimeCapsuleResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    message: str
+    created_at: datetime
+
+class OnlyMessageResponse(BaseModel):
+    message: str
+    model_config = {"from_attributes": True}
