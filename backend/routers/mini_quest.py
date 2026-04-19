@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models import DBAppUser, DBMiniQuest, DBUserMiniQuest, DBHobby, get_utc_now
-from backend.schemas import MiniQuestResponse, UserMiniQuestResponse, QuestEvaluateRequest
+from backend.schemas import MiniQuest, UserMiniQuestResponse, QuestEvaluateRequest, HobbyResponse
 from backend.auth_utils import get_current_user
 from backend.enums import QuestStatus
 from typing import List
@@ -14,8 +14,9 @@ router = APIRouter(
 )
 
 
-@router.get("/recommendations", response_model=List[MiniQuestResponse])
+@router.get("/recommendations", response_model=List[MiniQuest])
 async def get_recommended_quests(hobby_name: str = None,
+        user: DBAppUser = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
     """

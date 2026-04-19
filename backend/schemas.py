@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime
 from backend.enums import *
 import re
+from geoalchemy2.shape import to_shape
 
 class HobbyResponse(BaseModel):
     id: int
@@ -49,6 +50,13 @@ class AppUserResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class AppUserPublic(BaseModel):
+    id: UUID
+    nickname: str
+
+    model_config = {"from_attributes": True}
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -56,9 +64,6 @@ class Token(BaseModel):
 class AppUserUpdate(BaseModel):
     nickname: Optional[str] = Field(None,min_length=1, max_length=30)
 
-class MiniQuest(BaseModel):
-    id: UUID
-    title: str
 
 class Coordinates(BaseModel):
     lat: float
@@ -71,6 +76,20 @@ class Place(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator('coordinates', mode='before')
+    @classmethod
+    def parse_geography_to_coords(cls, value):
+        if isinstance(value, dict) or isinstance(value, Coordinates):
+            return value
+
+        try:
+            from geoalchemy2.shape import to_shape
+            point = to_shape(value)
+
+            return {"lat": point.y, "lng": point.x}
+        except Exception:
+            return value
+
 class GeoQuest(BaseModel):
     id: UUID
     title: str
@@ -79,27 +98,41 @@ class GeoQuest(BaseModel):
 
     model_config = {"from_attributes": True}
 
-class UserMiniQuestResponse(BaseModel):
-    id: UUID
-    user_id: UUID
-    user: AppUserResponse
-    mini_quest_id: UUID
-    mini_quest: MiniQuest
-    status: QuestStatus
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-
-    model_config = {"from_attributes" : True}
-
 class UserGeoQuestResponse(BaseModel):
     id: UUID
     user_id: UUID
-    user: AppUserResponse
+    user: Optional[AppUserPublic] = None
     geo_quest_id: UUID
     geo_quest: GeoQuest
     status: QuestStatus
-    photo_url: Optional[str] = None
+    photo_proof_url: Optional[str] = None
+    is_verified: bool = False
+    saved_to_album: bool = False
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class MiniQuest(BaseModel):
+    id: UUID
+    title: str
+    hobbies: List[HobbyResponse] = []
+    model_config = {"from_attributes": True}
+
+class QuestEvaluateRequest(BaseModel):
+    evaluation: QuestEvaluation
+
+class UserMiniQuestResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    user: Optional[AppUserPublic] = None
+    mini_quest_id: UUID
+    mini_quest: Optional[MiniQuest] = None
+    status: QuestStatus
+    evaluation: Optional[QuestEvaluation] = None
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
@@ -120,7 +153,7 @@ class ReactionResponse(BaseModel):
 class PostResponse(BaseModel):
     id: UUID
     user_id: UUID
-    user: Optional[AppUserResponse] = None
+    user: Optional[AppUserPublic] = None
     user_mini_quest_id: Optional[UUID] = None
     user_mini_quest: Optional[UserMiniQuestResponse] = None
     user_geo_quest_id: Optional[UUID] = None
@@ -132,21 +165,17 @@ class PostResponse(BaseModel):
     model_config = {"from_attributes" : True}
 
 class CreatePost(BaseModel):
-    user_mini_quest_id: Optional[UUID] = Field(None,gt=0)
-    user_geo_quest_id: Optional[UUID] = Field(None,gt=0)
+    user_mini_quest_id: Optional[UUID] = None
+    # user_geo_quest_id: Optional[UUID] = None
     is_anonymous: bool
 
-    @model_validator(mode='after')
-    def check_quest_id(self):
-        if not self.user_mini_quest_id and not self.user_geo_quest_id:
-            raise ValueError("Пост має бути прив'язаний до міні-квесту АБО гео-квесту")
-        if self.user_mini_quest_id and self.user_geo_quest_id:
-            raise ValueError("Один пост не може стосуватися двох квестів одночасно")
-        return self
-
-
-
-
+    # @model_validator(mode='after')
+    # def check_quest_id(self):
+    #     # if not self.user_mini_quest_id and not self.user_geo_quest_id:
+    #     #     raise ValueError("Пост має бути прив'язаний до міні-квесту АБО гео-квесту")
+    #     # if self.user_mini_quest_id and self.user_geo_quest_id:
+    #     #     raise ValueError("Один пост не може стосуватися двох квестів одночасно")
+    #     # return self
 
 
 class StateLogCreate(BaseModel):
@@ -174,28 +203,3 @@ class OnlyMessageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class MiniQuest(BaseModel):
-    id: UUID
-    title: str
-    hobbies: List[HobbyResponse] = []
-    model_config = {"from_attributes": True}
-
-class QuestEvaluateRequest(BaseModel):
-    evaluation: QuestEvaluation
-
-class UserMiniQuestResponse(BaseModel):
-    id: UUID
-    user_id: UUID
-    user: Optional[AppUserResponse] = None
-    mini_quest_id: UUID
-    mini_quest: Optional[MiniQuest] = None
-    status: QuestStatus
-    evaluation: Optional[QuestEvaluation] = None
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-
-    model_config = {"from_attributes" : True}
-
-class MiniQuestResponse(MiniQuest):
-    pass
