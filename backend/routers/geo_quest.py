@@ -29,19 +29,36 @@ async def start_geo_quest(
     if not quest:
         raise HTTPException(status_code=404, detail="Гео-квест не знайдено")
 
-    existing_user_quest = db.query(DBUserGeoQuest).filter(
+    now = get_utc_now()
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    active_quest = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,
-        DBUserGeoQuest.user_id == user.id
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
     ).first()
 
-    if existing_user_quest:
-        raise HTTPException(status_code=400, detail="Ви вже взяли або виконали цей квест")
+    if active_quest:
+        raise HTTPException(status_code=400, detail="Ви вже взяли цей квест, але ще не завершили його!")
+
+    completed_today = db.query(DBUserGeoQuest).filter(
+        DBUserGeoQuest.geo_quest_id == geo_quest_id,
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.COMPLETED,
+        DBUserGeoQuest.completed_at >= start_of_today
+    ).first()
+
+    if completed_today:
+        raise HTTPException(
+            status_code=400,
+            detail="Ви вже виконали цей квест сьогодні. Повертайтеся завтра після 00:00!"
+        )
 
     user_geo_quest = DBUserGeoQuest(
         user_id=user.id,
         geo_quest_id=quest.id,
         status=QuestStatus.IN_PROGRESS,
-        started_at=get_utc_now()
+        started_at=now
     )
 
     db.add(user_geo_quest)

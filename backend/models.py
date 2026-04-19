@@ -52,12 +52,12 @@ class DBPost(Base):
     id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
     user_id = Column(Uuid, ForeignKey("app_user.id"), nullable=False)
     user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
-    # user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
+    user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
     is_anonymous = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     user = relationship("DBAppUser", backref="posts")
     user_mini_quest = relationship("DBUserMiniQuest", backref="posts")
-    # user_geo_quest = relationship("DBUserGeoQuest", backref="posts")
+    user_geo_quest = relationship("DBUserGeoQuest", backref="posts")
     reactions = relationship("DBPostReaction", backref="post", cascade="all, delete-orphan")
 
 class DBPostReaction(Base):

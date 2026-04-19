@@ -166,16 +166,16 @@ class PostResponse(BaseModel):
 
 class CreatePost(BaseModel):
     user_mini_quest_id: Optional[UUID] = None
-    # user_geo_quest_id: Optional[UUID] = None
+    user_geo_quest_id: Optional[UUID] = None
     is_anonymous: bool
 
-    # @model_validator(mode='after')
-    # def check_quest_id(self):
-    #     # if not self.user_mini_quest_id and not self.user_geo_quest_id:
-    #     #     raise ValueError("Пост має бути прив'язаний до міні-квесту АБО гео-квесту")
-    #     # if self.user_mini_quest_id and self.user_geo_quest_id:
-    #     #     raise ValueError("Один пост не може стосуватися двох квестів одночасно")
-    #     # return self
+    @model_validator(mode='after')
+    def check_quest_id(self):
+        if not self.user_mini_quest_id and not self.user_geo_quest_id:
+            raise ValueError("Пост має бути прив'язаний до міні-квесту АБО гео-квесту")
+        if self.user_mini_quest_id and self.user_geo_quest_id:
+            raise ValueError("Один пост не може стосуватися двох квестів одночасно")
+        return self
 
 
 class StateLogCreate(BaseModel):

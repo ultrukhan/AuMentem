@@ -19,20 +19,28 @@ async def create_post(post:CreatePost, user: DBAppUser = Depends(get_current_use
     newpost = DBPost(
         user_id= user.id,
         user_mini_quest_id=post.user_mini_quest_id,
-        # user_geo_quest_id=post.user_geo_quest_id,
+        user_geo_quest_id=post.user_geo_quest_id,
         is_anonymous=post.is_anonymous,
     )
 
     db.add(newpost)
     db.commit()
     db.refresh(newpost)
+
+    if newpost.is_anonymous:
+        newpost.user = None
+        if newpost.user_mini_quest:
+            newpost.user_mini_quest.user = None
+        if newpost.user_geo_quest:
+            newpost.user_geo_quest.user = None
+
     return newpost
 
 @router.get("/", response_model=List[PostResponse])
 async def get_posts(user: DBAppUser = Depends(get_current_user),db: Session = Depends(get_db)):
     posts = (db.query(DBPost).options(joinedload(DBPost.user),
                                       joinedload(DBPost.user_mini_quest),
-                                      # joinedload(DBPost.user_geo_quest),
+                                      joinedload(DBPost.user_geo_quest),
                                       joinedload(DBPost.reactions)).order_by(desc(DBPost.created_at)).limit(15).all())
 
     for post in posts:
@@ -40,6 +48,8 @@ async def get_posts(user: DBAppUser = Depends(get_current_user),db: Session = De
             post.user = None
             if post.user_mini_quest:
                 post.user_mini_quest.user = None
+            if post.user_geo_quest:
+                post.user_geo_quest.user = None
 
     return posts
 
