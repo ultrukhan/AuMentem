@@ -1,24 +1,70 @@
+import { BASE_URL } from '@/constants/api';
 import React, { useState } from 'react';
 import { 
   View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, SafeAreaView 
+  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator
 } from 'react-native';
-import { Mail, Lock, Sparkles, ArrowRight } from 'lucide-react-native';
+import { User, Lock, Sparkles, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-// Імпортуємо нашу дизайн-систему
+import * as SecureStore from 'expo-secure-store'; 
+
 import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false); // Потім підключимо глобально
+  const [isDark, setIsDark] = useState(false); 
   
+ const [nickname, setNickname] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
 
-  const handleLogin = () => {
-    // Переходимо на головний екран, стираючи екран логіна з історії
-    router.replace('/(main)/home'); 
+  const handleLogin = async () => {
+    if (!nickname || !password) {
+      setErrorMessage('Введіть нікнейм та пароль');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const formBody = new URLSearchParams();
+      formBody.append('username', nickname); 
+      formBody.append('password', password);
+
+      const response = await fetch(`${BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formBody.toString(),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const detail = errorData.detail || 'Неправильний нікнейм або пароль';
+        setErrorMessage(typeof detail === 'string' ? detail : 'Помилка авторизації');
+        return;
+      }
+
+      const data = await response.json();
+      
+      await SecureStore.setItemAsync('userToken', data.access_token);
+      console.log("Успішний вхід! Токен збережено.");
+
+      router.replace('/(main)/home'); 
+
+    } catch (error) {
+      console.error("Помилка мережі:", error);
+      setErrorMessage('Не вдалося з\'єднатися з сервером. Перевірте підключення.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -29,7 +75,6 @@ export default function AuthScreen() {
       >
         <View style={s.content}>
           
-          {/* ── HEADER (Згідно ТЗ: pt-12) ── */}
           <View style={s.header}>
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
@@ -40,16 +85,18 @@ export default function AuthScreen() {
             </Text>
           </View>
 
-          {/* ── FORM CARD (p-5, rounded-3xl, shadow-soft) ── */}
           <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
             <View style={s.inputGroup}>
-              <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-                <Mail color={c.textMuted} size={20} />
+              
+         <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
+                <User color={c.textMuted} size={20} /> 
                 <TextInput
                   style={[s.input, { color: c.text }]}
-                  placeholder="Твій email"
+                  placeholder="Твій нікнейм"
                   placeholderTextColor={c.textMuted}
                   autoCapitalize="none"
+                  value={nickname} 
+                  onChangeText={setNickname}
                 />
               </View>
 
@@ -60,27 +107,40 @@ export default function AuthScreen() {
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
                   secureTextEntry
+                  value={password}
+                  onChangeText={setPassword}
                 />
               </View>
             </View>
+
+            {errorMessage ? (
+              <Text style={s.errorText}>{errorMessage}</Text>
+            ) : null}
 
             <Pressable style={s.forgotBtn}>
               <Text style={[s.forgotText, { color: c.accent }]}>Забули пароль?</Text>
             </Pressable>
           </View>
 
-          {/* ── ACTIONS (rounded-full, gap-4) ── */}
           <View style={s.footer}>
             <Pressable 
               style={({ pressed }) => [
                 s.primaryBtn, 
                 { backgroundColor: c.accent },
-                pressed && s.btnPressed
+                pressed && s.btnPressed,
+                isLoading && { opacity: 0.7 }
               ]}
               onPress={handleLogin}
+              disabled={isLoading}
             >
-              <Text style={s.primaryBtnText}>Увійти</Text>
-              <ArrowRight color="#FFF" size={20} strokeWidth={3} />
+              {isLoading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Text style={s.primaryBtnText}>Увійти</Text>
+                  <ArrowRight color="#FFF" size={20} strokeWidth={3} />
+                </>
+              )}
             </Pressable>
 
             <Pressable 
@@ -103,16 +163,16 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 24, // px-6
+    paddingHorizontal: 24, 
     justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginBottom: 40, // mb-8 (32px + запас)
+    marginBottom: 40, 
   },
   iconGlow: {
     padding: 16,
-    borderRadius: Radii.lg, // rounded-3xl
+    borderRadius: Radii.lg, 
     marginBottom: 20,
   },
   mainTitle: {
@@ -124,8 +184,8 @@ const s = StyleSheet.create({
     textAlign: 'center',
   },
   card: {
-    borderRadius: Radii.lg, // 24px
-    padding: 20, // p-5
+    borderRadius: Radii.lg, 
+    padding: 20, 
     borderWidth: 1,
     marginBottom: 32,
   },
@@ -133,7 +193,7 @@ const s = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radii.md, // 16px
+    borderRadius: Radii.md, 
     paddingHorizontal: 16,
     height: 56,
     gap: 12,
@@ -141,6 +201,13 @@ const s = StyleSheet.create({
   input: {
     flex: 1,
     ...Typography.body,
+  },
+  errorText: {
+    color: '#FF3B30', 
+    marginTop: 12,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
   },
   forgotBtn: {
     alignSelf: 'flex-end',

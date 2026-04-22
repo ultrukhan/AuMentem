@@ -1,23 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, Text, Pressable, StyleSheet, ImageBackground, 
-  SafeAreaView, Platform 
+  SafeAreaView, Platform, ActivityIndicator 
 } from 'react-native';
 import { 
   User, Settings, Moon, Sun, 
   Sparkles, Map, MessageCircleHeart 
 } from 'lucide-react-native';
-import BottomNav from '@/components/BottomNav'; // Наше літаюче меню
+import BottomNav from '@/components/BottomNav'; 
 import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router'; 
+import * as SecureStore from 'expo-secure-store';
+import { BASE_URL } from '@/constants/api'; 
 
 export default function HomeScreen() {
   const [isDark, setIsDark] = useState(false);
   const router = useRouter();
-  // Витягуємо кольори та тіні з нашої дизайн-системи
+  
+  // Стан для збереження даних користувача
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUser = async () => {
+        try {
+          const token = await SecureStore.getItemAsync('userToken');
+          
+          if (!token) {
+            router.replace('/');
+            return;
+          }
+
+          const response = await fetch(`${BASE_URL}/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserProfile(data); 
+          } else {
+            await SecureStore.deleteItemAsync('userToken');
+            router.replace('/');
+          }
+        } catch (error) {
+          console.error("Помилка завантаження профілю:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchUser();
+
+      return () => {}; 
+    }, [])
+  );
 
   return (
     <ImageBackground 
@@ -25,22 +68,30 @@ export default function HomeScreen() {
       style={s.container}
       resizeMode="cover"
     >
-      {/* Напівпрозорий оверлей поверх картинки */}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
 
       <SafeAreaView style={s.safe}>
         <View style={s.content}>
           
-          {/* ── HEADER ── */}
           <View style={s.header}>
-            <Pressable style={({ pressed }) => [
-              s.iconBtn, 
-              { backgroundColor: c.card, borderColor: c.border }, 
-              sh.soft,
-              pressed && s.pressed
-            ]}>
-              <User color={c.text} size={24} strokeWidth={2} />
-            </Pressable>
+            
+            <View style={s.userInfo}>
+              <View style={[s.avatarPlaceholder, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+                <User color={c.text} size={24} strokeWidth={2} />
+              </View>
+              <View>
+                <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>
+                  З поверненням,
+                </Text>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={c.accent} style={{ alignSelf: 'flex-start' }} />
+                ) : (
+                  <Text style={[Typography.titleMd, { color: c.text }]}>
+                    {userProfile?.nickname || 'Мандрівник'}
+                  </Text>
+                )}
+              </View>
+            </View>
 
             <View style={s.headerRight}>
               <Pressable 
@@ -59,7 +110,9 @@ export default function HomeScreen() {
                 )}
               </Pressable>
 
-              <Pressable style={({ pressed }) => [
+              <Pressable 
+                onPress={() => router.push('/profile')} 
+                style={({ pressed }) => [
                 s.iconBtn, 
                 { backgroundColor: c.card, borderColor: c.border }, 
                 sh.soft,
@@ -70,25 +123,12 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* ── КАРТКИ (Головне меню) ── */}
           <View style={s.grid}>
             
-            {/* Ряд 1: Квести та Геоквести */}
-            {/* <View style={s.row}>
-              <Pressable style={({ pressed }) => [
-                s.halfCard, 
-                { backgroundColor: c.card, borderColor: c.border }, 
-                sh.soft,
-                pressed && s.pressed
-              ]}>
-                <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
-                  <Sparkles color={c.iconColor} size={32} strokeWidth={2} />
-                </View>
-                <Text style={[Typography.titleMd, { color: c.text }]}>Квести</Text>
-              </Pressable> */}
-          <View style={s.row}>
+            <View style={s.row}>
               <Pressable 
-onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dark' : 'light' } })}                style={({ pressed }) => [
+                onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dark' : 'light' } })}                
+                style={({ pressed }) => [
                   s.halfCard, 
                   { backgroundColor: c.card, borderColor: c.border }, 
                   sh.soft,
@@ -99,18 +139,7 @@ onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dar
                 </View>
                 <Text style={[Typography.titleMd, { color: c.text }]}>Квести</Text>
               </Pressable>
-{/* 
-              <Pressable style={({ pressed }) => [
-                s.halfCard, 
-                { backgroundColor: c.card, borderColor: c.border }, 
-                sh.soft,
-                pressed && s.pressed
-              ]}>
-                <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
-                  <Map color={c.iconColor} size={32} strokeWidth={2} />
-                </View>
-                <Text style={[Typography.titleMd, { color: c.text }]}>Геоквести</Text>
-              </Pressable> */}
+
               <Pressable 
                 onPress={() => router.push({ pathname: '/geoquests', params: { theme: isDark ? 'dark' : 'light' } })}
                 style={({ pressed }) => [
@@ -124,10 +153,8 @@ onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dar
                 </View>
                 <Text style={[Typography.titleMd, { color: c.text }]}>Геоквести</Text>
               </Pressable>
-            
             </View>
 
-            {/* Ряд 2: Анонімна стрічка */}
             <Pressable style={({ pressed }) => [
               s.fullCard, 
               { backgroundColor: c.card, borderColor: c.border }, 
@@ -152,7 +179,6 @@ onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dar
         </View>
       </SafeAreaView>
 
-      {/* Підключаємо наше готове нижнє меню */}
       <BottomNav />
 
     </ImageBackground>
@@ -163,7 +189,6 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   safe: { 
     flex: 1, 
-    // На Android SafeAreaView іноді не дає відступ зверху, тому додаємо його вручну
     paddingTop: Platform.OS === 'android' ? 40 : 0 
   },
   content: { 
@@ -174,7 +199,18 @@ const s = StyleSheet.create({
   header: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
+    alignItems: 'center', 
     marginBottom: 32 
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatarPlaceholder: {
+    padding: 12,
+    borderRadius: Radii.full, 
+    borderWidth: 1,
   },
   headerRight: { 
     flexDirection: 'row', 
@@ -185,13 +221,8 @@ const s = StyleSheet.create({
     borderRadius: Radii.md, 
     borderWidth: 1 
   },
-  grid: { 
-    gap: 16 
-  },
-  row: { 
-    flexDirection: 'row', 
-    gap: 16 
-  },
+  grid: { gap: 16 },
+  row: { flexDirection: 'row', gap: 16 },
   halfCard: { 
     flex: 1, 
     borderRadius: Radii.lg, 
