@@ -4,19 +4,51 @@ from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
 from backend.database import get_db
 from backend.models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from backend.schemas import UserGeoQuestResponse
+from backend.schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
 from backend.auth_utils import get_current_user
 from backend.enums import QuestStatus
 import uuid
 import os
 import shutil
+from typing import List
+import time
+import cloudinary
+import cloudinary.utils
+from backend.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 router = APIRouter(
     prefix="/geo-quests",
     tags=["Geo Quests"]
 )
 
+cloudinary.config(
+  cloud_name = CLOUDINARY_CLOUD_NAME,
+  api_key = CLOUDINARY_API_KEY,
+  api_secret = CLOUDINARY_API_SECRET
+)
 
+
+@router.get("/generate-upload-signature")
+async def get_upload_signature(user: DBAppUser = Depends(get_current_user)):
+    """Генеруємо підпис для фронтенда"""
+    timestamp = int(time.time())
+    params_to_sign = {
+        "timestamp": timestamp,
+        "folder": "geo_proofs"
+    }
+
+    signature = cloudinary.utils.api_sign_request(
+        params_to_sign,
+        cloudinary.config().api_secret
+    )
+
+    return {
+        "timestamp": timestamp,
+        "signature": signature,
+        "api_key": cloudinary.config().api_key,
+        "cloud_name": cloudinary.config().cloud_name,
+        "folder": "geo_proofs"
+    }
 @router.post("/{geo_quest_id}/start", response_model=UserGeoQuestResponse)
 async def start_geo_quest(
         geo_quest_id: uuid.UUID,
@@ -75,9 +107,7 @@ async def start_geo_quest(
 @router.patch("/my-quests/{user_geo_quest_id}/complete", response_model=UserGeoQuestResponse)
 async def complete_quest(
         user_geo_quest_id: uuid.UUID,
-        lat: float = Form(...),
-        lng: float = Form(...),
-        photo: UploadFile = File(...),
+        payload: QuestCompleteRequest,
         user: DBAppUser = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
@@ -86,8 +116,7 @@ async def complete_quest(
     Перевіряє радіус 10 метрів за переданими координатами і зберігає доказ.
     """
     user_quest = db.query(DBUserGeoQuest).options(
-        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place),
-        joinedload(DBUserGeoQuest.user)
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
     ).filter(
         DBUserGeoQuest.id == user_geo_quest_id,
         DBUserGeoQuest.user_id == user.id,
@@ -97,28 +126,18 @@ async def complete_quest(
     if not user_quest:
         raise HTTPException(status_code=404, detail="Ваш активний квест не знайдено")
 
-    user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
+    user_point = WKTElement(f'POINT({payload.lng} {payload.lat})', srid=4326)
     target_coordinates = user_quest.geo_quest.place.coordinates
-
     distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
 
     if distance > 10.0:
         raise HTTPException(
             status_code=400,
-            detail=f"Ви занадто далеко від цілі! Відстань: {distance:.1f} м. Підійдіть ближче."
+            detail=f"Ви занадто далеко! Відстань: {distance:.1f} м."
         )
 
-    os.makedirs("uploads/geo_proofs", exist_ok=True)
-    file_extension = photo.filename.split(".")[-1]
-    file_name = f"{uuid.uuid4()}.{file_extension}"
-    file_path = f"uploads/geo_proofs/{file_name}"
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(photo.file, buffer)
-
     current_time = get_utc_now()
-
-    user_quest.photo_proof_url = f"/{file_path}"
+    user_quest.photo_proof_url = payload.photo_url
     user_quest.status = QuestStatus.COMPLETED
     user_quest.completed_at = current_time
     user_quest.is_verified = True
@@ -128,3 +147,34 @@ async def complete_quest(
     db.refresh(user_quest)
 
     return user_quest
+
+@router.get("/nearest", response_model=List[NearestGeoQuestResponse])
+async def get_nearest_geo_quests(
+        lat: float,
+        lng: float,
+        limit: int = 5,
+        db: Session = Depends(get_db),
+        user: DBAppUser = Depends(get_current_user)
+):
+    """
+    Повертає список найближчих гео-квестів відносно переданих координат юзера.
+    """
+    user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
+
+    results = db.query(
+        DBGeoQuest,
+        func.ST_Distance(DBPlace.coordinates, user_point).label('distance')
+    ).join(
+        DBPlace, DBGeoQuest.place_id == DBPlace.id
+    ).order_by(
+        func.ST_Distance(DBPlace.coordinates, user_point)
+    ).limit(limit).all()
+
+    response = []
+    for quest, distance in results:
+        response.append({
+            "geo_quest": quest,
+            "distance_meters": round(distance, 2)
+        })
+
+    return response

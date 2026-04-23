@@ -115,6 +115,16 @@ class UserGeoQuestResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+class NearestGeoQuestResponse(BaseModel):
+    geo_quest: GeoQuest
+    distance_meters: float
+
+    model_config = {"from_attributes": True}
+
+class QuestCompleteRequest(BaseModel):
+    lat: float
+    lng: float
+    photo_url: str
 
 class MiniQuest(BaseModel):
     id: UUID
