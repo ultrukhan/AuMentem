@@ -23,10 +23,18 @@ async def create_post(post:CreatePost, user: DBAppUser = Depends(get_current_use
         is_anonymous=post.is_anonymous,
     )
 
-    db.add(post)
+    db.add(newpost)
     db.commit()
-    db.refresh(post)
-    return post
+    db.refresh(newpost)
+
+    if newpost.is_anonymous:
+        newpost.user = None
+        if newpost.user_mini_quest:
+            newpost.user_mini_quest.user = None
+        if newpost.user_geo_quest:
+            newpost.user_geo_quest.user = None
+
+    return newpost
 
 @router.get("/", response_model=List[PostResponse])
 async def get_posts(user: DBAppUser = Depends(get_current_user),db: Session = Depends(get_db)):
@@ -38,6 +46,10 @@ async def get_posts(user: DBAppUser = Depends(get_current_user),db: Session = De
     for post in posts:
         if post.is_anonymous:
             post.user = None
+            if post.user_mini_quest:
+                post.user_mini_quest.user = None
+            if post.user_geo_quest:
+                post.user_geo_quest.user = None
 
     return posts
 

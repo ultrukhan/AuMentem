@@ -12,7 +12,7 @@ router = APIRouter(
     tags=["tracker"]
 )
 
-@router.post("/state", response_model=OnlyMessageResponse)
+@router.post("/state", response_model=StateLogResponse)
 async def save_state(state: StateLogCreate,
                          user: DBAppUser = Depends(get_current_user),
                          db: Session = Depends(get_db)
@@ -21,7 +21,7 @@ async def save_state(state: StateLogCreate,
     Ендпоінт для запису стану.
     """
     new_state = DBStateLog(user_id = user.id,
-                               state = state.state)
+                            state = state.state)
     db.add(new_state)
 
     try:
