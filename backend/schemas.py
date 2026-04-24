@@ -18,8 +18,6 @@ class AppUserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=50)
 
-    hobby_ids: List[int] = []
-
     @field_validator('email')
     @classmethod
     def email_to_lower(cls, value: str):
@@ -39,6 +37,8 @@ class AppUserCreate(BaseModel):
 
         return value
 
+class UserHobbiesUpdate(BaseModel):
+    hobby_ids: List[int]
 
 class AppUserResponse(BaseModel):
     id: UUID

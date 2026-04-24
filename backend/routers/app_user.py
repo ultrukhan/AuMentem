@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from backend.database import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from backend.models import DBAppUser
+from backend.models import DBAppUser,DBHobby
 from backend.auth_utils import get_current_user
-from backend.schemas import AppUserUpdate, AppUserResponse
+from backend.schemas import AppUserUpdate, AppUserResponse, UserHobbiesUpdate
 
 router = APIRouter(
     prefix="/app_user",
@@ -28,8 +28,28 @@ async def update_nick(update_data:AppUserUpdate, user: DBAppUser = Depends(get_c
         db.commit()
         db.refresh(user)
     except IntegrityError:
+        db.rollback()
         raise HTTPException(status_code=400, detail = "Цей нікнейм вже зайнятий іншим користувачем!")
 
     return user
 
+@router.put("/upd_hobbies",response_model = AppUserResponse)
+async def set_hobbies(hobbies: UserHobbiesUpdate, user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+            Оновлює список хоббі для поточного авторизованого користувача
+    """
+    if not hobbies.hobby_ids:
+        user.hobbies = []
+    else:
+        selected_hobbies = db.query(DBHobby).filter(DBHobby.id.in_(hobbies.hobby_ids)).all()
+
+        if len(selected_hobbies) != len(hobbies.hobby_ids):
+            raise HTTPException(status_code =400, detail = "Одне або кілька вибраних хоббі не існують")
+
+        user.hobbies = selected_hobbies
+
+    db.commit()
+    db.refresh(user)
+
+    return user
 
