@@ -3,6 +3,7 @@ import enum
 class QuestStatus(str, enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
+    AVAILABLE = "AVAILABLE"
 
 class MoodState(str, enum.Enum):
     CRITICAL = "CRITICAL"
@@ -15,3 +16,7 @@ class ReactionType(str, enum.Enum):
     PROUD = "PROUD"
     HEART = "HEART"
 
+class QuestEvaluation(str, enum.Enum):
+    BETTER = "BETTER"
+    WORSE = "WORSE"
+    SAME = "SAME"

@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum
 from backend.enums import *
+from geoalchemy2 import Geography
 
 def get_utc_now():
     return datetime.now(timezone.utc)
@@ -50,13 +51,13 @@ class DBPost(Base):
 
     id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
     user_id = Column(Uuid, ForeignKey("app_user.id"), nullable=False)
-    #user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
-    #user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
+    user_mini_quest_id = Column(Uuid, ForeignKey("user_mini_quest.id"), nullable=True)
+    user_geo_quest_id = Column(Uuid, ForeignKey("user_geo_quest.id"), nullable=True)
     is_anonymous = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     user = relationship("DBAppUser", backref="posts")
-    #user_mini_quest = relationship("DBUserMiniQuest", backref="posts")
-    #user_geo_quest = relationship("DBUserGeoQuest", backref="posts")
+    user_mini_quest = relationship("DBUserMiniQuest", backref="posts")
+    user_geo_quest = relationship("DBUserGeoQuest", backref="posts")
     reactions = relationship("DBPostReaction", backref="post", cascade="all, delete-orphan")
 
 class DBPostReaction(Base):
@@ -88,3 +89,61 @@ class DBTimeCapsule(Base):
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
 
     user = relationship("DBAppUser", backref="time_capsule")
+
+
+class DBMiniQuest(Base):
+    __tablename__ = "mini_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    hobbies = relationship("DBHobby", secondary=mini_quest_hobby_table, backref="mini_quests")
+
+
+class DBUserMiniQuest(Base):
+    __tablename__ = "user_mini_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id'), nullable=False)
+    mini_quest_id = Column(Uuid, ForeignKey('mini_quest.id'), nullable=False)
+    status = Column(Enum(QuestStatus), default=QuestStatus.AVAILABLE, nullable=False)
+    evaluation = Column(Enum(QuestEvaluation), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("DBAppUser", backref="user_mini_quest")
+    mini_quest = relationship("DBMiniQuest", backref="user_mini_quest")
+
+
+class DBPlace(Base):
+    __tablename__ = "place"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    coordinates = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
+
+class DBGeoQuest(Base):
+    __tablename__ = "geo_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    title = Column(String, unique=True, nullable=False)
+    place_id = Column(Uuid, ForeignKey('place.id'), nullable=False)
+    place = relationship("DBPlace", backref="geo_quests")
+
+class DBUserGeoQuest(Base):
+    __tablename__ = "user_geo_quest"
+
+    id = Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id'), nullable=False)
+    geo_quest_id = Column(Uuid, ForeignKey('geo_quest.id'), nullable=False)
+    status = Column(Enum(QuestStatus), default=QuestStatus.AVAILABLE, nullable=False)
+    photo_proof_url = Column(String, nullable=True)
+    is_verified = Column(Boolean, default=False)
+    saved_to_album = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("DBAppUser", backref="user_geo_quests")
+    geo_quest = relationship("DBGeoQuest", backref="user_geo_quests")
