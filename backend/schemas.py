@@ -144,14 +144,8 @@ class CreatePost(BaseModel):
             raise ValueError("Один пост не може стосуватися двох квестів одночасно")
         return self
 
-
-
-
-
-
 class StateLogCreate(BaseModel):
     state: MoodState
-
 class StateLogResponse(BaseModel):
     id: UUID
     user_id: UUID
