@@ -17,11 +17,9 @@ import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
 const MOOD_OPTIONS = [
-  { id: 'EXCELLENT', label: 'Чудово', emoji: '🤩', color: '#10B981' }, 
-  { id: 'GOOD', label: 'Добре', emoji: '🙂', color: '#34D399' },      
-  { id: 'NEUTRAL', label: 'Нормально', emoji: '😐', color: '#9CA3AF' }, 
-  { id: 'BAD', label: 'Погано', emoji: '😞', color: '#F59E0B' },       
-  { id: 'CRITICAL', label: 'Дуже погано', emoji: '😭', color: '#EF4444' }, 
+  { id: 'POSITIVE', label: 'Добре', emoji: '🙂', color: '#10B981' }, 
+  { id: 'APATHY', label: 'Апатія', emoji: '😐', color: '#9CA3AF' },  
+  { id: 'CRITICAL', label: 'Дуже погано', emoji: '😭', color: '#EF4444' },
 ];
 
 export default function TrackerScreen() {
@@ -43,7 +41,6 @@ export default function TrackerScreen() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       
-      // 1. Спочатку зберігаємо стан настрою
       const response = await fetch(`${BASE_URL}/tracker/state`, {
         method: 'POST',
         headers: {
@@ -54,10 +51,8 @@ export default function TrackerScreen() {
       });
 
       if (response.ok) {
-        // ── НОВА ЛОГІКА: Якщо стан критичний або поганий ──
-        if (selectedState === 'CRITICAL' || selectedState === 'BAD') {
+        if (selectedState === 'CRITICAL' || selectedState === 'APATHY') {
           try {
-            // Шукаємо лист у капсулі часу
             const capsuleRes = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -65,29 +60,26 @@ export default function TrackerScreen() {
             if (capsuleRes.ok) {
               const capsuleData = await capsuleRes.json();
               if (capsuleData && capsuleData.message) {
-                // Якщо є лист — показуємо його!
                 Alert.alert(
                   "Лист із минулого 💌", 
                   `Ти колись залишила це повідомлення для себе:\n\n"${capsuleData.message}"\n\nТримайся, ти сильніша, ніж здається!`,
                   [{ text: 'Дякую', onPress: () => router.back() }]
                 );
-                return; // Зупиняємо виконання, щоб вікно не закрилося само
+                return; 
               }
             }
           } catch (e) {
             console.error("Не вдалося дістати капсулу", e);
           }
 
-          // Якщо капсула порожня або сталася помилка — показуємо базову підтримку
           Alert.alert(
             "Ми з тобою 🫂", 
             "Зараз може бути складно, але ти не сама. Пам'ятай, що після найтемнішої ночі завжди настає світанок. Відпочинь і бережи себе.",
             [{ text: 'Добре', onPress: () => router.back() }]
           );
-          return; // Зупиняємо виконання
+          return; 
         }
 
-        // ── СТАНДАРТНА ЛОГІКА для нормального/гарного настрою ──
         setIsSuccess(true);
         setTimeout(() => {
           router.back();
