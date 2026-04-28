@@ -1,48 +1,54 @@
-import { BASE_URL } from '@/constants/api';
-import React, { useState } from 'react';
-import { 
-  View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator 
-} from 'react-native';
-import { Mail, Lock, Sparkles, ArrowRight, User } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
-// Імпортуємо вашу дизайн-систему
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { BASE_URL } from "@/constants/api";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ActivityIndicator,
+} from "react-native";
+import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { Colors, Typography, Radii, Shadows } from "@/constants/theme";
+import * as SecureStore from "expo-secure-store";
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false); 
-  
-  const [nickname, setNickname] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [isDark, setIsDark] = useState(false);
 
-  const theme = isDark ? 'dark' : 'light';
+  const [nickname, setNickname] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const theme = isDark ? "dark" : "light";
   const c = Colors[theme];
   const sh = Shadows[theme];
 
   const handleRegister = async () => {
-    
     if (!nickname || !email || !password) {
-      setErrorMessage('Будь ласка, заповніть всі поля');
+      setErrorMessage("Будь ласка, заповніть всі поля");
       return;
     }
-    
-    if (!email.includes('@') || !email.includes('.')) {
-      setErrorMessage('Введіть коректний email (наприклад: user@mail.com)');
+
+    if (!email.includes("@") || !email.includes(".")) {
+      setErrorMessage("Введіть коректний email (наприклад: user@mail.com)");
       return;
     }
 
     if (password.length < 6) {
-      setErrorMessage('Пароль має містити щонайменше 6 символів');
+      setErrorMessage("Пароль має містити щонайменше 6 символів");
       return;
     }
 
     setIsLoading(true);
-    setErrorMessage(''); 
+    setErrorMessage("");
 
     try {
       /* ВАЖЛИВО: 
@@ -50,31 +56,35 @@ export default function RegisterScreen() {
          Для Expo Go (реальний телефон): впишіть IP-адресу комп'ютера в Wi-Fi (напр. 192.168.0.100)
       */
       const response = await fetch(`${BASE_URL}/auth/register`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           nickname: nickname,
           email: email,
           password: password,
-          hobby_ids: [] 
+          hobby_ids: [],
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        const detail = errorData.detail?.[0]?.msg || errorData.detail || 'Сталася помилка при реєстрації';
+        const detail =
+          errorData.detail?.[0]?.msg ||
+          errorData.detail ||
+          "Сталася помилка при реєстрації";
         setErrorMessage(detail);
         return;
       }
-
+      await SecureStore.setItemAsync("isFirstLogin", "true");
       console.log("Акаунт успішно створено!");
-      router.back(); 
-
+      router.back();
     } catch (error) {
       console.error("Помилка мережі:", error);
-      setErrorMessage('Не вдалося з\'єднатися з сервером. Перевірте підключення.');
+      setErrorMessage(
+        "Не вдалося з'єднатися з сервером. Перевірте підключення.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -82,12 +92,11 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={s.content}>
-          
           <View style={s.header}>
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
@@ -98,9 +107,14 @@ export default function RegisterScreen() {
             </Text>
           </View>
 
-          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+          <View
+            style={[
+              s.card,
+              { backgroundColor: c.card, borderColor: c.border },
+              sh.soft,
+            ]}
+          >
             <View style={s.inputGroup}>
-              
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
                 <TextInput
@@ -144,15 +158,15 @@ export default function RegisterScreen() {
           </View>
 
           <View style={s.footer}>
-            <Pressable 
+            <Pressable
               style={({ pressed }) => [
-                s.primaryBtn, 
+                s.primaryBtn,
                 { backgroundColor: c.accent },
                 pressed && s.btnPressed,
-                isLoading && { opacity: 0.7 }
+                isLoading && { opacity: 0.7 },
               ]}
               onPress={handleRegister}
-              disabled={isLoading} 
+              disabled={isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color="#FFF" />
@@ -164,7 +178,7 @@ export default function RegisterScreen() {
               )}
             </Pressable>
 
-            <Pressable 
+            <Pressable
               style={({ pressed }) => [s.secondaryBtn, pressed && s.btnPressed]}
               onPress={() => router.back()}
             >
@@ -173,7 +187,6 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           </View>
-
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -184,16 +197,16 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 24, 
-    justifyContent: 'center',
+    paddingHorizontal: 24,
+    justifyContent: "center",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 40,
   },
   iconGlow: {
     padding: 16,
-    borderRadius: Radii.lg, 
+    borderRadius: Radii.lg,
     marginBottom: 20,
   },
   mainTitle: {
@@ -202,19 +215,19 @@ const s = StyleSheet.create({
   },
   subtitle: {
     ...Typography.body,
-    textAlign: 'center',
+    textAlign: "center",
   },
   card: {
-    borderRadius: Radii.lg, 
-    padding: 20, 
+    borderRadius: Radii.lg,
+    padding: 20,
     borderWidth: 1,
     marginBottom: 32,
   },
   inputGroup: { gap: 12 },
   inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Radii.md, 
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: Radii.md,
     paddingHorizontal: 16,
     height: 56,
     gap: 12,
@@ -224,30 +237,30 @@ const s = StyleSheet.create({
     ...Typography.body,
   },
   errorText: {
-    color: '#FF3B30', 
+    color: "#FF3B30",
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   footer: { gap: 16 },
   primaryBtn: {
-    flexDirection: 'row',
+    flexDirection: "row",
     height: 60,
     borderRadius: Radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   primaryBtnText: {
     ...Typography.titleMd,
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 18,
   },
   secondaryBtn: {
     height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryBtnText: {
     ...Typography.body,

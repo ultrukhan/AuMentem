@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator 
+  KeyboardAvoidingView, Platform, ActivityIndicator 
 } from 'react-native';
-import { User, ArrowLeft, Check, AlertCircle } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context'; 
+import { User, ArrowLeft, Check, AlertCircle, Sparkles } from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router'; 
 import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
+import HobbiesModal from '@/components/HobbiesModal';
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  
+  const { theme: themeParam } = useLocalSearchParams();
+  const isDark = themeParam === 'dark'; 
   
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(true); 
   const [isSaving, setIsSaving] = useState(false); 
   const [message, setMessage] = useState({ text: '', type: '' }); 
+  
+  const [showHobbiesModal, setShowHobbiesModal] = useState(false);
 
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
@@ -81,7 +88,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
+    <SafeAreaView style={[s.container, { backgroundColor: c.background }]} edges={['top']}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -103,8 +110,9 @@ export default function ProfileScreen() {
             <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 50 }} />
           ) : (
             <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
-              <Text style={[Typography.body, { color: c.textMuted, marginBottom: 8, marginLeft: 4 }]}>
-                Змінити нікнейм
+              
+              <Text style={[Typography.titleMd, { color: c.text, marginBottom: 12 }]}>
+                Особисті дані
               </Text>
               
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
@@ -114,7 +122,10 @@ export default function ProfileScreen() {
                   placeholder="Введіть новий нікнейм"
                   placeholderTextColor={c.textMuted}
                   value={nickname}
-                  onChangeText={setNickname}
+                  onChangeText={(text) => {
+                    setNickname(text);
+                    if (message.text) setMessage({ text: '', type: '' });
+                  }}
                 />
               </View>
 
@@ -134,7 +145,7 @@ export default function ProfileScreen() {
               <Pressable 
                 style={({ pressed }) => [
                   s.primaryBtn, 
-                  { backgroundColor: c.accent, marginTop: 24 },
+                  { backgroundColor: c.accent, marginTop: 16 },
                   pressed && s.pressed,
                   isSaving && { opacity: 0.7 }
                 ]}
@@ -144,12 +155,44 @@ export default function ProfileScreen() {
                 {isSaving ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={s.primaryBtnText}>Зберегти зміни</Text>
+                  <Text style={s.primaryBtnText}>Оновити нікнейм</Text>
                 )}
               </Pressable>
+
+              <View style={[s.divider, { backgroundColor: c.border }]} />
+
+              <Text style={[Typography.titleMd, { color: c.text, marginBottom: 12 }]}>
+                Вподобання
+              </Text>
+
+              <Pressable 
+                onPress={() => setShowHobbiesModal(true)}
+                style={({ pressed }) => [
+                  s.inputWrapper, 
+                  { backgroundColor: c.background, justifyContent: 'space-between' },
+                  pressed && s.pressed
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Sparkles color={c.textMuted} size={20} />
+                  <Text style={[Typography.body, { color: c.text }]}>
+                    Твої інтереси
+                  </Text>
+                </View>
+                <Text style={{ color: c.accent, fontWeight: '600', fontSize: 14 }}>Змінити</Text>
+              </Pressable>
+
             </View>
           )}
         </View>
+
+        <HobbiesModal 
+          visible={showHobbiesModal} 
+          isDark={isDark} 
+          onSuccess={() => setShowHobbiesModal(false)}
+          onClose={() => setShowHobbiesModal(false)} 
+        />
+        
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -161,7 +204,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 40 : 10,
+    paddingTop: 10,
     paddingBottom: 20,
   },
   backBtn: {
@@ -176,6 +219,11 @@ const s = StyleSheet.create({
     borderRadius: Radii.lg, 
     padding: 20, 
     borderWidth: 1,
+  },
+  divider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 24,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -194,7 +242,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     padding: 12,
     borderRadius: Radii.md,
-    marginTop: 16,
+    marginTop: 12,
     gap: 8,
   },
   messageText: {
@@ -204,7 +252,7 @@ const s = StyleSheet.create({
     flex: 1,
   },
   primaryBtn: {
-    height: 56,
+    height: 50,
     borderRadius: Radii.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -212,7 +260,7 @@ const s = StyleSheet.create({
   primaryBtnText: {
     ...Typography.titleMd,
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 15,
   },
   pressed: {
     opacity: 0.85,

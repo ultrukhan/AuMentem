@@ -43,17 +43,32 @@ export const Radii = {
   md: 16,    // rounded-2xl (інпути, іконки)
   lg: 24,    // rounded-3xl (картки)
   full: 999, // rounded-full (кнопки CTA)
+  xl: 24
 };
 
 export const Shadows = {
   light: {
     soft: { shadowColor: '#D4AF37', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
     glow: { shadowColor: '#FACC15', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 },
-    nav:  { shadowColor: '#D4AF37', shadowOffset: { width: 0, height: -12 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 10 },
+    nav: { shadowColor: '#D4AF37', shadowOffset: { width: 0, height: -12 }, shadowOpacity: 0.15, shadowRadius: 30, elevation: 10 },
+    hard: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 }, // Тінь падає вгору
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 10,
+    }
   },
   dark: {
     soft: { shadowColor: '#000000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.6, shadowRadius: 24, elevation: 12 },
     glow: { shadowColor: '#2563EB', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 5 },
-    nav:  { shadowColor: '#000000', shadowOffset: { width: 0, height: -12 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 15 },
+    nav: { shadowColor: '#000000', shadowOffset: { width: 0, height: -12 }, shadowOpacity: 0.8, shadowRadius: 30, elevation: 15 },
+    hard: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.3, // Трохи інтенсивніша для темного фону
+      shadowRadius: 12,
+      elevation: 10,
+    }
   },
 };

@@ -1,29 +1,38 @@
 import React, { useState, useCallback } from 'react';
 import { 
   View, Text, Pressable, StyleSheet, ImageBackground, 
-  SafeAreaView, Platform, ActivityIndicator 
+  Platform, ActivityIndicator 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   User, Settings, Moon, Sun, 
-  Sparkles, Map, MessageCircleHeart 
+  Sparkles, Map, MessageCircleHeart, Clock, Activity, LogOut 
 } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav'; 
 import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
 import { useRouter, useFocusEffect } from 'expo-router'; 
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api'; 
+import HobbiesModal from '@/components/HobbiesModal';
 
 export default function HomeScreen() {
   const [isDark, setIsDark] = useState(false);
   const router = useRouter();
   
-  // Стан для збереження даних користувача
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  const [showHobbies, setShowHobbies] = useState(false);
+  
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
+
+  const handleLogout = async () => {
+    await SecureStore.deleteItemAsync('userToken');
+    await SecureStore.deleteItemAsync('has_hobbies');
+    await SecureStore.deleteItemAsync('user_saved_hobbies');
+    router.replace('/');
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -37,16 +46,24 @@ export default function HomeScreen() {
           }
 
           const response = await fetch(`${BASE_URL}/auth/me`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
+            headers: { 'Authorization': `Bearer ${token}` }
           });
 
           if (response.ok) {
             const data = await response.json();
             setUserProfile(data); 
+
+            const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+            
+            if (isFirstLogin === 'true') {
+              setShowHobbies(true);
+              await SecureStore.deleteItemAsync('isFirstLogin');
+            }
+
           } else {
             await SecureStore.deleteItemAsync('userToken');
+            await SecureStore.deleteItemAsync('has_hobbies');
+            await SecureStore.deleteItemAsync('user_saved_hobbies');
             router.replace('/');
           }
         } catch (error) {
@@ -70,11 +87,10 @@ export default function HomeScreen() {
     >
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
 
-      <SafeAreaView style={s.safe}>
+      <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.content}>
           
           <View style={s.header}>
-            
             <View style={s.userInfo}>
               <View style={[s.avatarPlaceholder, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
                 <User color={c.text} size={24} strokeWidth={2} />
@@ -97,28 +113,35 @@ export default function HomeScreen() {
               <Pressable 
                 onPress={() => setIsDark(!isDark)} 
                 style={({ pressed }) => [
-                  s.iconBtn, 
-                  { backgroundColor: c.card, borderColor: c.border }, 
-                  sh.soft,
-                  pressed && s.pressed
+                  s.iconBtn, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
                 ]}
               >
-                {isDark ? (
-                  <Sun color={c.text} size={24} strokeWidth={2} />
-                ) : (
-                  <Moon color={c.text} size={24} strokeWidth={2} />
-                )}
+                {isDark ? <Sun color={c.text} size={20} strokeWidth={2} /> : <Moon color={c.text} size={20} strokeWidth={2} />}
               </Pressable>
 
               <Pressable 
-                onPress={() => router.push('/profile')} 
+                onPress={() => router.push({ pathname: '/tracker', params: { theme: isDark ? 'dark' : 'light' } })}
                 style={({ pressed }) => [
-                s.iconBtn, 
-                { backgroundColor: c.card, borderColor: c.border }, 
-                sh.soft,
-                pressed && s.pressed
+                  s.iconBtn, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
+                ]}
+              >
+                <Activity color={c.text} size={20} strokeWidth={2} />
+              </Pressable>
+
+              <Pressable 
+               onPress={() => router.push({ pathname: '/profile', params: { theme: isDark ? 'dark' : 'light' } })}
+                style={({ pressed }) => [
+                s.iconBtn, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
               ]}>
-                <Settings color={c.text} size={24} strokeWidth={2} />
+                <Settings color={c.text} size={20} strokeWidth={2} />
+              </Pressable>
+
+              <Pressable 
+               onPress={handleLogout}
+                style={({ pressed }) => [
+                s.iconBtn, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
+              ]}>
+                <LogOut color="#EF4444" size={20} strokeWidth={2} />
               </Pressable>
             </View>
           </View>
@@ -129,10 +152,7 @@ export default function HomeScreen() {
               <Pressable 
                 onPress={() => router.push({ pathname: '/quests', params: { theme: isDark ? 'dark' : 'light' } })}                
                 style={({ pressed }) => [
-                  s.halfCard, 
-                  { backgroundColor: c.card, borderColor: c.border }, 
-                  sh.soft,
-                  pressed && s.pressed
+                  s.halfCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
               ]}>
                 <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
                   <Sparkles color={c.iconColor} size={32} strokeWidth={2} />
@@ -143,10 +163,7 @@ export default function HomeScreen() {
               <Pressable 
                 onPress={() => router.push({ pathname: '/geoquests', params: { theme: isDark ? 'dark' : 'light' } })}
                 style={({ pressed }) => [
-                s.halfCard, 
-                { backgroundColor: c.card, borderColor: c.border }, 
-                sh.soft,
-                pressed && s.pressed
+                s.halfCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
               ]}>
                 <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
                   <Map color={c.iconColor} size={32} strokeWidth={2} />
@@ -155,12 +172,12 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={({ pressed }) => [
-              s.fullCard, 
-              { backgroundColor: c.card, borderColor: c.border }, 
-              sh.soft,
-              pressed && s.pressed
-            ]}>
+            <Pressable 
+              onPress={() => router.push({ pathname: '/feed', params: { theme: isDark ? 'dark' : 'light' } })}
+              style={({ pressed }) => [
+                s.fullCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
+              ]}
+            >
               <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, sh.glow]}>
                 <MessageCircleHeart color={c.iconColor} size={28} strokeWidth={2} />
               </View>
@@ -174,85 +191,56 @@ export default function HomeScreen() {
               </View>
             </Pressable>
 
+            <Pressable 
+              onPress={() => router.push({ pathname: '/time-capsule', params: { theme: isDark ? 'dark' : 'light' } })}
+              style={({ pressed }) => [
+                s.fullCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft, pressed && s.pressed
+              ]}
+            >
+              <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, sh.glow]}>
+                <Clock color={c.iconColor} size={28} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[Typography.titleLg, { color: c.text, marginBottom: 4 }]}>
+                  Капсула часу
+                </Text>
+                <Text style={[Typography.muted, { color: c.textMuted }]}>
+                  Напиши собі в майбутнє
+                </Text>
+              </View>
+            </Pressable>
+
           </View>
 
         </View>
       </SafeAreaView>
 
       <BottomNav />
-
+      
+      <HobbiesModal 
+        visible={showHobbies} 
+        isDark={isDark}
+        onSuccess={() => setShowHobbies(false)} 
+        onClose={() => setShowHobbies(false)} 
+      />
     </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  safe: { 
-    flex: 1, 
-    paddingTop: Platform.OS === 'android' ? 40 : 0 
-  },
-  content: { 
-    flex: 1, 
-    paddingHorizontal: 24, 
-    paddingTop: 12 
-  },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 32 
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatarPlaceholder: {
-    padding: 12,
-    borderRadius: Radii.full, 
-    borderWidth: 1,
-  },
-  headerRight: { 
-    flexDirection: 'row', 
-    gap: 12 
-  },
-  iconBtn: { 
-    padding: 12, 
-    borderRadius: Radii.md, 
-    borderWidth: 1 
-  },
+  safe: { flex: 1 },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 12 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 },
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatarPlaceholder: { padding: 12, borderRadius: Radii.full, borderWidth: 1 },
+  headerRight: { flexDirection: 'row', gap: 8 },
+  iconBtn: { padding: 10, borderRadius: Radii.md, borderWidth: 1 },
   grid: { gap: 16 },
   row: { flexDirection: 'row', gap: 16 },
-  halfCard: { 
-    flex: 1, 
-    borderRadius: Radii.lg, 
-    padding: 20, 
-    alignItems: 'center', 
-    borderWidth: 1 
-  },
-  fullCard: { 
-    borderRadius: Radii.lg, 
-    padding: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    borderWidth: 1 
-  },
-  iconBox: { 
-    padding: 12, 
-    borderRadius: Radii.md, 
-    marginBottom: 12, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  iconBoxRow: { 
-    padding: 16, 
-    borderRadius: Radii.md, 
-    marginRight: 16, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  pressed: { 
-    opacity: 0.85, 
-    transform: [{ scale: 0.97 }] 
-  }
+  halfCard: { flex: 1, borderRadius: Radii.lg, padding: 20, alignItems: 'center', borderWidth: 1 },
+  fullCard: { borderRadius: Radii.lg, padding: 20, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
+  iconBox: { padding: 12, borderRadius: Radii.md, marginBottom: 12, alignItems: 'center', justifyContent: 'center' },
+  iconBoxRow: { padding: 16, borderRadius: Radii.md, marginRight: 16, alignItems: 'center', justifyContent: 'center' },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] }
 });
