@@ -30,10 +30,6 @@ async def create_app_user(app_user: AppUserCreate, background_tasks: BackgroundT
         verification_code = token
     )
 
-    if app_user.hobby_ids:
-        selected_hobbies = db.query(DBHobby).filter(DBHobby.id.in_(app_user.hobby_ids)).all()
-        user.hobbies = selected_hobbies
-
     db.add(user)
     try:
         db.commit()
@@ -79,7 +75,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get('/me', response_model=AppUserResponse)
-async def verify(curr_user: DBAppUser = Depends(get_current_user)):
+async def token_verify(curr_user: DBAppUser = Depends(get_current_user)):
     """
     Ендпоінт для автоматичного входу при старті додатка.
     Перевіряє токен і одразу віддає профіль гравця.
