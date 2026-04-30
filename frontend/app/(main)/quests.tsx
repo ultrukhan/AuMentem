@@ -14,38 +14,47 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { 
-  ArrowLeft, 
-  User, 
-  Settings, 
-  Activity, 
-  Footprints, 
-  Palette,
-  CheckCircle2,
-  Sparkles,
-  Star,
-  Check,
-  Share,
-  Ghost
+  ArrowLeft, User, Settings, Activity, Footprints, Palette,
+  CheckCircle2, Sparkles, Star, Check, Share, Ghost
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api';
 
-interface MiniQuest {
-  id: string;
-  status: 'AVAILABLE' | 'IN_PROGRESS' | 'COMPLETED';
-  evaluation: string | null;
-  mini_quest: {
-    id: string;
-    title: string;
-  };
-}
+import { Colors, Typography, Radii, Spacing, IconSizes } from '@/constants/theme';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+import ConfettiCannon from 'react-native-confetti-cannon';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Залишаємо цю важку пружну картку ТІЛЬКИ для хедера
+const AnimatedCard = ({ onPress, disabled, style, children }: any) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  return (
+    <AnimatedPressable
+      disabled={disabled}
+      onPressIn={() => { if (!disabled) scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }) }}
+      onPressOut={() => scale.value = withSpring(1, { damping: 15, stiffness: 200 })}
+      onPress={onPress}
+      style={[style, animatedStyle]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
 
 export default function QuestsScreen() {
   const router = useRouter();
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
+  
+  const c = Colors[isDark ? 'dark' : 'light'];
 
-  const [quests, setQuests] = useState<MiniQuest[]>([]);
+  const [quests, setQuests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -54,21 +63,22 @@ export default function QuestsScreen() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
-  const colors = {
-    overlay: isDark ? 'rgba(15, 20, 30, 0.75)' : 'rgba(0, 0, 0, 0.2)', 
-    cardBg: isDark ? 'rgba(26, 32, 53, 0.85)' : 'rgba(255, 255, 255, 0.92)',
-    textMain: isDark ? '#EFF6FF' : '#2D1B08',
-    textMuted: isDark ? '#94A3B8' : 'rgba(45, 27, 8, 0.7)',
-    headerBtnBg: isDark ? 'rgba(30, 41, 59, 0.8)' : 'rgba(255, 255, 255, 0.85)',
-    iconBg: isDark ? 'rgba(45, 212, 191, 0.15)' : '#FEF3C7',
-    iconColor: isDark ? '#2DD4BF' : '#F97316', 
-    modalBg: isDark ? '#1E293B' : '#FFFFFF', // Суцільний колір для модалки
-    inputBg: isDark ? '#0F172A' : '#F3F4F6',
-  };
+  // ОПТИМІЗАЦІЯ 1: Тримаємо конфеті вимкненим, поки воно реально не знадобиться
+  const [showConfetti, setShowConfetti] = useState(false);
 
-  const fetchQuests = async () => {
+  // Плавна анімація фону
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: withTiming(c.overlay, { duration: 400 }),
+    };
+  }, [c.overlay]);
+
+  const loadQuests = async (showLoadingIndicator = true) => {
+    if (showLoadingIndicator) setIsLoading(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
+      if (!token) return;
+
       const response = await fetch(`${BASE_URL}/mini-quests/daily`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -86,7 +96,8 @@ export default function QuestsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchQuests();
+      loadQuests(true);
+      return () => {};
     }, [])
   );
 
@@ -100,12 +111,22 @@ export default function QuestsScreen() {
       });
 
       if (response.ok) {
-        await fetchQuests(); 
+        await loadQuests(false); // Оновлюємо список у фоні без індикатора завантаження екрану
         
         if (action === 'complete') {
-          setQuestToShare(questId);
-          setIsAnonymous(false); 
-          setShareModalVisible(true);
+          // Вмикаємо рендер конфеті!
+          setShowConfetti(true);
+          
+          setTimeout(() => {
+            setQuestToShare(questId);
+            setIsAnonymous(false); 
+            setShareModalVisible(true);
+          }, 1500); // Чекаємо 1.5 секунди поки салют відгримить
+          
+          // Вимикаємо конфеті з пам'яті через 4 секунди
+          setTimeout(() => {
+            setShowConfetti(false);
+          }, 4000);
         }
       }
     } catch (error) {
@@ -161,7 +182,7 @@ export default function QuestsScreen() {
       });
 
       if (response.ok) {
-        await fetchQuests();
+        await loadQuests(false);
       }
     } catch (error) {
       console.error("Помилка оцінки:", error);
@@ -189,39 +210,39 @@ export default function QuestsScreen() {
 
   return (
     <ImageBackground 
-      source={require('@/assets/images/rain-window.png')} 
+      source={require('@/assets/images/background.jpg')} 
       style={s.container}
       resizeMode="cover"
     >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, overlayAnimatedStyle]} />
 
       <SafeAreaView style={s.safe} edges={['top']}>
         
         <View style={s.header}>
-          <Pressable 
+          <AnimatedCard 
             onPress={() => router.back()}
-            style={({ pressed }) => [s.iconBtn, { backgroundColor: colors.headerBtnBg }, pressed && s.pressed]}
+            style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}
           >
-            <ArrowLeft color={colors.textMain} size={24} strokeWidth={2} />
-          </Pressable>
+            <ArrowLeft color={c.textMain} size={24} strokeWidth={2} />
+          </AnimatedCard>
 
           <View style={s.headerRight}>
-            <Pressable style={({ pressed }) => [s.iconBtn, { backgroundColor: colors.headerBtnBg }, pressed && s.pressed]}>
-              <User color={colors.textMain} size={24} strokeWidth={2} />
-            </Pressable>
-            <Pressable 
-              onPress={() => router.push('/profile')}
-              style={({ pressed }) => [s.iconBtn, { backgroundColor: colors.headerBtnBg }, pressed && s.pressed]}
+            <AnimatedCard style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+              <User color={c.textMain} size={24} strokeWidth={2} />
+            </AnimatedCard>
+            <AnimatedCard 
+              onPress={() => router.push({ pathname: '/profile', params: { theme } })}
+              style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}
             >
-              <Settings color={colors.textMain} size={24} strokeWidth={2} />
-            </Pressable>
+              <Settings color={c.textMain} size={24} strokeWidth={2} />
+            </AnimatedCard>
           </View>
         </View>
 
-        <Text style={s.mainTitle}>Квести</Text>
+        <Text style={[Typography.titleXl, s.mainTitle, { color: c.textMain }]}>Квести</Text>
 
         {isLoading ? (
-          <ActivityIndicator size="large" color={colors.iconColor} style={{ marginTop: 50 }} />
+          <ActivityIndicator size="large" color={c.iconColor} style={{ marginTop: 50 }} />
         ) : (
           <ScrollView 
             style={s.scrollView}
@@ -264,18 +285,20 @@ export default function QuestsScreen() {
               }
 
               const isItemLoading = actionLoadingId === quest.id;
+              const isButtonDisabled = isItemLoading || (quest.status === 'COMPLETED' && !!quest.evaluation);
 
               return (
-                <View key={quest.id} style={[s.card, { backgroundColor: colors.cardBg }]}>
-                  <View style={[s.iconBox, { backgroundColor: colors.iconBg }]}>
-                    <IconComponent color={colors.iconColor} size={32} strokeWidth={2} />
+                <View key={quest.id} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+                  
+                  <View style={[s.iconBoxInner, { backgroundColor: c.iconBg }]}>
+                    <IconComponent color={c.iconColor} size={32} strokeWidth={2} />
                   </View>
 
                   <View style={s.cardContent}>
-                    <Text style={[s.questTitle, { color: colors.textMain }]}>
+                    <Text style={[Typography.titleMd, { color: c.textMain, marginBottom: 4 }]}>
                       {quest.mini_quest.title}
                     </Text>
-                    <Text style={[s.questSubtitle, { color: colors.textMuted }]}>
+                    <Text style={[Typography.muted, { color: c.textMuted, marginBottom: 12 }]}>
                       Щоденне завдання
                     </Text>
 
@@ -292,22 +315,21 @@ export default function QuestsScreen() {
                       )}
                     </View>
 
+                    {/* ОПТИМІЗАЦІЯ 2: Повернули стандартний легкий Pressable замість AnimatedCard */}
                     <Pressable 
                       onPress={onPressAction}
-                      disabled={isItemLoading || (quest.status === 'COMPLETED' && !!quest.evaluation)}
+                      disabled={isButtonDisabled}
                       style={({ pressed }) => [
                         s.actionButton,
-                        isDark ? s.actionButtonDark : s.actionButtonLight,
-                        pressed && s.pressedButtonBase,
-                        pressed && isDark && s.pressedButtonDark, 
-                        pressed && !isDark && s.pressedButtonLight,
-                        (quest.status === 'COMPLETED' && !!quest.evaluation) && { opacity: 0.5 }
+                        { backgroundColor: c.accent },
+                        pressed && s.pressedLight,
+                        isButtonDisabled && { opacity: 0.5, backgroundColor: c.textMuted }
                       ]}
                     >
                       {isItemLoading ? (
                         <ActivityIndicator color="#FFF" size="small" />
                       ) : (
-                        <Text style={s.actionButtonText}>{buttonText}</Text>
+                        <Text style={[Typography.button, { color: '#FFF' }]}>{buttonText}</Text>
                       )}
                     </Pressable>
                   </View>
@@ -317,61 +339,58 @@ export default function QuestsScreen() {
           </ScrollView>
         )}
 
-        <Modal visible={shareModalVisible} transparent animationType="slide">
+        <Modal visible={shareModalVisible} transparent animationType="fade">
           <View style={s.modalOverlay}>
-            <View style={[s.shareModal, { backgroundColor: colors.modalBg }]}>
+            <View style={[s.shareModal, { backgroundColor: c.cardBg, borderColor: c.border, borderWidth: 1 }]}>
               
-              <View style={[s.shareIconBox, { backgroundColor: colors.iconBg }]}>
-                <Share color={colors.iconColor} size={32} />
+              <View style={[s.shareIconBox, { backgroundColor: c.iconBg }]}>
+                <Share color={c.iconColor} size={32} />
               </View>
 
-              <Text style={[s.shareTitle, { color: colors.textMain }]}>Квест виконано! 🎉</Text>
-              <Text style={[s.shareDesc, { color: colors.textMuted }]}>
-                Кожен маленький крок важливий. Поділися цим успіхом у стрічці, щоб надихнути інших користувачів на відновлення.
+              <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center', marginBottom: 8 }]}>
+                Квест виконано! 🎉
+              </Text>
+              <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginBottom: 24 }]}>
+                Кожен маленький крок важливий. Поділися цим успіхом у стрічці, щоб надихнути інших.
               </Text>
 
               <Pressable 
                 onPress={() => setIsAnonymous(!isAnonymous)}
-                style={[s.checkboxRow, { backgroundColor: colors.inputBg }]}
+                style={[s.checkboxRow, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}
               >
                 <View style={[
                   s.checkbox, 
-                  { borderColor: colors.textMuted },
-                  isAnonymous && { backgroundColor: colors.iconColor, borderColor: colors.iconColor }
+                  { borderColor: c.textMuted },
+                  isAnonymous && { backgroundColor: c.accent, borderColor: c.accent }
                 ]}>
                   {isAnonymous && <Check color="#FFF" size={14} strokeWidth={3} />}
                 </View>
                 
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[s.checkboxTitle, { color: colors.textMain }]}>Опублікувати анонімно</Text>
-                  <Text style={[s.checkboxSubtitle, { color: colors.textMuted }]}>Твоє ім'я буде приховано</Text>
+                  <Text style={[Typography.body, { color: c.textMain }]}>Опублікувати анонімно</Text>
+                  <Text style={[Typography.nav, { color: c.textMuted }]}>Твоє ім'я буде приховано</Text>
                 </View>
 
-                <Ghost color={isAnonymous ? colors.iconColor : colors.textMuted} size={24} />
+                <Ghost color={isAnonymous ? c.accent : c.textMuted} size={24} />
               </Pressable>
 
               <View style={s.modalButtons}>
                 <Pressable 
                   onPress={() => setShareModalVisible(false)}
-                  style={({ pressed }) => [s.cancelBtn, { backgroundColor: colors.inputBg }, pressed && s.pressed]}
+                  style={({ pressed }) => [s.cancelBtn, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }, pressed && s.pressedLight]}
                 >
-                  <Text style={[s.cancelBtnText, { color: colors.textMain }]}>Ні, дякую</Text>
+                  <Text style={[Typography.button, { color: c.textMain }]}>Ні, дякую</Text>
                 </Pressable>
 
                 <Pressable 
                   onPress={handleShareQuest}
                   disabled={isSharing}
-                  style={({ pressed }) => [
-                    s.confirmBtn, 
-                    { backgroundColor: colors.iconColor }, 
-                    pressed && s.pressed,
-                    isSharing && { opacity: 0.7 }
-                  ]}
+                  style={({ pressed }) => [s.confirmBtn, { backgroundColor: c.accent }, pressed && s.pressedLight, isSharing && { opacity: 0.7 }]}
                 >
                   {isSharing ? (
                     <ActivityIndicator color="#FFF" />
                   ) : (
-                    <Text style={s.confirmBtnText}>Поділитися</Text>
+                    <Text style={[Typography.button, { color: '#FFF' }]}>Поділитися</Text>
                   )}
                 </Pressable>
               </View>
@@ -379,6 +398,17 @@ export default function QuestsScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Конфеті рендериться ТІЛЬКИ коли потрібно, і зменшено до 100 елементів */}
+        {showConfetti && (
+          <ConfettiCannon
+            count={100}
+            origin={{x: -10, y: 0}}
+            autoStart={true}
+            fadeOut={true}
+            fallSpeed={2500}
+          />
+        )}
 
       </SafeAreaView>
     </ImageBackground>
@@ -391,118 +421,35 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 12,
     paddingBottom: 24,
   },
   headerRight: { flexDirection: 'row', gap: 12 },
-  iconBtn: { padding: 12, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  iconBtn: { padding: 12, borderRadius: Radii.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
   mainTitle: {
-    fontSize: 32, fontWeight: 'bold', color: '#FFFFFF',
-    paddingHorizontal: 24, marginBottom: 24,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6,
+    paddingHorizontal: Spacing.screenX, marginBottom: 24,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
   },
-  scrollView: { flex: 1, paddingHorizontal: 24 },
+  scrollView: { flex: 1, paddingHorizontal: Spacing.screenX },
   card: {
-    borderRadius: 24, padding: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start',
+    borderRadius: Radii.lg, padding: Spacing.cardP, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1,
   },
-  iconBox: { padding: 12, borderRadius: 16, marginRight: 16, alignItems: 'center', justifyContent: 'center', width: 64, height: 64 },
+  iconBoxInner: { padding: Spacing.iconP, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center', width: 64, height: 64, marginRight: 16 },
   cardContent: { flex: 1 },
-  questTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-  questSubtitle: { fontSize: 14, fontWeight: '500', marginBottom: 12, lineHeight: 20 },
   statusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: Radii.full },
   statusText: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5 },
   completedStatus: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  actionButton: { paddingVertical: 12, borderRadius: 30, alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44 },
-  actionButtonLight: { backgroundColor: '#F97316', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65, elevation: 8 },
-  actionButtonDark: { backgroundColor: '#0F766E', shadowColor: '#2DD4BF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 },
-  actionButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold' },
-  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-  pressedButtonBase: { transform: [{ scale: 0.95 }] },
-  pressedButtonLight: { backgroundColor: '#EA580C', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2, elevation: 2 },
-  pressedButtonDark: { backgroundColor: '#115E59', shadowColor: '#2DD4BF', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 2 },
-
-  // СТИЛІ МОДАЛКИ
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  shareModal: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-  },
-  shareIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 20,
-    marginTop: -8,
-  },
-  shareTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  shareDesc: {
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  checkboxSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 30,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  confirmBtn: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 30,
-    alignItems: 'center',
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
+  actionButton: { paddingVertical: 12, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: 44 },
+  pressedLight: { opacity: 0.8, transform: [{ scale: 0.96 }] },
+  
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  shareModal: { borderTopLeftRadius: Radii.lg, borderTopRightRadius: Radii.lg, padding: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
+  shareIconBox: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 20, marginTop: -8 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: Radii.md, marginBottom: 24 },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  modalButtons: { flexDirection: 'row', gap: 12 },
+  cancelBtn: { flex: 1, paddingVertical: 16, borderRadius: Radii.full, alignItems: 'center' },
+  confirmBtn: { flex: 1, paddingVertical: 16, borderRadius: Radii.full, alignItems: 'center' },
 });

@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { 
-  View, Text, Pressable, StyleSheet, ImageBackground, 
-  ActivityIndicator 
+  View, Text, Pressable, StyleSheet, ImageBackground, ActivityIndicator, Platform 
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
@@ -15,10 +14,34 @@ import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api'; 
 import HobbiesModal from '@/components/HobbiesModal';
 
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// Красива пружна анімація натискання (залишаємо, бо це топ)
+const AnimatedCard = ({ onPress, style, children }: any) => {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  return (
+    <AnimatedPressable
+      onPressIn={() => scale.value = withSpring(0.96, { damping: 15, stiffness: 200 })}
+      onPressOut={() => scale.value = withSpring(1, { damping: 15, stiffness: 200 })}
+      onPress={onPress}
+      style={[style, animatedStyle]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
+
 export default function HomeScreen() {
   const [isDark, setIsDark] = useState(false);
   const router = useRouter();
-  const insets = useSafeAreaInsets(); // Отримуємо безпечні зони телефону
+  const insets = useSafeAreaInsets(); 
   
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +50,13 @@ export default function HomeScreen() {
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
+
+  // Плавна анімація фону при зміні теми
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      backgroundColor: withTiming(c.overlay, { duration: 400 }),
+    };
+  }, [c.overlay]);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,7 +78,6 @@ export default function HomeScreen() {
             setUserProfile(data); 
 
             const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-            
             if (isFirstLogin === 'true') {
               setShowHobbies(true);
               await SecureStore.deleteItemAsync('isFirstLogin');
@@ -67,23 +96,23 @@ export default function HomeScreen() {
       };
 
       fetchUser();
-
       return () => {}; 
     }, [])
   );
 
-  const getCardStyle = (pressed: boolean, isWide: boolean = false) => [
+  // ВИПРАВЛЕННЯ БАГУ ANDROID: 
+  // Ми відключаємо тіні (sh.soft) на Android, бо elevation + rgba = просвічування квадратів.
+  // На iOS тіні працюватимуть як красиве скло.
+  const getCardStyle = (isWide: boolean = false) => [
     isWide ? s.fullCard : s.halfCard,
     { backgroundColor: c.cardBg, borderColor: c.border },
-    sh.soft,
-    pressed && s.pressed
+    Platform.OS === 'ios' ? sh.soft : { elevation: 0 } 
   ];
 
-  const getIconBtnStyle = (pressed: boolean) => [
+  const getIconBtnStyle = () => [
     s.iconBtn, 
     { backgroundColor: c.cardBg, borderColor: c.border }, 
-    sh.soft, 
-    pressed && s.pressed
+    Platform.OS === 'ios' ? sh.soft : { elevation: 0 }
   ];
 
   return (
@@ -92,15 +121,18 @@ export default function HomeScreen() {
       style={s.container}
       resizeMode="cover"
     >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
+      <Animated.View style={[StyleSheet.absoluteFill, overlayAnimatedStyle]} />
 
-      {/* Головний контейнер з динамічним відступом зверху */}
       <View style={[s.content, { paddingTop: Math.max(insets.top + 16, 40) }]}>
         
         {/* HEADER */}
         <View style={s.header}>
-          <View style={s.userInfo}>
-            <View style={[s.avatarPlaceholder, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+          <AnimatedCard 
+            style={s.userInfo}
+            onPress={() => router.push({ pathname: '/profile', params: { theme } })}
+          >
+            {/* Аватарка: прибрано elevation для Android */}
+            <View style={[s.avatarPlaceholder, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'ios' ? sh.soft : null]}>
               <User color={c.textMain} size={IconSizes.sm} strokeWidth={2} />
             </View>
             <View>
@@ -115,33 +147,24 @@ export default function HomeScreen() {
                 </Text>
               )}
             </View>
-          </View>
+          </AnimatedCard>
 
           <View style={s.headerRight}>
-            <Pressable 
-              onPress={() => setIsDark(!isDark)} 
-              style={({ pressed }) => getIconBtnStyle(pressed)}
-            >
+            <AnimatedCard onPress={() => setIsDark(!isDark)} style={getIconBtnStyle()}>
               {isDark ? (
                 <Sun color={c.textMain} size={20} strokeWidth={2} />
               ) : (
                 <Moon color={c.textMain} size={20} strokeWidth={2} />
               )}
-            </Pressable>
+            </AnimatedCard>
 
-            <Pressable 
-              onPress={() => router.push({ pathname: '/tracker', params: { theme } })}
-              style={({ pressed }) => getIconBtnStyle(pressed)}
-            >
+            <AnimatedCard onPress={() => router.push({ pathname: '/tracker', params: { theme } })} style={getIconBtnStyle()}>
               <Activity color={c.textMain} size={20} strokeWidth={2} />
-            </Pressable>
+            </AnimatedCard>
 
-            <Pressable 
-              onPress={() => router.push({ pathname: '/profile', params: { theme } })}
-              style={({ pressed }) => getIconBtnStyle(pressed)}
-            >
+            <AnimatedCard onPress={() => router.push({ pathname: '/settings', params: { theme } })} style={getIconBtnStyle()}>
               <Settings color={c.textMain} size={20} strokeWidth={2} />
-            </Pressable>
+            </AnimatedCard>
           </View>
         </View>
 
@@ -149,32 +172,33 @@ export default function HomeScreen() {
         <View style={s.grid}>
           
           <View style={s.row}>
-            <Pressable 
+            <AnimatedCard 
               onPress={() => router.push({ pathname: '/quests', params: { theme } })}                
-              style={({ pressed }) => getCardStyle(pressed, false)}
+              style={getCardStyle(false)}
             >
-              <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
+              {/* Іконки без бага з чорним квадратом на Android */}
+              <View style={[s.iconBox, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
                 <Sparkles color={c.iconColor} size={IconSizes.lg} strokeWidth={2} />
               </View>
               <Text style={[Typography.titleMd, { color: c.textMain }]}>Квести</Text>
-            </Pressable>
+            </AnimatedCard>
 
-            <Pressable 
+            <AnimatedCard 
               onPress={() => router.push({ pathname: '/geoquests', params: { theme } })}
-              style={({ pressed }) => getCardStyle(pressed, false)}
+              style={getCardStyle(false)}
             >
-              <View style={[s.iconBox, { backgroundColor: c.iconBg }, sh.glow]}>
+              <View style={[s.iconBox, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
                 <Map color={c.iconColor} size={IconSizes.lg} strokeWidth={2} />
               </View>
               <Text style={[Typography.titleMd, { color: c.textMain }]}>Геоквести</Text>
-            </Pressable>
+            </AnimatedCard>
           </View>
 
-          <Pressable 
+          <AnimatedCard 
             onPress={() => router.push({ pathname: '/feed', params: { theme } })}
-            style={({ pressed }) => getCardStyle(pressed, true)}
+            style={getCardStyle(true)}
           >
-            <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, sh.glow]}>
+            <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
               <MessageCircleHeart color={c.iconColor} size={IconSizes.md} strokeWidth={2} />
             </View>
             <View style={{ flex: 1 }}>
@@ -185,13 +209,13 @@ export default function HomeScreen() {
                 Ділись почуттями безпечно
               </Text>
             </View>
-          </Pressable>
+          </AnimatedCard>
 
-          <Pressable 
+          <AnimatedCard 
             onPress={() => router.push({ pathname: '/time-capsule', params: { theme } })}
-            style={({ pressed }) => getCardStyle(pressed, true)}
+            style={getCardStyle(true)}
           >
-            <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, sh.glow]}>
+            <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
               <Clock color={c.iconColor} size={IconSizes.md} strokeWidth={2} />
             </View>
             <View style={{ flex: 1 }}>
@@ -202,7 +226,7 @@ export default function HomeScreen() {
                 Напиши собі в майбутнє
               </Text>
             </View>
-          </Pressable>
+          </AnimatedCard>
 
         </View>
       </View>
@@ -221,7 +245,6 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  // Прибрали flex: 1 з content, щоб елементи не "розповзалися" по екрану
   content: { paddingHorizontal: Spacing.screenX },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.headMb },
   userInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -234,5 +257,4 @@ const s = StyleSheet.create({
   fullCard: { borderRadius: Radii.lg, padding: Spacing.cardP, flexDirection: 'row', alignItems: 'center', borderWidth: 1 },
   iconBox: { padding: Spacing.iconP, borderRadius: Radii.md, marginBottom: 12, alignItems: 'center', justifyContent: 'center' },
   iconBoxRow: { padding: Spacing.iconWideP, borderRadius: Radii.md, marginRight: 16, alignItems: 'center', justifyContent: 'center' },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.97 }] }
 });
