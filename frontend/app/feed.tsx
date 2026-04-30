@@ -14,7 +14,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Heart, Sparkles, MapPin, Ghost } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
 interface Post {
@@ -110,7 +110,7 @@ export default function FeedScreen() {
     const hasMyReaction = reactionsCount > 0; 
 
     return (
-      <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+      <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
         
         <View style={s.cardHeader}>
           <View style={s.authorInfo}>
@@ -124,7 +124,7 @@ export default function FeedScreen() {
               )}
             </View>
             <View>
-              <Text style={[Typography.titleMd, { color: c.text, fontSize: 15 }]}>
+              <Text style={[Typography.titleMd, { color: c.textMain, fontSize: 15 }]}>
                 {authorName}
               </Text>
               <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>
@@ -136,7 +136,7 @@ export default function FeedScreen() {
 
         <View style={[s.questBadge, { backgroundColor: isGeo ? '#3B82F615' : c.accent + '15' }]}>
           {isGeo ? <MapPin color="#3B82F6" size={16} /> : <Sparkles color={c.accent} size={16} />}
-          <Text style={[Typography.body, { color: c.text, marginLeft: 8, flex: 1 }]}>
+          <Text style={[Typography.body, { color: c.textMain, marginLeft: 8, flex: 1 }]}>
             Виконано: <Text style={{ fontWeight: '600' }}>{questTitle}</Text>
           </Text>
         </View>
@@ -176,9 +176,9 @@ export default function FeedScreen() {
           onPress={() => router.back()} 
           style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
         >
-          <ArrowLeft color={c.text} size={24} />
+          <ArrowLeft color={c.textMain} size={IconSizes.sm} />
         </Pressable>
-        <Text style={[Typography.titleLg, { color: c.text, flex: 1, textAlign: 'center', marginRight: 40 }]}>
+        <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>
           Анонімна стрічка
         </Text>
       </View>
@@ -212,20 +212,20 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 10,
     paddingBottom: 16,
   },
   backBtn: { padding: 8 },
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.screenX,
     paddingBottom: 40,
     paddingTop: 8,
   },
   card: {
     borderRadius: Radii.lg,
     borderWidth: 1,
-    marginBottom: 16,
+    marginBottom: Spacing.gap,
     overflow: 'hidden',
   },
   cardHeader: {

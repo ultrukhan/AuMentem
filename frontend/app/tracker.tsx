@@ -13,7 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Activity, Check } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
 const MOOD_OPTIONS = [
@@ -102,9 +102,9 @@ export default function TrackerScreen() {
           onPress={() => router.back()} 
           style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
         >
-          <ArrowLeft color={c.text} size={24} />
+          <ArrowLeft color={c.textMain} size={24} />
         </Pressable>
-        <Text style={[Typography.titleLg, { color: c.text, flex: 1, textAlign: 'center', marginRight: 40 }]}>
+        <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>
           Трекер стану
         </Text>
       </View>
@@ -114,7 +114,7 @@ export default function TrackerScreen() {
           <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
             <Activity color={c.iconColor} size={28} />
           </View>
-          <Text style={[Typography.titleXl, { color: c.text, textAlign: 'center', marginTop: 16 }]}>
+          <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginTop: 16 }]}>
             Як ти зараз?
           </Text>
           <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8 }]}>
@@ -136,7 +136,7 @@ export default function TrackerScreen() {
                 disabled={isSaving || isSuccess}
                 style={({ pressed }) => [
                   s.moodCard,
-                  { backgroundColor: c.card, borderColor: isSelected ? mood.color : c.border },
+                  { backgroundColor: c.cardBg, borderColor: isSelected ? mood.color : c.border },
                   sh.soft,
                   isSelected && { backgroundColor: mood.color + '15', borderWidth: 2 }, 
                   pressed && s.pressed
@@ -145,7 +145,7 @@ export default function TrackerScreen() {
                 <Text style={s.emoji}>{mood.emoji}</Text>
                 <Text style={[
                   Typography.titleMd, 
-                  { color: isSelected ? mood.color : c.text, flex: 1, marginLeft: 16 }
+                  { color: isSelected ? mood.color : c.textMain, flex: 1, marginLeft: 16 }
                 ]}>
                   {mood.label}
                 </Text>
@@ -195,13 +195,13 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 10,
     paddingBottom: 16,
   },
   backBtn: { padding: 8 },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.screenX,
     paddingBottom: 40,
   },
   titleContainer: {

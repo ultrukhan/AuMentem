@@ -8,7 +8,7 @@ import { User, ArrowLeft, Check, AlertCircle, Sparkles } from 'lucide-react-nati
 import { useRouter, useLocalSearchParams } from 'expo-router'; 
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
 import HobbiesModal from '@/components/HobbiesModal';
@@ -98,9 +98,9 @@ export default function ProfileScreen() {
             onPress={() => router.back()} 
             style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
           >
-            <ArrowLeft color={c.text} size={24} />
+            <ArrowLeft color={c.textMain} size={IconSizes.sm} />
           </Pressable>
-          <Text style={[Typography.titleLg, { color: c.text, flex: 1, textAlign: 'center', marginRight: 40 }]}>
+          <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>
             Мій профіль
           </Text>
         </View>
@@ -109,16 +109,16 @@ export default function ProfileScreen() {
           {isLoading ? (
             <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 50 }} />
           ) : (
-            <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+            <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
               
-              <Text style={[Typography.titleMd, { color: c.text, marginBottom: 12 }]}>
+              <Text style={[Typography.titleMd, { color: c.textMain, marginBottom: 12 }]}>
                 Особисті дані
               </Text>
               
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Введіть новий нікнейм"
                   placeholderTextColor={c.textMuted}
                   value={nickname}
@@ -161,7 +161,7 @@ export default function ProfileScreen() {
 
               <View style={[s.divider, { backgroundColor: c.border }]} />
 
-              <Text style={[Typography.titleMd, { color: c.text, marginBottom: 12 }]}>
+              <Text style={[Typography.titleMd, { color: c.textMain, marginBottom: 12 }]}>
                 Вподобання
               </Text>
 
@@ -175,7 +175,7 @@ export default function ProfileScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <Sparkles color={c.textMuted} size={20} />
-                  <Text style={[Typography.body, { color: c.text }]}>
+                  <Text style={[Typography.body, { color: c.textMain }]}>
                     Твої інтереси
                   </Text>
                 </View>
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 10,
     paddingBottom: 20,
   },
@@ -212,12 +212,12 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24, 
+    paddingHorizontal: Spacing.screenX, 
     paddingTop: 20,
   },
   card: {
     borderRadius: Radii.lg, 
-    padding: 20, 
+    padding: Spacing.cardP, 
     borderWidth: 1,
   },
   divider: {

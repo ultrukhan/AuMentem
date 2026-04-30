@@ -16,7 +16,7 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Clock, Send, MailOpen, Sparkles } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
 export default function TimeCapsuleScreen() {
@@ -109,9 +109,9 @@ export default function TimeCapsuleScreen() {
             onPress={() => router.back()} 
             style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
           >
-            <ArrowLeft color={c.text} size={24} />
+            <ArrowLeft color={c.textMain} size={IconSizes.sm} />
           </Pressable>
-          <Text style={[Typography.titleLg, { color: c.text, flex: 1, textAlign: 'center', marginRight: 40 }]}>
+          <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>
             Капсула часу
           </Text>
         </View>
@@ -126,18 +126,18 @@ export default function TimeCapsuleScreen() {
           ) : (
             <>
               {unreadMessage && (
-                <View style={[s.letterCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+                <View style={[s.letterCard, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
                   <View style={s.letterHeader}>
                     <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
                       <MailOpen color={c.iconColor} size={20} />
                     </View>
-                    <Text style={[Typography.titleMd, { color: c.text, marginLeft: 12 }]}>
+                    <Text style={[Typography.titleMd, { color: c.textMain, marginLeft: 12 }]}>
                       Лист від тебе з минулого
                     </Text>
                   </View>
                   
-                  <View style={[s.messageBubble, { backgroundColor: isDark ? '#1E293B' : '#F8FAFC' }]}>
-                    <Text style={[Typography.body, { color: c.text, lineHeight: 24, fontStyle: 'italic' }]}>
+                  <View style={[s.messageBubble, { backgroundColor: c.overlay }]}>
+                    <Text style={[Typography.body, { color: c.textMain, lineHeight: 24, fontStyle: 'italic' }]}>
                       "{unreadMessage}"
                     </Text>
                   </View>
@@ -147,10 +147,10 @@ export default function TimeCapsuleScreen() {
                 </View>
               )}
 
-              <View style={[s.writeCard, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+              <View style={[s.writeCard, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 }}>
                   <Clock color={c.accent} size={24} />
-                  <Text style={[Typography.titleMd, { color: c.text }]}>
+                  <Text style={[Typography.titleMd, { color: c.textMain }]}>
                     Написати в майбутнє
                   </Text>
                 </View>
@@ -164,7 +164,7 @@ export default function TimeCapsuleScreen() {
                     s.inputArea, 
                     { 
                       backgroundColor: c.background, 
-                      color: c.text,
+                      color: c.textMain,
                       borderColor: c.border 
                     }
                   ]}
@@ -172,7 +172,7 @@ export default function TimeCapsuleScreen() {
                   placeholderTextColor={c.textMuted}
                   multiline
                   numberOfLines={6}
-                  textAlignVertical="top" // Важливо для Android, щоб текст починався зверху
+                  textAlignVertical="top"
                   value={newMessage}
                   onChangeText={setNewMessage}
                 />
@@ -217,19 +217,19 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 10,
     paddingBottom: 16,
   },
   backBtn: { padding: 8 },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.screenX,
     paddingBottom: 40,
     paddingTop: 10,
   },
   
   letterCard: {
-    padding: 20,
+    padding: Spacing.cardP,
     borderRadius: Radii.lg,
     borderWidth: 1,
     marginBottom: 24,
@@ -251,7 +251,7 @@ const s = StyleSheet.create({
   },
 
   writeCard: {
-    padding: 20,
+    padding: Spacing.cardP,
     borderRadius: Radii.lg,
     borderWidth: 1,
   },

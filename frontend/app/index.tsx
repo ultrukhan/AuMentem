@@ -8,13 +8,13 @@ import { User, Lock, Sparkles, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'; 
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
 
 export default function AuthScreen() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false); 
   
- const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -79,19 +79,19 @@ export default function AuthScreen() {
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
             </View>
-            <Text style={[s.mainTitle, { color: c.text }]}>AuMentem</Text>
+            <Text style={[s.mainTitle, { color: c.textMain }]}>AuMentem</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
               Твій простір для відновлення 🌿
             </Text>
           </View>
 
-          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
             <View style={s.inputGroup}>
               
-         <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
+              <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} /> 
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Твій нікнейм"
                   placeholderTextColor={c.textMuted}
                   autoCapitalize="none"
@@ -103,7 +103,7 @@ export default function AuthScreen() {
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Lock color={c.textMuted} size={20} />
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
                   secureTextEntry
@@ -147,7 +147,7 @@ export default function AuthScreen() {
               style={({ pressed }) => [s.secondaryBtn, pressed && s.btnPressed]}
               onPress={() => router.push('/register')}
             >
-              <Text style={[s.secondaryBtnText, { color: c.text }]}>
+              <Text style={[s.secondaryBtnText, { color: c.textMain }]}>
                 Ще немає акаунту? <Text style={{ color: c.accent }}>Створити</Text>
               </Text>
             </Pressable>
@@ -163,7 +163,7 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 24, 
+    paddingHorizontal: Spacing.screenX, 
     justifyContent: 'center',
   },
   header: {
@@ -185,7 +185,7 @@ const s = StyleSheet.create({
   },
   card: {
     borderRadius: Radii.lg, 
-    padding: 20, 
+    padding: Spacing.cardP, 
     borderWidth: 1,
     marginBottom: 32,
   },

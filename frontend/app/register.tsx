@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { Colors, Typography, Radii, Shadows } from "@/constants/theme";
+import { Colors, Typography, Radii, Shadows, Spacing } from "@/constants/theme";
 import * as SecureStore from "expo-secure-store";
 
 export default function RegisterScreen() {
@@ -101,7 +101,7 @@ export default function RegisterScreen() {
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
             </View>
-            <Text style={[s.mainTitle, { color: c.text }]}>Реєстрація</Text>
+            <Text style={[s.mainTitle, { color: c.textMain }]}>Реєстрація</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
               Почни свій шлях в AuMentem 🌱
             </Text>
@@ -110,7 +110,7 @@ export default function RegisterScreen() {
           <View
             style={[
               s.card,
-              { backgroundColor: c.card, borderColor: c.border },
+              { backgroundColor: c.cardBg, borderColor: c.border },
               sh.soft,
             ]}
           >
@@ -118,7 +118,7 @@ export default function RegisterScreen() {
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Твій нікнейм"
                   placeholderTextColor={c.textMuted}
                   value={nickname}
@@ -129,7 +129,7 @@ export default function RegisterScreen() {
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Mail color={c.textMuted} size={20} />
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Твій email"
                   placeholderTextColor={c.textMuted}
                   autoCapitalize="none"
@@ -142,7 +142,7 @@ export default function RegisterScreen() {
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Lock color={c.textMuted} size={20} />
                 <TextInput
-                  style={[s.input, { color: c.text }]}
+                  style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
                   secureTextEntry
@@ -182,7 +182,7 @@ export default function RegisterScreen() {
               style={({ pressed }) => [s.secondaryBtn, pressed && s.btnPressed]}
               onPress={() => router.back()}
             >
-              <Text style={[s.secondaryBtnText, { color: c.text }]}>
+              <Text style={[s.secondaryBtnText, { color: c.textMain }]}>
                 Вже маєш акаунт? <Text style={{ color: c.accent }}>Увійти</Text>
               </Text>
             </Pressable>
@@ -197,7 +197,7 @@ const s = StyleSheet.create({
   container: { flex: 1 },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: Spacing.screenX,
     justifyContent: "center",
   },
   header: {
@@ -205,7 +205,7 @@ const s = StyleSheet.create({
     marginBottom: 40,
   },
   iconGlow: {
-    padding: 16,
+    padding: Spacing.iconWideP,
     borderRadius: Radii.lg,
     marginBottom: 20,
   },
@@ -219,9 +219,9 @@ const s = StyleSheet.create({
   },
   card: {
     borderRadius: Radii.lg,
-    padding: 20,
+    padding: Spacing.cardP,
     borderWidth: 1,
-    marginBottom: 32,
+    marginBottom: Spacing.headMb,
   },
   inputGroup: { gap: 12 },
   inputWrapper: {
@@ -243,7 +243,7 @@ const s = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  footer: { gap: 16 },
+  footer: { gap: Spacing.gap },
   primaryBtn: {
     flexDirection: "row",
     height: 60,
