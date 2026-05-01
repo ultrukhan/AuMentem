@@ -25,7 +25,7 @@
       cardBg: 'rgba(26, 28, 41, 0.85)',    // bg-cardDark/85
       textMain: '#EFF6FF',                 // textDarkMain
       textMuted: '#BFDBFE',                // textDarkMuted
-      accent: '#F97316',                   // accentOrange
+      accent: '#2563EB',                   // accentOrange
       iconBg: 'rgba(37, 99, 235, 0.2)',    // bg-iconBgDark/20
       iconColor: '#93C5FD',                // iconColorDark
       
