@@ -6,8 +6,8 @@ from jose import jwt, JWTError
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models import DBAppUser
+from database import get_db
+from models import DBAppUser
 
 load_dotenv()
 

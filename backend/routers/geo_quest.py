@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
-from backend.database import get_db
-from backend.models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from backend.schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
-from backend.auth_utils import get_current_user
-from backend.enums import QuestStatus
+from database import get_db
+from models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
+from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
+from auth_utils import get_current_user
+from enums import QuestStatus
 import uuid
 import os
 import shutil
@@ -14,7 +14,7 @@ from typing import List
 import time
 import cloudinary
 import cloudinary.utils
-from backend.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 router = APIRouter(
     prefix="/geo-quests",
@@ -28,9 +28,39 @@ cloudinary.config(
 )
 
 
-@router.get("/generate-upload-signature")
-async def get_upload_signature(user: DBAppUser = Depends(get_current_user)):
-    """Генеруємо підпис для фронтенда"""
+@router.post("/generate-upload-signature")
+async def get_upload_signature(
+    user_geo_quest_id: uuid.UUID = Body(...),
+    lat: float = Body(...),
+    lng: float = Body(...),
+    user: DBAppUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    1. Перевіряє координати користувача.
+    2. Якщо юзер на місці — генерує підпис для Cloudinary.
+    """
+    user_quest = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.id == user_geo_quest_id,
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).first()
+
+    if not user_quest:
+        raise HTTPException(status_code=404, detail="Квест не знайдено")
+
+    user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
+    target_coordinates = user_quest.geo_quest.place.coordinates
+    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
+
+    if distance > 20.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підпис не згенеровано."
+        )
+
     timestamp = int(time.time())
     params_to_sign = {
         "timestamp": timestamp,
@@ -49,6 +79,7 @@ async def get_upload_signature(user: DBAppUser = Depends(get_current_user)):
         "cloud_name": cloudinary.config().cloud_name,
         "folder": "geo_proofs"
     }
+
 @router.post("/{geo_quest_id}/start", response_model=UserGeoQuestResponse)
 async def start_geo_quest(
         geo_quest_id: uuid.UUID,
@@ -112,11 +143,11 @@ async def complete_quest(
         db: Session = Depends(get_db)
 ):
     """
-    Змінює статус квесту на COMPLETED.
-    Перевіряє радіус 10 метрів за переданими координатами і зберігає доказ.
+    Зберігає отриманий URL та закриває квест.
     """
     user_quest = db.query(DBUserGeoQuest).options(
-        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place),
+        joinedload(DBUserGeoQuest.user)
     ).filter(
         DBUserGeoQuest.id == user_geo_quest_id,
         DBUserGeoQuest.user_id == user.id,
@@ -124,24 +155,12 @@ async def complete_quest(
     ).first()
 
     if not user_quest:
-        raise HTTPException(status_code=404, detail="Ваш активний квест не знайдено")
-
-    user_point = WKTElement(f'POINT({payload.lng} {payload.lat})', srid=4326)
-    target_coordinates = user_quest.geo_quest.place.coordinates
-    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
-
-    if distance > 10.0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ви занадто далеко! Відстань: {distance:.1f} м."
-        )
+        raise HTTPException(status_code=404, detail="Активний квест не знайдено")
 
     current_time = get_utc_now()
     user_quest.photo_proof_url = payload.photo_url
     user_quest.status = QuestStatus.COMPLETED
     user_quest.completed_at = current_time
-    user_quest.is_verified = True
-    user_quest.verified_at = current_time
 
     db.commit()
     db.refresh(user_quest)

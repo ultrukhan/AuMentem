@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models import DBAppUser, DBTimeCapsule
-from backend.schemas import TimeCapsuleCreate, TimeCapsuleResponse, OnlyMessageResponse
-from backend.auth_utils import get_current_user
+from database import get_db
+from models import DBAppUser, DBTimeCapsule
+from schemas import TimeCapsuleCreate, TimeCapsuleResponse, OnlyMessageResponse
+from auth_utils import get_current_user
 from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(

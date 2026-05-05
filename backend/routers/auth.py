@@ -1,13 +1,13 @@
-from backend.models import DBAppUser,get_utc_now,DBHobby
-from backend.schemas import AppUserCreate, AppUserResponse,Token,HobbyResponse
-from backend.auth_utils import verify_password, create_access_token,get_password_hash,get_current_user
+from models import DBAppUser,get_utc_now,DBHobby
+from schemas import AppUserCreate, AppUserResponse,Token,HobbyResponse
+from auth_utils import verify_password, create_access_token,get_password_hash,get_current_user
 from fastapi import APIRouter, Depends, HTTPException,BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from backend.database import get_db
+from database import get_db
 from sqlalchemy.exc import IntegrityError
 import secrets
-from backend.email_utils import send_verification_email
+from email_utils import send_verification_email
 from typing import List
 
 router = APIRouter(

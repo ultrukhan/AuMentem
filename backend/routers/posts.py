@@ -2,11 +2,11 @@ from typing import List
 from sqlalchemy import desc
 from sqlalchemy.orm import Session,joinedload
 from sqlalchemy.exc import IntegrityError
-from backend.database import get_db
+from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from backend.models import DBPost,DBAppUser,DBPostReaction
-from backend.auth_utils import get_current_user
-from backend.schemas import PostResponse,CreatePost,ReactionToggle
+from models import DBPost,DBAppUser,DBPostReaction
+from auth_utils import get_current_user
+from schemas import PostResponse,CreatePost,ReactionToggle
 from uuid import UUID
 
 router = APIRouter(

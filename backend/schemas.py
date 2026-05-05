@@ -2,7 +2,7 @@ from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
 from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
-from backend.enums import *
+from enums import *
 import re
 from geoalchemy2.shape import to_shape
 
@@ -106,12 +106,9 @@ class UserGeoQuestResponse(BaseModel):
     geo_quest: GeoQuest
     status: QuestStatus
     photo_proof_url: Optional[str] = None
-    is_verified: bool = False
-    saved_to_album: bool = False
     created_at: datetime
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    verified_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -122,9 +119,7 @@ class NearestGeoQuestResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 class QuestCompleteRequest(BaseModel):
-    lat: float
-    lng: float
-    photo_url: str
+    photo_url: Optional[str] = None
 
 class MiniQuest(BaseModel):
     id: UUID
