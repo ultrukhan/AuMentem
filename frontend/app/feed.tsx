@@ -93,7 +93,6 @@ export default function FeedScreen() {
 
     setMyReactions(prev => ({ ...prev, [postId]: newReaction }));
 
-    // Оптимістичне оновлення лічильників
     setPosts(currentPosts => 
       currentPosts.map(post => {
         if (post.id === postId) {
@@ -136,7 +135,6 @@ export default function FeedScreen() {
     // Якщо анонімно — бекенд затирає юзера
     const authorName = (item.is_anonymous || !item.user) ? "Таємний мандрівник" : item.user.nickname;
     
-    // Пошук тайтлу квесту у вкладених об'єктах
     const questTitle = item.user_mini_quest?.mini_quest?.title 
                      || item.user_geo_quest?.geo_quest?.title 
                      || "Завдання виконано";
@@ -227,7 +225,7 @@ export default function FeedScreen() {
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={fetchPosts} tintColor={c.accent} />}
           ListEmptyComponent={
             <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 40 }]}>
-              Стрічка поки порожня. Поділися успіхом першою! 🌟
+              Стрічка поки порожня. Створи перший привід для гордості в цій стрічці! 🌟
             </Text>
           }
         />
