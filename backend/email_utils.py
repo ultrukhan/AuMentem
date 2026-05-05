@@ -4,7 +4,7 @@ from email.message import EmailMessage
 
 def send_verification_email(email_to: str, token: str):
     SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 465
+    SMTP_PORT = 587
     SENDER_EMAIL = os.getenv("SMTP_EMAIL")
     SENDER_PASSWORD = os.getenv("SMTP_PASSWORD")
     BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
@@ -31,7 +31,8 @@ def send_verification_email(email_to: str, token: str):
     msg.set_content(body, subtype="html")
 
     try:
-        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
+        server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
         server.send_message(msg)
         server.quit()
