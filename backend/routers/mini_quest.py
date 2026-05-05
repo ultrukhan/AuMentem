@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from backend.database import get_db
-from backend.models import DBAppUser, DBMiniQuest, DBUserMiniQuest, DBHobby, get_utc_now
-from backend.schemas import MiniQuest, UserMiniQuestResponse, QuestEvaluateRequest
-from backend.auth_utils import get_current_user
-from backend.enums import QuestStatus
+from database import get_db
+from models import DBAppUser, DBMiniQuest, DBUserMiniQuest, DBHobby, get_utc_now
+from schemas import MiniQuest, UserMiniQuestResponse, QuestEvaluateRequest
+from auth_utils import get_current_user
+from enums import QuestStatus
 from typing import List
 import uuid
 

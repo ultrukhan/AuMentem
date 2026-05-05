@@ -1,11 +1,11 @@
-from backend.database import Base
+from database import Base
 from datetime import datetime,timezone
 import uuid
 from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum
-from backend.enums import *
+from enums import *
 from geoalchemy2 import Geography
 
 def get_utc_now():

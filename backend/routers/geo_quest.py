@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
-from backend.database import get_db
-from backend.models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from backend.schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
-from backend.auth_utils import get_current_user
-from backend.enums import QuestStatus
+from database import get_db
+from models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
+from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
+from auth_utils import get_current_user
+from enums import QuestStatus
 import uuid
 import os
 import shutil
@@ -14,7 +14,7 @@ from typing import List
 import time
 import cloudinary
 import cloudinary.utils
-from backend.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 router = APIRouter(
     prefix="/geo-quests",
