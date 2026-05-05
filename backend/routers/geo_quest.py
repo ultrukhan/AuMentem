@@ -30,7 +30,7 @@ cloudinary.config(
 
 @router.post("/generate-upload-signature")
 async def get_upload_signature(
-    geo_quest_id: uuid.UUID = Body(...),
+    user_geo_quest_id: uuid.UUID = Body(...),
     lat: float = Body(...),
     lng: float = Body(...),
     user: DBAppUser = Depends(get_current_user),
@@ -40,12 +40,19 @@ async def get_upload_signature(
     1. Перевіряє координати користувача.
     2. Якщо юзер на місці — генерує підпис для Cloudinary.
     """
-    quest = db.query(DBGeoQuest).options(joinedload(DBGeoQuest.place)).filter(DBGeoQuest.id == geo_quest_id).first()
-    if not quest:
-        raise HTTPException(status_code=404, detail="Гео-квест не знайдено")
+    user_quest = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.id == user_geo_quest_id,
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).first()
+
+    if not user_quest:
+        raise HTTPException(status_code=404, detail="Квест не знайдено")
 
     user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
-    target_coordinates = quest.place.coordinates
+    target_coordinates = user_quest.geo_quest.place.coordinates
     distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
 
     if distance > 20.0:
