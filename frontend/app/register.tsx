@@ -180,12 +180,22 @@ export default function RegisterScreen() {
               <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
                 Акаунт створено. Тепер увійди, щоб обрати свої хобі.
               </Text>
-              <Pressable 
+              {/* <Pressable 
                 style={[s.modalBtn, { backgroundColor: c.accent }]} 
                 onPress={() => { setShowSuccess(false); router.back(); }}
               >
                 <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
-              </Pressable>
+              </Pressable> */}
+              <Pressable 
+  style={[s.modalBtn, { backgroundColor: c.accent }]} 
+  onPress={async () => { 
+    setShowSuccess(false); 
+    // Ми вже записали 'isFirstLogin' у handleRegister, тому просто повертаємось
+    router.replace('/'); // Повертаємось на екран авторизації
+  }}
+>
+  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
+</Pressable>
             </View>
           </View>
         </Modal>
