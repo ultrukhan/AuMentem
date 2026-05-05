@@ -138,12 +138,9 @@ class DBUserGeoQuest(Base):
     geo_quest_id = Column(Uuid, ForeignKey('geo_quest.id'), nullable=False)
     status = Column(Enum(QuestStatus), default=QuestStatus.AVAILABLE, nullable=False)
     photo_proof_url = Column(String, nullable=True)
-    is_verified = Column(Boolean, default=False)
-    saved_to_album = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    verified_at = Column(DateTime(timezone=True), nullable=True)
 
     user = relationship("DBAppUser", backref="user_geo_quests")
     geo_quest = relationship("DBGeoQuest", backref="user_geo_quests")
