@@ -2,7 +2,7 @@ from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
 from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
-from backend.enums import *
+from enums import *
 import re
 from geoalchemy2.shape import to_shape
 
