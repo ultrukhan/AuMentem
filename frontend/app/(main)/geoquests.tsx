@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import * as ImagePicker from 'expo-image-picker'; // ДОДАЛИ ІМПОРТ
+import * as ImagePicker from 'expo-image-picker';
 import polyline from '@mapbox/polyline';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
@@ -204,8 +204,6 @@ export default function GeoQuestsScreen() {
     }
   };
 
-  // --- НОВА ЛОГІКА: КАМЕРА ТА ЗАВАНТАЖЕННЯ ---
-
   const handleCompletePress = async () => {
     Alert.alert(
       "Доказ виконання",
@@ -234,10 +232,10 @@ export default function GeoQuestsScreen() {
 
       let result;
       const options: ImagePicker.ImagePickerOptions = {
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.5, // Стискаємо фото для швидкого завантаження
+        quality: 0.5,
       };
 
       if (source === 'camera') {
@@ -263,14 +261,19 @@ export default function GeoQuestsScreen() {
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
       const token = await SecureStore.getItemAsync('userToken');
 
-      // 1. ОТРИМУЄМО ПІДПИС ВІД БЕКЕНДА
       const sigRes = await fetch(`${BASE_URL}/geo-quests/generate-upload-signature`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!sigRes.ok) throw new Error("Не вдалося отримати підпис Cloudinary");
+      
+      if (!sigRes.ok) {
+        const errorText = await sigRes.text();
+        console.error("❌ ПОМИЛКА БЕКЕНДА:", errorText);
+        Alert.alert("Помилка Сервера", `Бекенд відмовив у підписі: ${errorText}`);
+        setIsCompleting(false);
+        return;
+      }
       const sigData = await sigRes.json();
 
-      // 2. ВІДПРАВЛЯЄМО ФОТО НА CLOUDINARY
       const formData = new FormData();
       formData.append('file', {
         uri: imageUri,
@@ -293,7 +296,6 @@ export default function GeoQuestsScreen() {
       
       const uploadedPhotoUrl = cloudData.secure_url;
 
-      // 3. ЯКЩО ЦЕ ТЕСТОВИЙ КВЕСТ
       if (selectedQuest.id === "test-mock-quest-id") {
         const targetLat = selectedQuest.place.coordinates.lat;
         const targetLng = selectedQuest.place.coordinates.lng;
@@ -309,7 +311,6 @@ export default function GeoQuestsScreen() {
         return;
       }
 
-      // 4. ВІДПРАВЛЯЄМО РЕАЛЬНИЙ ЗАПИТ НА БЕКЕНД
       const res = await fetch(`${BASE_URL}/geo-quests/my-quests/${activeUserQuestId}/complete`, {
         method: 'PATCH',
         headers: { 
@@ -319,7 +320,7 @@ export default function GeoQuestsScreen() {
         body: JSON.stringify({
           lat: loc.coords.latitude,
           lng: loc.coords.longitude,
-          photo_url: uploadedPhotoUrl // Передаємо реальне посилання!
+          photo_url: uploadedPhotoUrl
         })
       });
 
@@ -486,7 +487,6 @@ export default function GeoQuestsScreen() {
           ) : (
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={s.activeActionRow}>
-                {/* ЗМІНИЛИ ТУТ: Викликаємо handleCompletePress замість completeQuest напрямую */}
                 <Pressable 
                   onPress={handleCompletePress} 
                   style={({ pressed }) => [s.completeBtn, { backgroundColor: '#10B981' }, pressed && { opacity: 0.8 }]}

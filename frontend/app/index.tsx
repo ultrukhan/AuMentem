@@ -10,6 +10,8 @@ import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
 
+import { playClickSound } from '@/utils/audio';
+
 export default function AuthScreen() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false); 
@@ -130,7 +132,10 @@ export default function AuthScreen() {
                 pressed && s.btnPressed,
                 isLoading && { opacity: 0.7 }
               ]}
-              onPress={handleLogin}
+              onPress={() => {
+              playClickSound();
+              handleLogin();
+              }}
               disabled={isLoading}
             >
               {isLoading ? (

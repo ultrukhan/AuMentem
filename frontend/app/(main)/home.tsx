@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { 
   View, Text, Pressable, StyleSheet, ImageBackground, ActivityIndicator, Platform 
 } from 'react-native';
@@ -16,9 +16,10 @@ import HobbiesModal from '@/components/HobbiesModal';
 
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 
+import { playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio';
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Красива пружна анімація натискання (залишаємо, бо це топ)
 const AnimatedCard = ({ onPress, style, children }: any) => {
   const scale = useSharedValue(1);
 
@@ -51,7 +52,10 @@ export default function HomeScreen() {
   const c = Colors[theme];
   const sh = Shadows[theme];
 
-  // Плавна анімація фону при зміні теми
+  useEffect(() => {
+    playAmbientSound();
+  }, []);
+
   const overlayAnimatedStyle = useAnimatedStyle(() => {
     return {
       backgroundColor: withTiming(c.overlay, { duration: 400 }),
@@ -100,9 +104,6 @@ export default function HomeScreen() {
     }, [])
   );
 
-  // ВИПРАВЛЕННЯ БАГУ ANDROID: 
-  // Ми відключаємо тіні (sh.soft) на Android, бо elevation + rgba = просвічування квадратів.
-  // На iOS тіні працюватимуть як красиве скло.
   const getCardStyle = (isWide: boolean = false) => [
     isWide ? s.fullCard : s.halfCard,
     { backgroundColor: c.cardBg, borderColor: c.border },
@@ -129,9 +130,11 @@ export default function HomeScreen() {
         <View style={s.header}>
           <AnimatedCard 
             style={s.userInfo}
-            onPress={() => router.push({ pathname: '/profile', params: { theme } })}
+            onPress={() => {
+              playClickSound();
+              router.push({ pathname: '/profile', params: { theme } });
+            }}
           >
-            {/* Аватарка: прибрано elevation для Android */}
             <View style={[s.avatarPlaceholder, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'ios' ? sh.soft : null]}>
               <User color={c.textMain} size={IconSizes.sm} strokeWidth={2} />
             </View>
@@ -150,7 +153,13 @@ export default function HomeScreen() {
           </AnimatedCard>
 
           <View style={s.headerRight}>
-            <AnimatedCard onPress={() => setIsDark(!isDark)} style={getIconBtnStyle()}>
+            <AnimatedCard 
+              onPress={() => {
+                playClickSound();
+                setIsDark(!isDark);
+              }} 
+              style={getIconBtnStyle()}
+            >
               {isDark ? (
                 <Sun color={c.textMain} size={20} strokeWidth={2} />
               ) : (
@@ -158,11 +167,23 @@ export default function HomeScreen() {
               )}
             </AnimatedCard>
 
-            <AnimatedCard onPress={() => router.push({ pathname: '/tracker', params: { theme } })} style={getIconBtnStyle()}>
+            <AnimatedCard 
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/tracker', params: { theme } });
+              }} 
+              style={getIconBtnStyle()}
+            >
               <Activity color={c.textMain} size={20} strokeWidth={2} />
             </AnimatedCard>
 
-            <AnimatedCard onPress={() => router.push({ pathname: '/settings', params: { theme } })} style={getIconBtnStyle()}>
+            <AnimatedCard 
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/settings', params: { theme } });
+              }} 
+              style={getIconBtnStyle()}
+            >
               <Settings color={c.textMain} size={20} strokeWidth={2} />
             </AnimatedCard>
           </View>
@@ -173,10 +194,12 @@ export default function HomeScreen() {
           
           <View style={s.row}>
             <AnimatedCard 
-              onPress={() => router.push({ pathname: '/quests', params: { theme } })}                
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/quests', params: { theme } });
+              }}                
               style={getCardStyle(false)}
             >
-              {/* Іконки без бага з чорним квадратом на Android */}
               <View style={[s.iconBox, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
                 <Sparkles color={c.iconColor} size={IconSizes.lg} strokeWidth={2} />
               </View>
@@ -184,7 +207,10 @@ export default function HomeScreen() {
             </AnimatedCard>
 
             <AnimatedCard 
-              onPress={() => router.push({ pathname: '/geoquests', params: { theme } })}
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/geoquests', params: { theme } });
+              }}
               style={getCardStyle(false)}
             >
               <View style={[s.iconBox, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
@@ -195,7 +221,10 @@ export default function HomeScreen() {
           </View>
 
           <AnimatedCard 
-            onPress={() => router.push({ pathname: '/feed', params: { theme } })}
+            onPress={() => {
+              playClickSound();
+              router.push({ pathname: '/feed', params: { theme } });
+            }}
             style={getCardStyle(true)}
           >
             <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>
@@ -212,7 +241,10 @@ export default function HomeScreen() {
           </AnimatedCard>
 
           <AnimatedCard 
-            onPress={() => router.push({ pathname: '/time-capsule', params: { theme } })}
+            onPress={() => {
+              playClickSound();
+              router.push({ pathname: '/time-capsule', params: { theme } });
+            }}
             style={getCardStyle(true)}
           >
             <View style={[s.iconBoxRow, { backgroundColor: c.iconBg }, Platform.OS === 'ios' ? sh.glow : { elevation: 0 }]}>

@@ -1,35 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ImageBackground, 
-  ScrollView, 
-  Switch, 
-  Platform,
-  Alert,
-  Pressable
+  View, Text, StyleSheet, ImageBackground, ScrollView, Switch, Platform, Alert, Pressable
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
-  ArrowLeft, 
-  Music, 
-  Volume2, 
-  Sparkles, 
-  Ghost, 
-  MessageCircleQuestion, 
-  ShieldCheck, 
-  HelpCircle 
+  ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, HelpCircle 
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
-
-import { Colors, Typography, Radii, Spacing, IconSizes } from '@/constants/theme';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
+import { playClickSound, stopAmbientSound } from '@/utils/audio';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Кнопка-посилання (для підтримки, політики тощо)
 const SettingsLink = ({ icon: Icon, title, onPress, isDark }: any) => {
   const c = Colors[isDark ? 'dark' : 'light'];
   const scale = useSharedValue(1);
@@ -38,11 +23,16 @@ const SettingsLink = ({ icon: Icon, title, onPress, isDark }: any) => {
     transform: [{ scale: scale.value }]
   }));
 
+  const handlePress = () => {
+    playClickSound();
+    onPress();
+  };
+
   return (
     <AnimatedPressable
       onPressIn={() => scale.value = withSpring(0.97, { damping: 15, stiffness: 200 })}
       onPressOut={() => scale.value = withSpring(1, { damping: 15, stiffness: 200 })}
-      onPress={onPress}
+      onPress={handlePress}
       style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border }, animatedStyle]}
     >
       <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
@@ -53,9 +43,13 @@ const SettingsLink = ({ icon: Icon, title, onPress, isDark }: any) => {
   );
 };
 
-// Перемикач (для музики, ефектів тощо)
 const SettingsToggle = ({ icon: Icon, title, value, onValueChange, isDark }: any) => {
   const c = Colors[isDark ? 'dark' : 'light'];
+
+  const handleToggle = (val: boolean) => {
+    playClickSound();
+    onValueChange(val);
+  };
 
   return (
     <View style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border }]}>
@@ -67,7 +61,7 @@ const SettingsToggle = ({ icon: Icon, title, value, onValueChange, isDark }: any
         trackColor={{ false: isDark ? '#334155' : '#E2E8F0', true: c.accent }}
         thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
         ios_backgroundColor={isDark ? '#334155' : '#E2E8F0'}
-        onValueChange={onValueChange}
+        onValueChange={handleToggle}
         value={value}
       />
     </View>
@@ -80,7 +74,6 @@ export default function SettingsScreen() {
   const isDark = theme === 'dark';
   const c = Colors[isDark ? 'dark' : 'light'];
 
-  // Стани налаштувань (за замовчуванням увімкнені)
   const [settings, setSettings] = useState({
     music: true,
     sfx: true,
@@ -88,7 +81,6 @@ export default function SettingsScreen() {
     anonymousMode: false,
   });
 
-  // Завантажуємо збережені налаштування при старті
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -103,7 +95,6 @@ export default function SettingsScreen() {
     loadSettings();
   }, []);
 
-  // Зберігаємо налаштування при кожній зміні
   const updateSetting = async (key: keyof typeof settings, value: boolean) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings);
@@ -111,25 +102,17 @@ export default function SettingsScreen() {
     try {
       await SecureStore.setItemAsync('userSettings', JSON.stringify(newSettings));
       
-      // ТУТ МОЖНА ДОДАТИ ЛОГІКУ:
-      // Якщо вимкнули музику (key === 'music' && !value) -> зупинити звук
-      // Якщо увімкнули (key === 'music' && value) -> запустити звук
+      if (key === 'music' && value === false) {
+        stopAmbientSound();
+      }
     } catch (error) {
       console.error('Помилка збереження:', error);
     }
   };
 
-  const handleSupportPress = () => {
-    Alert.alert("Підтримка", "Функція відправки повідомлення в підтримку з'явиться незабаром!");
-  };
-
-  const handlePolicyPress = () => {
-    Alert.alert("Політика", "Тут буде текст політики конфіденційності.");
-  };
-
-  const handleFAQPress = () => {
-    Alert.alert("FAQ", "Тут будуть часті питання.");
-  };
+  const handleSupportPress = () => Alert.alert("Підтримка", "Функція відправки повідомлення з'явиться незабаром!");
+  const handlePolicyPress = () => Alert.alert("Політика", "Тут буде текст політики конфіденційності.");
+  const handleFAQPress = () => Alert.alert("FAQ", "Тут будуть часті питання.");
 
   return (
     <ImageBackground 
@@ -140,11 +123,12 @@ export default function SettingsScreen() {
       <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
 
       <SafeAreaView style={s.safe} edges={['top']}>
-        
-        {/* Хедер */}
         <View style={s.header}>
           <Pressable 
-            onPress={() => router.back()}
+            onPress={() => {
+              playClickSound();
+              router.back();
+            }}
             style={({ pressed }) => [
               s.iconBtn, 
               { backgroundColor: c.cardBg, borderColor: c.border },
@@ -162,7 +146,6 @@ export default function SettingsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {/* СЕКЦІЯ: Звук та Візуал */}
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>
             ВРАЖЕННЯ ВІД ДОДАТКУ
           </Text>
@@ -190,7 +173,6 @@ export default function SettingsScreen() {
             />
           </View>
 
-          {/* СЕКЦІЯ: Приватність */}
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>
             ПРИВАТНІСТЬ
           </Text>
@@ -207,7 +189,6 @@ export default function SettingsScreen() {
             </Text>
           </View>
 
-          {/* СЕКЦІЯ: Інформація */}
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>
             ІНФОРМАЦІЯ
           </Text>
@@ -231,55 +212,21 @@ export default function SettingsScreen() {
               isDark={isDark} 
             />
           </View>
-
         </ScrollView>
       </SafeAreaView>
     </ImageBackground>
   );
 }
 
-import { Pressable as NativePressable } from 'react-native';
-
 const s = StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.screenX,
-    paddingTop: 12,
-    paddingBottom: 24,
-  },
-  iconBtn: { 
-    padding: 12, borderRadius: Radii.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' 
-  },
-  mainTitle: {
-    paddingHorizontal: Spacing.screenX, marginBottom: 24,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4,
-  },
+  header: { flexDirection: 'row', paddingHorizontal: Spacing.screenX, paddingTop: 12, paddingBottom: 24 },
+  iconBtn: { padding: 12, borderRadius: Radii.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  mainTitle: { paddingHorizontal: Spacing.screenX, marginBottom: 24, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   scrollView: { flex: 1, paddingHorizontal: Spacing.screenX },
-  
-  sectionTitle: {
-    marginBottom: 8,
-    marginLeft: 4,
-    letterSpacing: 1,
-    fontSize: 12,
-  },
-  section: {
-    marginBottom: 32,
-    gap: 8,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-  },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: Radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sectionTitle: { marginBottom: 8, marginLeft: 4, letterSpacing: 1, fontSize: 12 },
+  section: { marginBottom: 32, gap: 8 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: Radii.lg, borderWidth: 1 },
+  iconBox: { width: 40, height: 40, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center' },
 });
