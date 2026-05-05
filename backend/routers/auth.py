@@ -122,7 +122,7 @@ def verify_email(token: str, db: Session = Depends(get_db)):
                 <div class="success-icon">✅</div>
                 <h1>Емейл підтверджено!</h1>
                 <p>Дякуємо! Ваша пошта успішно верифікована.</p>
-                <p><strong>Тепер ви можете повернутися у додаток AuMentem та увійти у свій акаунт.</strong></p>
+                <p><strong>Тепер ви можете повернутися у додаток Altera та увійти у свій акаунт.</strong></p>
             </div>
         </body>
         </html>
