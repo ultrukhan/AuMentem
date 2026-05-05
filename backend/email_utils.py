@@ -1,26 +1,20 @@
 import smtplib
 import os
-import base64
-
+from email.message import EmailMessage
 
 def send_verification_email(email_to: str, token: str):
     SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
+    SMTP_PORT = 465
     SENDER_EMAIL = os.getenv("SMTP_EMAIL")
     SENDER_PASSWORD = os.getenv("SMTP_PASSWORD")
     BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+
     verify_link = f"{BASE_URL}/auth/verify?token={token}"
 
-    subject = "Підтвердження реєстрації"
-    encoded_subject = f"=?utf-8?b?{base64.b64encode(subject.encode('utf-8')).decode('ascii')}?="
-
-    headers = (
-        f"From: {SENDER_EMAIL}\r\n"
-        f"To: {email_to}\r\n"
-        f"Subject: {encoded_subject}\r\n"
-        f"MIME-Version: 1.0\r\n"
-        f"Content-Type: text/html; charset=utf-8\r\n\r\n"
-    )
+    msg = EmailMessage()
+    msg["Subject"] = "Підтвердження реєстрації"
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = email_to
 
     body = f"""
     <html>
@@ -34,19 +28,14 @@ def send_verification_email(email_to: str, token: str):
         </body>
     </html>
     """
-
-    raw_message = (headers + body).encode('utf-8')
+    msg.set_content(body, subtype="html")
 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
-
-        server.sendmail(SENDER_EMAIL, email_to, raw_message)
-
+        server.send_message(msg)
         server.quit()
         print(f"Емейл успішно відправлено на {email_to}")
-
     except Exception as e:
         import traceback
         traceback.print_exc()
