@@ -1,22 +1,22 @@
-import smtplib
 import os
-from email.message import EmailMessage
+import requests
+
 
 def send_verification_email(email_to: str, token: str):
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY")
     SENDER_EMAIL = os.getenv("SMTP_EMAIL")
-    SENDER_PASSWORD = os.getenv("SMTP_PASSWORD")
-    BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:8000")
+    BASE_URL = os.getenv("BASE_URL", "https://altera-v8cl.onrender.com")
 
     verify_link = f"{BASE_URL}/auth/verify?token={token}"
 
-    msg = EmailMessage()
-    msg["Subject"] = "Підтвердження реєстрації"
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = email_to
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
 
-    body = f"""
+    html_content = f"""
     <html>
         <body>
             <h2>Вітаємо!</h2>
@@ -28,16 +28,19 @@ def send_verification_email(email_to: str, token: str):
         </body>
     </html>
     """
-    msg.set_content(body, subtype="html")
+
+    payload = {
+        "sender": {"name": "Altera", "email": SENDER_EMAIL},
+        "to": [{"email": email_to}],
+        "subject": "Підтвердження реєстрації",
+        "htmlContent": html_content
+    }
 
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"Емейл успішно відправлено на {email_to}")
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        print(f"Емейл успішно відправлено на {email_to} через Brevo")
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Помилка відправки емейлу: {e}")
+        print(f"Помилка відправки емейлу (Brevo): {e}")
+        if isinstance(e, requests.exceptions.HTTPError):
+            print(f"Деталі помилки: {e.response.text}")
