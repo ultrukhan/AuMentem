@@ -1,161 +1,208 @@
 import React, { useState } from 'react';
 import { 
-  View, 
-  Text, 
-  Pressable, 
-  StyleSheet, 
-  ActivityIndicator,
-  ScrollView,
-  Alert
+  View, Text, Pressable, StyleSheet, ActivityIndicator, 
+  ScrollView, Linking, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Activity, Check } from 'lucide-react-native';
+import { ArrowLeft, Activity, Check, HeartHandshake, X, Sparkles, MailOpen } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 
+const DEFAULT_SUPPORT_MESSAGES = [
+  "Ти все подолаєш! Навіть після найтемнішої ночі настає світанок ✨",
+  "Пам'ятай: твій стан — це не ти. Це лише хвиля, яка обов'язково пройде 🌊",
+  "Ти вже робиш велику справу, просто дбаючи про себе в цей момент 🫂",
+  "Дай собі час. Відпочинок — це не слабкість, а крок до відновлення 🔋",
+  "Сьогодні може бути складно, але ти сильніший/сильніша, ніж здається 💪"
+];
+
 const MOOD_OPTIONS = [
-  { id: 'POSITIVE', label: 'Добре', emoji: '🙂', color: '#10B981' }, 
-  { id: 'APATHY', label: 'Апатія', emoji: '😐', color: '#9CA3AF' },  
-  { id: 'CRITICAL', label: 'Дуже погано', emoji: '😭', color: '#EF4444' },
+  { id: 'POSITIVE', label: 'Добре', emoji: '🙂', color: '#10B981', subtext: 'Поділитися радістю із собою крізь час' }, 
+  { id: 'APATHY', label: 'Апатія', emoji: '😐', color: '#9CA3AF', subtext: 'Час переглянути щось тепле' },  
+  { id: 'CRITICAL', label: 'Дуже погано', emoji: '😭', color: '#EF4444', subtext: 'Підтримка та допомога поруч' },
 ];
 
 export default function TrackerScreen() {
   const router = useRouter();
   const { theme: themeParam } = useLocalSearchParams();
   const isDark = themeParam === 'dark';
-  
   const c = Colors[isDark ? 'dark' : 'light'];
   const sh = Shadows[isDark ? 'dark' : 'light'];
 
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  
+  const [activeModal, setActiveModal] = useState<'NONE' | 'POSITIVE' | 'CRITICAL'>('NONE');
+  const [apathyModalVisible, setApathyModalVisible] = useState(false);
+  const [supportMessage, setSupportMessage] = useState("");
+
+  const callSupport = (number: string) => Linking.openURL(`tel:${number}`);
+
+  const autoSaveToCapsule = async () => {
+    setIsAutoSaving(true);
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const autoMessage = "Цей момент радості зафіксовано в трекері! Нехай цей промінь світла стане підтримкою у майбутньому. Все буде добре! ✨";
+      
+      const response = await fetch(`${BASE_URL}/time-capsule/message`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: autoMessage })
+      });
+
+      if (response.ok) {
+        router.replace('/(main)/home');
+      }
+    } catch (e) {
+      console.error(e);
+      setIsAutoSaving(false); 
+    }
+  };
 
   const handleSaveState = async () => {
     if (!selectedState) return;
-
     setIsSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      
       const response = await fetch(`${BASE_URL}/tracker/state`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: selectedState })
       });
 
       if (response.ok) {
-        if (selectedState === 'CRITICAL' || selectedState === 'APATHY') {
-          try {
-            const capsuleRes = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (capsuleRes.ok) {
-              const capsuleData = await capsuleRes.json();
-              if (capsuleData && capsuleData.message) {
-                Alert.alert(
-                  "Лист із минулого 💌", 
-                  `Ти колись залишила це повідомлення для себе:\n\n"${capsuleData.message}"\n\nТримайся, ти сильніша, ніж здається!`,
-                  [{ text: 'Дякую', onPress: () => router.back() }]
-                );
-                return; 
-              }
-            }
-          } catch (e) {
-            console.error("Не вдалося дістати капсулу", e);
+        if (selectedState === 'APATHY') {
+          const res = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          
+          if (data && data.message) {
+            setSupportMessage(data.message);
+          } else {
+            const randomIndex = Math.floor(Math.random() * DEFAULT_SUPPORT_MESSAGES.length);
+            setSupportMessage(DEFAULT_SUPPORT_MESSAGES[randomIndex]);
           }
-
-          Alert.alert(
-            "Ми з тобою 🫂", 
-            "Зараз може бути складно, але ти не сама. Пам'ятай, що після найтемнішої ночі завжди настає світанок. Відпочинь і бережи себе.",
-            [{ text: 'Добре', onPress: () => router.back() }]
-          );
-          return; 
+          
+          setApathyModalVisible(true);
+        } else {
+          setActiveModal(selectedState as any);
         }
-
-        setIsSuccess(true);
-        setTimeout(() => {
-          router.back();
-        }, 1500);
-
-      } else {
-        console.error("Не вдалося зберегти стан");
       }
     } catch (error) {
-      console.error("Помилка мережі:", error);
+      console.error(error);
     } finally {
       setIsSaving(false);
     }
   };
 
+  const CustomModal = ({ type }: { type: typeof activeModal }) => {
+    if (type === 'NONE') return null;
+
+    const config = {
+      POSITIVE: {
+        title: "Збережемо цей момент? ✨",
+        desc: "Зараз гарний настрій — це цінно. Як краще зафіксувати цей стан у Капсулі Часу?",
+        icon: <Sparkles color="#10B981" size={48} />,
+        primaryBtn: "Записати автоматично",
+        btnColor: "#10B981",
+        onPrimary: autoSaveToCapsule,
+        secondaryBtn: "Написати свій текст",
+        onSecondary: () => { setActiveModal('NONE'); router.push('/time-capsule'); }
+      },
+      CRITICAL: {
+        title: "Підтримка поруч ❤️",
+        desc: "Зараз складно, але важливо не залишатися наодинці. Фахівці цих служб готові вислухати прямо зараз:",
+        icon: <HeartHandshake color="#EF4444" size={48} />,
+        primaryBtn: "7333 (Лінія підтримки)",
+        btnColor: "#EF4444",
+        onPrimary: () => callSupport('7333'),
+        secondaryBtn: "0 800 501 701",
+        onSecondary: () => callSupport('0800501701')
+      }
+    }[type as 'POSITIVE' | 'CRITICAL'];
+
+    return (
+      <Modal transparent animationType="slide" visible={type !== 'NONE'}>
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+            <Pressable style={s.closeIcon} onPress={() => { setActiveModal('NONE'); router.back(); }}>
+              <X color={c.textMuted} size={24} />
+            </Pressable>
+            <View style={s.modalIconBox}>{config.icon}</View>
+            <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center' }]}>{config.title}</Text>
+            <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 16, lineHeight: 22 }]}>{config.desc}</Text>
+            <View style={s.modalFooter}>
+              <Pressable style={[s.modalBtn, { backgroundColor: config.btnColor }]} onPress={config.onPrimary} disabled={isAutoSaving}>
+                {isAutoSaving && type === 'POSITIVE' ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={s.modalBtnText}>{config.primaryBtn}</Text>
+                )}
+              </Pressable>
+              <Pressable style={[s.modalBtn, { marginTop: 12, backgroundColor: 'transparent', borderWidth: 1, borderColor: c.border }]} onPress={config.onSecondary}>
+                <Text style={[s.modalBtnText, { color: c.textMain }]}>{config.secondaryBtn}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]} edges={['top']}>
+      <CustomModal type={activeModal} />
+      
+      <Modal visible={apathyModalVisible} transparent animationType="fade">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+            <View style={s.modalIconBox}><MailOpen color="#9CA3AF" size={40} /></View>
+            <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center' }]}>Послання для тебе 🫂</Text>
+            <Text style={[Typography.body, { color: c.textMain, fontStyle: 'italic', marginVertical: 20, textAlign: 'center', lineHeight: 24 }]}>
+              "{supportMessage}"
+            </Text>
+            <Pressable style={[s.modalBtn, { backgroundColor: '#9CA3AF' }]} onPress={() => { setApathyModalVisible(false); router.replace('/(main)/home'); }}>
+              <Text style={s.modalBtnText}>Дякую за підтримку</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <View style={s.header}>
-        <Pressable 
-          onPress={() => router.back()} 
-          style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
-        >
-          <ArrowLeft color={c.textMain} size={24} />
-        </Pressable>
-        <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>
-          Трекер стану
-        </Text>
+        <Pressable onPress={() => router.back()} style={s.backBtn}><ArrowLeft color={c.textMain} size={24} /></Pressable>
+        <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>Трекер стану</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
         <View style={s.titleContainer}>
-          <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
-            <Activity color={c.iconColor} size={28} />
-          </View>
-          <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginTop: 16 }]}>
-            Як ти зараз?
-          </Text>
-          <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8 }]}>
-            Обери стан, який найкраще описує твої емоції в цю хвилину.
-          </Text>
+          <View style={[s.iconBox, { backgroundColor: c.iconBg }]}><Activity color={c.iconColor} size={28} /></View>
+          <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginTop: 16 }]}>Як ти зараз?</Text>
+          <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8 }]}>Твій стан — понад усе. Обери варіант, що підходить.</Text>
         </View>
 
         <View style={s.optionsContainer}>
           {MOOD_OPTIONS.map((mood) => {
             const isSelected = selectedState === mood.id;
-            
             return (
               <Pressable
                 key={mood.id}
-                onPress={() => {
-                  setSelectedState(mood.id);
-                  setIsSuccess(false); 
-                }}
-                disabled={isSaving || isSuccess}
-                style={({ pressed }) => [
-                  s.moodCard,
-                  { backgroundColor: c.cardBg, borderColor: isSelected ? mood.color : c.border },
-                  sh.soft,
-                  isSelected && { backgroundColor: mood.color + '15', borderWidth: 2 }, 
-                  pressed && s.pressed
-                ]}
+                onPress={() => setSelectedState(mood.id)}
+                style={[s.moodCard, { backgroundColor: isSelected ? mood.color + '15' : c.cardBg, borderColor: isSelected ? mood.color : c.border, borderWidth: isSelected ? 2 : 1 }, sh.soft]}
               >
-                <Text style={s.emoji}>{mood.emoji}</Text>
-                <Text style={[
-                  Typography.titleMd, 
-                  { color: isSelected ? mood.color : c.textMain, flex: 1, marginLeft: 16 }
-                ]}>
-                  {mood.label}
-                </Text>
-                
-                <View style={[
-                  s.radioCircle, 
-                  { borderColor: isSelected ? mood.color : c.border },
-                  isSelected && { backgroundColor: mood.color }
-                ]}>
-                  {isSelected && <Check color="#FFF" size={14} strokeWidth={3} />}
+                <View style={s.cardInner}>
+                  <Text style={s.emoji}>{mood.emoji}</Text>
+                  <View style={{ flex: 1, marginLeft: 16 }}>
+                    <Text style={[Typography.titleMd, { color: isSelected ? mood.color : c.textMain }]}>{mood.label}</Text>
+                    <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>{mood.subtext}</Text>
+                  </View>
+                  <View style={[s.radioCircle, { borderColor: isSelected ? mood.color : c.border }, isSelected && { backgroundColor: mood.color }]}>
+                    {isSelected && <Check color="#FFF" size={14} strokeWidth={3} />}
+                  </View>
                 </View>
               </Pressable>
             );
@@ -166,24 +213,10 @@ export default function TrackerScreen() {
       <View style={[s.footer, { borderTopColor: c.border, backgroundColor: c.background }]}>
         <Pressable 
           onPress={handleSaveState}
-          disabled={!selectedState || isSaving || isSuccess}
-          style={({ pressed }) => [
-            s.saveBtn,
-            { backgroundColor: isSuccess ? '#34C759' : c.accent },
-            pressed && s.pressed,
-            (!selectedState || isSaving) && !isSuccess && { opacity: 0.5 }
-          ]}
+          disabled={!selectedState || isSaving}
+          style={[s.saveBtn, { backgroundColor: selectedState ? MOOD_OPTIONS.find(m => m.id === selectedState)?.color : c.accent }, (!selectedState || isSaving) && { opacity: 0.5 }]}
         >
-          {isSaving ? (
-            <ActivityIndicator color="#FFF" />
-          ) : isSuccess ? (
-            <View style={s.successContent}>
-              <Check color="#FFF" size={24} strokeWidth={3} />
-              <Text style={s.saveBtnText}>Записано!</Text>
-            </View>
-          ) : (
-            <Text style={s.saveBtnText}>Зберегти стан</Text>
-          )}
+          {isSaving ? <ActivityIndicator color="#FFF" /> : <Text style={s.saveBtnText}>Продовжити</Text>}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -192,70 +225,24 @@ export default function TrackerScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.screenX,
-    paddingTop: 10,
-    paddingBottom: 16,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screenX, paddingTop: 10, paddingBottom: 16 },
   backBtn: { padding: 8 },
-  content: {
-    paddingHorizontal: Spacing.screenX,
-    paddingBottom: 40,
-  },
-  titleContainer: {
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 32,
-  },
-  iconBox: {
-    padding: 16,
-    borderRadius: Radii.full,
-  },
-  optionsContainer: {
-    gap: 12,
-  },
-  moodCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: Radii.lg,
-    borderWidth: 1,
-  },
-  emoji: {
-    fontSize: 28,
-  },
-  radioCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  footer: {
-    padding: 24,
-    borderTopWidth: 1,
-  },
-  saveBtn: {
-    height: 56,
-    borderRadius: Radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveBtnText: {
-    ...Typography.titleMd,
-    color: '#FFF',
-    fontSize: 16,
-  },
-  successContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
+  content: { paddingHorizontal: Spacing.screenX, paddingBottom: 40 },
+  titleContainer: { alignItems: 'center', marginTop: 20, marginBottom: 32 },
+  iconBox: { padding: 16, borderRadius: Radii.full },
+  optionsContainer: { gap: 14 },
+  moodCard: { borderRadius: Radii.lg, padding: 18 },
+  cardInner: { flexDirection: 'row', alignItems: 'center' },
+  emoji: { fontSize: 32 },
+  radioCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  footer: { padding: 24, borderTopWidth: 1 },
+  saveBtn: { height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  saveBtnText: { ...Typography.titleMd, color: '#FFF', fontSize: 18 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.9)', justifyContent: 'center', padding: 24 },
+  modalContainer: { borderRadius: Radii.xl, padding: 28, borderWidth: 1, alignItems: 'center' },
+  modalIconBox: { marginBottom: 20, padding: 12, borderRadius: Radii.full, backgroundColor: 'rgba(255, 255, 255, 0.05)' },
+  modalFooter: { width: '100%', marginTop: 8 },
+  modalBtn: { width: '100%', height: 56, borderRadius: Radii.full, justifyContent: 'center', alignItems: 'center' },
+  modalBtnText: { ...Typography.titleMd, color: '#FFF', fontSize: 16 },
+  closeIcon: { position: 'absolute', right: 16, top: 16, padding: 4 }
 });

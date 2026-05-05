@@ -10,6 +10,7 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -19,6 +20,7 @@ import * as SecureStore from "expo-secure-store";
 export default function RegisterScreen() {
   const router = useRouter();
   const [isDark, setIsDark] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
@@ -51,15 +53,14 @@ export default function RegisterScreen() {
     setErrorMessage("");
 
     try {
-      /* ВАЖЛИВО: 
-         Для емулятора Android: змініть 127.0.0.1 на 10.0.2.2
-         Для Expo Go (реальний телефон): впишіть IP-адресу комп'ютера в Wi-Fi (напр. 192.168.0.100)
-      */
+      await SecureStore.deleteItemAsync('userToken');
+      await SecureStore.deleteItemAsync('isFirstLogin');
+      await SecureStore.deleteItemAsync('user_saved_hobbies');
+      await SecureStore.deleteItemAsync('has_hobbies');
+
       const response = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nickname: nickname,
           email: email,
@@ -70,21 +71,16 @@ export default function RegisterScreen() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        const detail =
-          errorData.detail?.[0]?.msg ||
-          errorData.detail ||
-          "Сталася помилка при реєстрації";
+        const detail = errorData.detail?.[0]?.msg || errorData.detail || "Сталася помилка при реєстрації";
         setErrorMessage(detail);
         return;
       }
+
       await SecureStore.setItemAsync("isFirstLogin", "true");
-      console.log("Акаунт успішно створено!");
-      router.back();
+      setShowSuccess(true);
+
     } catch (error) {
-      console.error("Помилка мережі:", error);
-      setErrorMessage(
-        "Не вдалося з'єднатися з сервером. Перевірте підключення.",
-      );
+      setErrorMessage("Не вдалося з'єднатися з сервером.");
     } finally {
       setIsLoading(false);
     }
@@ -107,13 +103,7 @@ export default function RegisterScreen() {
             </Text>
           </View>
 
-          <View
-            style={[
-              s.card,
-              { backgroundColor: c.cardBg, borderColor: c.border },
-              sh.soft,
-            ]}
-          >
+          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
             <View style={s.inputGroup}>
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
@@ -133,7 +123,6 @@ export default function RegisterScreen() {
                   placeholder="Твій email"
                   placeholderTextColor={c.textMuted}
                   autoCapitalize="none"
-                  keyboardType="email-address"
                   value={email}
                   onChangeText={setEmail}
                 />
@@ -152,9 +141,7 @@ export default function RegisterScreen() {
               </View>
             </View>
 
-            {errorMessage ? (
-              <Text style={s.errorText}>{errorMessage}</Text>
-            ) : null}
+            {errorMessage ? <Text style={s.errorText}>{errorMessage}</Text> : null}
           </View>
 
           <View style={s.footer}>
@@ -168,9 +155,7 @@ export default function RegisterScreen() {
               onPress={handleRegister}
               disabled={isLoading}
             >
-              {isLoading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
+              {isLoading ? <ActivityIndicator color="#FFF" /> : (
                 <>
                   <Text style={s.primaryBtnText}>Створити акаунт</Text>
                   <ArrowRight color="#FFF" size={20} strokeWidth={3} />
@@ -178,16 +163,32 @@ export default function RegisterScreen() {
               )}
             </Pressable>
 
-            <Pressable
-              style={({ pressed }) => [s.secondaryBtn, pressed && s.btnPressed]}
-              onPress={() => router.back()}
-            >
+            <Pressable style={s.secondaryBtn} onPress={() => router.back()}>
               <Text style={[s.secondaryBtnText, { color: c.textMain }]}>
                 Вже маєш акаунт? <Text style={{ color: c.accent }}>Увійти</Text>
               </Text>
             </Pressable>
           </View>
         </View>
+
+        {/* МОДАЛКА УСПІХУ */}
+        <Modal visible={showSuccess} transparent animationType="fade">
+          <View style={s.modalOverlay}>
+            <View style={[s.modalContent, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+              <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
+              <Text style={[Typography.titleLg, { color: c.textMain }]}>Готово! 🎉</Text>
+              <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
+                Акаунт створено. Тепер увійди, щоб обрати свої хобі.
+              </Text>
+              <Pressable 
+                style={[s.modalBtn, { backgroundColor: c.accent }]} 
+                onPress={() => { setShowSuccess(false); router.back(); }}
+              >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -195,79 +196,23 @@ export default function RegisterScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    flex: 1,
-    paddingHorizontal: Spacing.screenX,
-    justifyContent: "center",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  iconGlow: {
-    padding: Spacing.iconWideP,
-    borderRadius: Radii.lg,
-    marginBottom: 20,
-  },
-  mainTitle: {
-    ...Typography.titleXl,
-    marginBottom: 4,
-  },
-  subtitle: {
-    ...Typography.body,
-    textAlign: "center",
-  },
-  card: {
-    borderRadius: Radii.lg,
-    padding: Spacing.cardP,
-    borderWidth: 1,
-    marginBottom: Spacing.headMb,
-  },
+  content: { flex: 1, paddingHorizontal: Spacing.screenX, justifyContent: "center" },
+  header: { alignItems: "center", marginBottom: 40 },
+  iconGlow: { padding: Spacing.iconWideP, borderRadius: Radii.lg, marginBottom: 20 },
+  mainTitle: { ...Typography.titleXl, marginBottom: 4 },
+  subtitle: { ...Typography.body, textAlign: "center" },
+  card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: Spacing.headMb },
   inputGroup: { gap: 12 },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: Radii.md,
-    paddingHorizontal: 16,
-    height: 56,
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    ...Typography.body,
-  },
-  errorText: {
-    color: "#FF3B30",
-    marginTop: 16,
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  inputWrapper: { flexDirection: "row", alignItems: "center", borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
+  input: { flex: 1, ...Typography.body },
+  errorText: { color: "#FF3B30", marginTop: 16, textAlign: "center", fontSize: 14, fontWeight: "500" },
   footer: { gap: Spacing.gap },
-  primaryBtn: {
-    flexDirection: "row",
-    height: 60,
-    borderRadius: Radii.full,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  primaryBtnText: {
-    ...Typography.titleMd,
-    color: "#FFF",
-    fontSize: 18,
-  },
-  secondaryBtn: {
-    height: 50,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryBtnText: {
-    ...Typography.body,
-    fontSize: 15,
-  },
-  btnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
+  primaryBtn: { flexDirection: "row", height: 60, borderRadius: Radii.full, alignItems: "center", justifyContent: "center", gap: 8 },
+  primaryBtnText: { ...Typography.titleMd, color: "#FFF", fontSize: 18 },
+  secondaryBtn: { height: 50, alignItems: "center", justifyContent: "center" },
+  secondaryBtnText: { ...Typography.body, fontSize: 15 },
+  btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 30 },
+  modalContent: { padding: 24, borderRadius: 20, alignItems: 'center', borderWidth: 1 },
+  modalBtn: { width: '100%', height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
 });
