@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, ActivityIndicator 
+import {
+  View, Text, TextInput, Pressable, StyleSheet,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context'; 
-import { User, ArrowLeft, Check, AlertCircle, Sparkles } from 'lucide-react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router'; 
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { User, ArrowLeft, Check, AlertCircle, Sparkles, Share2 ,LogOut} from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
@@ -17,12 +17,14 @@ export default function ProfileScreen() {
   const router = useRouter();
   
   const { theme: themeParam } = useLocalSearchParams();
-  const isDark = themeParam === 'dark'; 
+  const isDark = themeParam === 'dark';
   
   const [nickname, setNickname] = useState('');
-  const [isLoading, setIsLoading] = useState(true); 
-  const [isSaving, setIsSaving] = useState(false); 
-  const [message, setMessage] = useState({ text: '', type: '' }); 
+  const [completedQuests, setCompletedQuests] = useState(0); 
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState({ text: '', type: '' });
   
   const [showHobbiesModal, setShowHobbiesModal] = useState(false);
 
@@ -42,7 +44,7 @@ export default function ProfileScreen() {
 
         if (response.ok) {
           const data = await response.json();
-          setNickname(data.nickname); 
+          setNickname(data.nickname);
         }
       } catch (error) {
         console.error("Помилка завантаження:", error);
@@ -53,6 +55,16 @@ export default function ProfileScreen() {
     fetchCurrentProfile();
   }, []);
 
+  const handleLogout = async () => {
+  try {
+    await SecureStore.deleteItemAsync('userToken');
+    await SecureStore.deleteItemAsync('has_hobbies');
+    
+    router.replace('/'); 
+  } catch (error) {
+    console.error("Помилка при виході:", error);
+  }
+};
   const handleUpdateNickname = async () => {
     if (!nickname.trim()) {
       setMessage({ text: 'Нікнейм не може бути порожнім', type: 'error' });
@@ -87,15 +99,28 @@ export default function ProfileScreen() {
     }
   };
 
+ 
+  const handleShareApp = async () => {
+    try {
+      const shareMessage = `Привіт! Я використовую додаток AuMentem. Мій нік: ${nickname}, і я вже виконав(ла) ${completedQuests} квестів для свого ментального здоров'я! Приєднуйся: https://aumentem.app 🚀`;
+      
+      await Share.share({
+        message: shareMessage,
+      });
+    } catch (error) {
+      console.error("Помилка при шерингу", error);
+    }
+  };
+
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]} edges={['top']}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={s.header}>
-          <Pressable 
-            onPress={() => router.back()} 
+          <Pressable
+            onPress={() => router.back()}
             style={({ pressed }) => [s.backBtn, pressed && s.pressed]}
           >
             <ArrowLeft color={c.textMain} size={IconSizes.sm} />
@@ -142,9 +167,9 @@ export default function ProfileScreen() {
                 </View>
               ) : null}
 
-              <Pressable 
+              <Pressable
                 style={({ pressed }) => [
-                  s.primaryBtn, 
+                  s.primaryBtn,
                   { backgroundColor: c.accent, marginTop: 16 },
                   pressed && s.pressed,
                   isSaving && { opacity: 0.7 }
@@ -165,10 +190,10 @@ export default function ProfileScreen() {
                 Вподобання
               </Text>
 
-              <Pressable 
+              <Pressable
                 onPress={() => setShowHobbiesModal(true)}
                 style={({ pressed }) => [
-                  s.inputWrapper, 
+                  s.inputWrapper,
                   { backgroundColor: c.background, justifyContent: 'space-between' },
                   pressed && s.pressed
                 ]}
@@ -182,17 +207,50 @@ export default function ProfileScreen() {
                 <Text style={{ color: c.accent, fontWeight: '600', fontSize: 14 }}>Змінити</Text>
               </Pressable>
 
+              <View style={[s.divider, { backgroundColor: c.border }]} />
+
+              {/* Кнопка "Поділитися додатком" */}
+              <Pressable 
+                onPress={handleShareApp}
+                style={({ pressed }) => [
+                  s.shareBtn,
+                  { backgroundColor: c.background, borderColor: c.border },
+                  pressed && s.pressed
+                ]}
+              >
+                <Share2 color={c.textMain} size={20} />
+                <Text style={[Typography.titleMd, { color: c.textMain, marginLeft: 12 }]}>
+                  Поділитися додатком
+                </Text>
+              </Pressable>
+<View style={[s.miniDivider, { backgroundColor: c.border }]} />
+
+              <Pressable 
+                onPress={handleLogout}
+                style={({ pressed }) => [
+                  s.logoutBtn, 
+                  { backgroundColor: isDark ? '#FF3B3015' : '#FF3B3005' }, 
+                  pressed && s.pressed
+                ]}
+              >
+                <LogOut color="#FF3B30" size={20} />
+                <Text style={[Typography.titleMd, { color: '#FF3B30', marginLeft: 12 }]}>
+                  Вийти з акаунта
+                </Text>
+              </Pressable>
+
             </View>
+            
           )}
         </View>
 
-        <HobbiesModal 
-          visible={showHobbiesModal} 
-          isDark={isDark} 
+        <HobbiesModal
+          visible={showHobbiesModal}
+          isDark={isDark}
           onSuccess={() => setShowHobbiesModal(false)}
-          onClose={() => setShowHobbiesModal(false)} 
+          onClose={() => setShowHobbiesModal(false)}
         />
-        
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -212,12 +270,12 @@ const s = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: Spacing.screenX, 
+    paddingHorizontal: Spacing.screenX,
     paddingTop: 20,
   },
   card: {
-    borderRadius: Radii.lg, 
-    padding: Spacing.cardP, 
+    borderRadius: Radii.lg,
+    padding: Spacing.cardP,
     borderWidth: 1,
   },
   divider: {
@@ -228,7 +286,7 @@ const s = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: Radii.md, 
+    borderRadius: Radii.md,
     paddingHorizontal: 16,
     height: 56,
     gap: 12,
@@ -262,8 +320,31 @@ const s = StyleSheet.create({
     color: '#FFF',
     fontSize: 15,
   },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+  },
   pressed: {
     opacity: 0.85,
     transform: [{ scale: 0.98 }],
   },
+  miniDivider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 12, 
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: '#FF3B3020', 
+  },
 });
+
