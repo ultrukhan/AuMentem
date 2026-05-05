@@ -10,68 +10,69 @@ const setupAudio = async () => {
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     });
-  } catch (e) {
-    console.warn(e);
-  }
+  } catch (e) {}
 };
 
-const isSoundAllowed = async (type: 'music' | 'sfx'): Promise<boolean> => {
+const getAudioSettings = async () => {
   try {
     const saved = await SecureStore.getItemAsync('userSettings');
-    if (!saved) return true;
+    if (!saved) return { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
     const settings = JSON.parse(saved);
-    return settings[type] !== false;
+    return {
+      music: settings.music !== false,
+      musicVolume: settings.musicVolume !== undefined ? settings.musicVolume : 0.5,
+      sfx: settings.sfx !== false,
+      sfxVolume: settings.sfxVolume !== undefined ? settings.sfxVolume : 0.5,
+    };
   } catch (e) {
-    return true; 
+    return { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
   }
 };
 
 export const playSuccessSound = async () => {
-  const allowed = await isSoundAllowed('sfx');
-  if (!allowed) return;
+  const { sfx, sfxVolume } = await getAudioSettings();
+  if (!sfx) return;
 
   await setupAudio();
   try {
     const { sound } = await Audio.Sound.createAsync(
-      require('../assets/sounds/success.mp3')
+      require('../assets/sounds/success.mp3'),
+      { volume: sfxVolume }
     );
     await sound.playAsync();
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) sound.unloadAsync();
     });
-  } catch (error) {
-    console.error(error);
-  }
+  } catch (error) {}
 };
 
 export const playClickSound = async () => {
-  const allowed = await isSoundAllowed('sfx');
-  if (!allowed) return;
+  const { sfx, sfxVolume } = await getAudioSettings();
+  if (!sfx) return;
 
   await setupAudio();
   try {
     const { sound } = await Audio.Sound.createAsync(
-      require('../assets/sounds/click.mp3')
+      require('../assets/sounds/click.mp3'),
+      { volume: sfxVolume }
     );
     await sound.playAsync();
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.isLoaded && status.didJustFinish) sound.unloadAsync();
     });
-  } catch (error) {
-    console.error(error);
-  }
+  } catch (error) {}
 };
 
 export const playAmbientSound = async (durationSeconds: number = 0) => {
-  const allowed = await isSoundAllowed('music');
-  if (!allowed) return;
+  const { music, musicVolume } = await getAudioSettings();
+  if (!music) return;
 
   await setupAudio();
   try {
     await stopAmbientSound();
     const { sound } = await Audio.Sound.createAsync(
       require('../assets/sounds/bgm.mp3'),
-      { isLooping: true, volume: 0.3 }
+      { isLooping: true, volume: musicVolume }
     );
     ambientSoundInstance = sound;
     await ambientSoundInstance.playAsync();
@@ -81,8 +82,14 @@ export const playAmbientSound = async (durationSeconds: number = 0) => {
         await stopAmbientSound();
       }, durationSeconds * 1000);
     }
-  } catch (error) {
-    console.error(error);
+  } catch (error) {}
+};
+
+export const setAmbientVolume = async (volume: number) => {
+  if (ambientSoundInstance) {
+    try {
+      await ambientSoundInstance.setVolumeAsync(volume);
+    } catch (e) {}
   }
 };
 
@@ -92,8 +99,6 @@ export const stopAmbientSound = async () => {
       await ambientSoundInstance.stopAsync();
       await ambientSoundInstance.unloadAsync();
       ambientSoundInstance = null;
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   }
 };
