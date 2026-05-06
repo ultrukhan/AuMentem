@@ -104,7 +104,7 @@ async def start_geo_quest(
     if active_quest:
         active_quest_with_relations = db.query(DBUserGeoQuest).options(
             joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place),
-            joinedload(DBUserGeoQuest.geo_quest.user)
+            joinedload(DBUserGeoQuest.user)
         ).filter(DBUserGeoQuest.id == active_quest.id).first()
         return active_quest_with_relations
 
