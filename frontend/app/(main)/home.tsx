@@ -1,12 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { 
-  View, Text, Pressable, StyleSheet, ImageBackground, ActivityIndicator, Platform 
-} from 'react-native';
+import { View, Text, Pressable, StyleSheet, ImageBackground, ActivityIndicator, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  User, Settings, Moon, Sun, 
-  Sparkles, Map, MessageCircleHeart, Clock, Activity 
-} from 'lucide-react-native';
+import { User, Settings, Moon, Sun, Sparkles, Map, MessageCircleHeart, Clock, Activity } from 'lucide-react-native';
 import BottomNav from '@/components/BottomNav'; 
 import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { useRouter, useFocusEffect } from 'expo-router'; 
@@ -20,7 +15,7 @@ import { playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audi
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const AnimatedCard = ({ onPress, style, children }: any) => {
+const AnimatedCard = ({ onPress, style, children, animationsEnabled }: any) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -29,10 +24,14 @@ const AnimatedCard = ({ onPress, style, children }: any) => {
 
   return (
     <AnimatedPressable
-      onPressIn={() => scale.value = withSpring(0.96, { damping: 15, stiffness: 200 })}
-      onPressOut={() => scale.value = withSpring(1, { damping: 15, stiffness: 200 })}
+      onPressIn={() => {
+        if (animationsEnabled) scale.value = withSpring(0.96, { damping: 15, stiffness: 200 });
+      }}
+      onPressOut={() => {
+        if (animationsEnabled) scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+      }}
       onPress={onPress}
-      style={[style, animatedStyle]}
+      style={[style, animationsEnabled ? animatedStyle : null]}
     >
       {children}
     </AnimatedPressable>
@@ -47,27 +46,37 @@ export default function HomeScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showHobbies, setShowHobbies] = useState(false);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
   
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
 
+  const backgroundImage = isDark 
+    ? require('@/assets/images/background_dark.jpg') 
+    : require('@/assets/images/background.jpg');
+
   useEffect(() => {
-    playAmbientSound();
-  }, []);
+    playAmbientSound(0, isDark);
+  }, [isDark]);
 
   const overlayAnimatedStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: withTiming(c.overlay, { duration: 400 }),
+      backgroundColor: withTiming(c.overlay, { duration: animationsEnabled ? 400 : 0 }),
     };
-  }, [c.overlay]);
+  }, [c.overlay, animationsEnabled]);
 
   useFocusEffect(
     useCallback(() => {
-      const fetchUser = async () => {
+      const loadData = async () => {
         try {
+          const savedSettings = await SecureStore.getItemAsync('userSettings');
+          if (savedSettings) {
+            const parsed = JSON.parse(savedSettings);
+            setAnimationsEnabled(parsed.animations !== false);
+          }
+
           const token = await SecureStore.getItemAsync('userToken');
-          
           if (!token) {
             router.replace('/');
             return;
@@ -93,13 +102,12 @@ export default function HomeScreen() {
             router.replace('/');
           }
         } catch (error) {
-          console.error("Помилка завантаження профілю:", error);
         } finally {
           setIsLoading(false);
         }
       };
 
-      fetchUser();
+      loadData();
       return () => {}; 
     }, [])
   );
@@ -117,18 +125,14 @@ export default function HomeScreen() {
   ];
 
   return (
-    <ImageBackground 
-      source={require('@/assets/images/background.jpg')} 
-      style={s.container}
-      resizeMode="cover"
-    >
+    <ImageBackground source={backgroundImage} style={s.container} resizeMode="cover">
       <Animated.View style={[StyleSheet.absoluteFill, overlayAnimatedStyle]} />
 
       <View style={[s.content, { paddingTop: Math.max(insets.top + 16, 40) }]}>
         
-        {/* HEADER */}
         <View style={s.header}>
           <AnimatedCard 
+            animationsEnabled={animationsEnabled}
             style={s.userInfo}
             onPress={() => {
               playClickSound();
@@ -154,6 +158,7 @@ export default function HomeScreen() {
 
           <View style={s.headerRight}>
             <AnimatedCard 
+              animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
                 setIsDark(!isDark);
@@ -168,6 +173,7 @@ export default function HomeScreen() {
             </AnimatedCard>
 
             <AnimatedCard 
+              animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
                 router.push({ pathname: '/tracker', params: { theme } });
@@ -178,6 +184,7 @@ export default function HomeScreen() {
             </AnimatedCard>
 
             <AnimatedCard 
+              animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
                 router.push({ pathname: '/settings', params: { theme } });
@@ -189,11 +196,10 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* GRID */}
         <View style={s.grid}>
-          
           <View style={s.row}>
             <AnimatedCard 
+              animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
                 router.push({ pathname: '/quests', params: { theme } });
@@ -207,6 +213,7 @@ export default function HomeScreen() {
             </AnimatedCard>
 
             <AnimatedCard 
+              animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
                 router.push({ pathname: '/geoquests', params: { theme } });
@@ -221,6 +228,7 @@ export default function HomeScreen() {
           </View>
 
           <AnimatedCard 
+            animationsEnabled={animationsEnabled}
             onPress={() => {
               playClickSound();
               router.push({ pathname: '/feed', params: { theme } });
@@ -241,6 +249,7 @@ export default function HomeScreen() {
           </AnimatedCard>
 
           <AnimatedCard 
+            animationsEnabled={animationsEnabled}
             onPress={() => {
               playClickSound();
               router.push({ pathname: '/time-capsule', params: { theme } });
@@ -259,7 +268,6 @@ export default function HomeScreen() {
               </Text>
             </View>
           </AnimatedCard>
-
         </View>
       </View>
 

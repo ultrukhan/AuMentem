@@ -18,6 +18,7 @@ import {
 
 import { Colors, Typography, Radii, Spacing, Shadows } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
+import BottomNav from '@/components/BottomNav'; // <-- Імпорт нижнього меню
 
 export default function LocalEventsScreen() {
   const router = useRouter();
@@ -25,6 +26,15 @@ export default function LocalEventsScreen() {
   const isDark = theme === 'dark';
   const c = Colors[isDark ? 'dark' : 'light'];
   const sh = Shadows[isDark ? 'dark' : 'light'];
+
+  const handleGoBack = () => {
+    playClickSound();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/home');
+    }
+  };
 
   return (
     <ImageBackground 
@@ -38,10 +48,7 @@ export default function LocalEventsScreen() {
         
         <View style={s.header}>
           <Pressable 
-            onPress={() => {
-              playClickSound();
-              router.back();
-            }}
+            onPress={handleGoBack}
             style={({ pressed }) => [
               s.iconBtn, 
               { backgroundColor: c.cardBg, borderColor: c.border },
@@ -83,10 +90,7 @@ export default function LocalEventsScreen() {
             </View>
 
             <Pressable 
-              onPress={() => {
-                playClickSound();
-                router.back();
-              }}
+              onPress={handleGoBack}
               style={({ pressed }) => [
                 s.primaryBtn, 
                 { backgroundColor: c.accent },
@@ -100,19 +104,17 @@ export default function LocalEventsScreen() {
 
           </View>
         </View>
-
+        
+        <BottomNav isDark={isDark} />
+        
       </SafeAreaView>
     </ImageBackground>
   );
 }
 
 const s = StyleSheet.create({
-  container: { 
-    flex: 1 
-  },
-  safe: { 
-    flex: 1 
-  },
+  container: { flex: 1 },
+  safe: { flex: 1 },
   header: { 
     flexDirection: 'row', 
     paddingHorizontal: Spacing.screenX, 
@@ -130,7 +132,7 @@ const s = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.screenX,
-    paddingBottom: 40,
+    paddingBottom: 120,
   },
   card: {
     padding: 32,
@@ -147,33 +149,11 @@ const s = StyleSheet.create({
     marginBottom: 24,
     position: 'relative',
   },
-  sparkleBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-  },
-  title: {
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  description: {
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
+  sparkleBadge: { position: 'absolute', top: -5, right: -5 },
+  title: { textAlign: 'center', marginBottom: 16 },
+  description: { textAlign: 'center', lineHeight: 24, marginBottom: 32 },
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: Radii.full,
-    marginBottom: 32,
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radii.full, marginBottom: 32,
   },
-  primaryBtn: {
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: Radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  }
+  primaryBtn: { width: '100%', paddingVertical: 16, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center' }
 });

@@ -9,6 +9,7 @@ const setupAudio = async () => {
       playsInSilentModeIOS: true,
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
     });
   } catch (e) {}
 };
@@ -63,15 +64,20 @@ export const playClickSound = async () => {
   } catch (error) {}
 };
 
-export const playAmbientSound = async (durationSeconds: number = 0) => {
+export const playAmbientSound = async (durationSeconds: number = 0, isDark: boolean = false) => {
   const { music, musicVolume } = await getAudioSettings();
   if (!music) return;
 
   await setupAudio();
   try {
     await stopAmbientSound();
+    
+    const soundFile = isDark 
+      ? require('../assets/sounds/bgm_dark.mp3') 
+      : require('../assets/sounds/bgm.mp3');
+
     const { sound } = await Audio.Sound.createAsync(
-      require('../assets/sounds/bgm.mp3'),
+      soundFile,
       { isLooping: true, volume: musicVolume }
     );
     ambientSoundInstance = sound;

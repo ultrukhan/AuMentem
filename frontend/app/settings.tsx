@@ -1,29 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ImageBackground, ScrollView, Switch, Platform, Alert, Pressable, Modal, TextInput, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Platform, Alert, Pressable, Modal, TextInput, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send, Bell } from 'lucide-react-native';
+import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
 import { Colors, Typography, Radii, Spacing, Shadows } from '@/constants/theme';
-import { playClickSound, stopAmbientSound, setAmbientVolume } from '@/utils/audio';
+import { playClickSound, stopAmbientSound, setAmbientVolume, playAmbientSound } from '@/utils/audio';
 import { BASE_URL } from '@/constants/api';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const SettingsLink = ({ icon: Icon, title, onPress, isDark }: any) => {
+const SettingsLink = ({ icon: Icon, title, onPress, isDark, animationsEnabled }: any) => {
   const c = Colors[isDark ? 'dark' : 'light'];
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
     <AnimatedPressable
-      onPressIn={() => scale.value = withSpring(0.97)}
-      onPressOut={() => scale.value = withSpring(1)}
+      onPressIn={() => {
+        if (animationsEnabled) scale.value = withSpring(0.97);
+      }}
+      onPressOut={() => {
+        if (animationsEnabled) scale.value = withSpring(1);
+      }}
       onPress={() => { playClickSound(); onPress(); }}
-      style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border }, animatedStyle]}
+      style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border }, animationsEnabled ? animatedStyle : null]}
     >
       <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
         <Icon color={c.iconColor} size={20} strokeWidth={2} />
@@ -85,7 +89,6 @@ export default function SettingsScreen() {
     sfx: true,
     sfxVolume: 0.5,
     animations: true,
-    notifications: true,
     anonymousMode: false,
   });
 
@@ -109,20 +112,19 @@ export default function SettingsScreen() {
     try {
       await SecureStore.setItemAsync('userSettings', JSON.stringify(newSettings));
       
-      if (!isSlider) {
-        if (key === 'sfx' && value === false) {
-          // Якщо вимкнули звуки — нічого не граємо
-        } else {
-          // Якщо ввімкнули звуки, або змінили інший тумблер — граємо звук
-          playClickSound(); 
-        }
+      if (!isSlider && !(key === 'sfx' && value === false)) {
+        playClickSound(); 
       }
 
-      if (key === 'music' && value === false) stopAmbientSound();
-      
-      if (key === 'musicVolume') {
-        setAmbientVolume(value);
+      if (key === 'music') {
+        if (value === false) {
+          stopAmbientSound();
+        } else {
+          playAmbientSound(0, isDark);
+        }
       }
+      
+      if (key === 'musicVolume') setAmbientVolume(value);
     } catch (error) {}
   };
 
@@ -132,7 +134,7 @@ export default function SettingsScreen() {
     
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      await fetch(`${BASE_URL}/support`, {
+      const res = await fetch(`${BASE_URL}/support`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,24 +143,26 @@ export default function SettingsScreen() {
         body: JSON.stringify({ message: supportMessage })
       });
       
-      Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку.");
-      setSupportModalVisible(false);
-      setSupportMessage('');
+      if (res.ok) {
+        Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
+        setSupportModalVisible(false);
+        setSupportMessage('');
+      } else {
+        Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
+      }
     } catch (e) {
-      Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
+      Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
     }
   };
 
   const openPrivacyPolicy = () => {
-    Linking.openURL('https://tvoj-sajt.com/privacy').catch(() => {
-      Alert.alert("Політика", "Тут будуть розписані правила використання.");
+    Linking.openURL('https://aumentem.notion.site/ab1c6d5d49f049e8971d08c4ee5c0095?source=copy_link').catch(() => {
+      Alert.alert("Політика", "Сторінка в розробці.");
     });
   };
 
   return (
-    <ImageBackground source={require('@/assets/images/background.jpg')} style={s.container} resizeMode="cover">
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
-
+    <View style={[s.container, { backgroundColor: c.background }]}>
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.header}>
           <Pressable 
@@ -199,27 +203,22 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ПРИВАТНІСТЬ ТА СПОВІЩЕННЯ</Text>
+          <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ПРИВАТНІСТЬ</Text>
           <View style={s.section}>
-            <SettingsToggle 
-              icon={Bell} title="Push-сповіщення" isDark={isDark}
-              value={settings.notifications} 
-              onValueChange={(val: boolean) => updateSetting('notifications', val)}
-            />
             <SettingsToggle 
               icon={Ghost} title="Глобальний режим анонімності" isDark={isDark}
               value={settings.anonymousMode} 
               onValueChange={(val: boolean) => updateSetting('anonymousMode', val)}
             />
             <Text style={[Typography.nav, { color: c.textMuted, marginTop: 4, paddingHorizontal: 4 }]}>
-              Всі нові пости у стрічці будуть публікуватися без імені.
+              Всі нові пости у стрічці будуть за замовчуванням публікуватися без імені.
             </Text>
           </View>
 
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ІНФОРМАЦІЯ</Text>
           <View style={s.section}>
-            <SettingsLink icon={MessageCircleQuestion} title="Написати в підтримку" isDark={isDark} onPress={() => setSupportModalVisible(true)} />
-            <SettingsLink icon={ShieldCheck} title="Умови та Політика" isDark={isDark} onPress={openPrivacyPolicy} />
+            <SettingsLink icon={MessageCircleQuestion} title="Написати в підтримку" isDark={isDark} animationsEnabled={settings.animations} onPress={() => setSupportModalVisible(true)} />
+            <SettingsLink icon={ShieldCheck} title="Умови та Політика" isDark={isDark} animationsEnabled={settings.animations} onPress={openPrivacyPolicy} />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -234,7 +233,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
             <Text style={[Typography.body, { color: c.textMuted, marginBottom: 16 }]}>
-              Знайшли баг чи маєте ідею? Напишіть нам!
+              Знайшли баг чи маєте ідею? Напишіть нам, і ми відповімо вам на email!
             </Text>
             
             <TextInput
@@ -257,7 +256,7 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
-    </ImageBackground>
+    </View>
   );
 }
 
@@ -265,7 +264,7 @@ const s = StyleSheet.create({
   container: { flex: 1 }, safe: { flex: 1 },
   header: { flexDirection: 'row', paddingHorizontal: Spacing.screenX, paddingTop: 12, paddingBottom: 24 },
   iconBtn: { padding: 12, borderRadius: Radii.md, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
-  mainTitle: { paddingHorizontal: Spacing.screenX, marginBottom: 24, textShadowColor: 'rgba(0, 0, 0, 0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+  mainTitle: { paddingHorizontal: Spacing.screenX, marginBottom: 24 },
   scrollView: { flex: 1, paddingHorizontal: Spacing.screenX },
   sectionTitle: { marginBottom: 8, marginLeft: 4, letterSpacing: 1, fontSize: 12 },
   section: { marginBottom: 32, gap: 8 },
