@@ -102,7 +102,11 @@ async def start_geo_quest(
     ).first()
 
     if active_quest:
-        raise HTTPException(status_code=400, detail="Ви вже взяли цей квест, але ще не завершили його!")
+        active_quest_with_relations = db.query(DBUserGeoQuest).options(
+            joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place),
+            joinedload(DBUserGeoQuest.geo_quest.user)
+        ).filter(DBUserGeoQuest.id == active_quest.id).first()
+        return active_quest_with_relations
 
     completed_today = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,

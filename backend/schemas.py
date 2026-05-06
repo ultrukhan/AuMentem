@@ -207,4 +207,7 @@ class OnlyMessageResponse(BaseModel):
     message: str
     model_config = {"from_attributes": True}
 
+class SupportRequest(BaseModel):
+    message: str = Field(..., min_length=10, description="Текст звернення в підтримку")
+
 
