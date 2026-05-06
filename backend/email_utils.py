@@ -44,3 +44,44 @@ def send_verification_email(email_to: str, token: str):
         print(f"Помилка відправки емейлу (Brevo): {e}")
         if isinstance(e, requests.exceptions.HTTPError):
             print(f"Деталі помилки: {e.response.text}")
+
+
+def send_support_email_to_admins(user_email: str, user_message: str):
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+    SENDER_EMAIL = os.getenv("SMTP_EMAIL")
+    ADMIN_EMAIL = os.getenv("SMTP_EMAIL")
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    html_content = f"""
+    <html>
+        <body>
+            <h2>Нове звернення в підтримку!</h2>
+            <p><strong>Від користувача:</strong> {user_email}</p>
+            <p><strong>Повідомлення:</strong></p>
+            <blockquote style="background: #f9f9f9; padding: 15px; border-left: 5px solid #ccc;">
+                {user_message}
+            </blockquote>
+        </body>
+    </html>
+    """
+
+    payload = {
+        "sender": {"name": "AuMentem Support Form", "email": SENDER_EMAIL},
+        "to": [{"email": ADMIN_EMAIL}],
+        "replyTo": {"email": user_email},
+        "subject": "Нове повідомлення з додатку",
+        "htmlContent": html_content
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        print("Повідомлення в підтримку успішно переслано адмінам")
+    except Exception as e:
+        print(f"Помилка відправки підтримки: {e}")
