@@ -23,11 +23,11 @@ import { BASE_URL } from '@/constants/api';
 import { Colors, Typography, Radii, Spacing, IconSizes } from '@/constants/theme';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import ConfettiCannon from 'react-native-confetti-cannon';
+import { playClickSound, playSuccessSound } from '@/utils/audio';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-// Залишаємо цю важку пружну картку ТІЛЬКИ для хедера
-const AnimatedCard = ({ onPress, disabled, style, children }: any) => {
+const AnimatedCard = ({ onPress, disabled, style, children, animationsEnabled = true }: any) => {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -37,10 +37,10 @@ const AnimatedCard = ({ onPress, disabled, style, children }: any) => {
   return (
     <AnimatedPressable
       disabled={disabled}
-      onPressIn={() => { if (!disabled) scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }) }}
-      onPressOut={() => scale.value = withSpring(1, { damping: 15, stiffness: 200 })}
+      onPressIn={() => { if (!disabled && animationsEnabled) scale.value = withSpring(0.96, { damping: 15, stiffness: 200 }) }}
+      onPressOut={() => { if (animationsEnabled) scale.value = withSpring(1, { damping: 15, stiffness: 200 }) }}
       onPress={onPress}
-      style={[style, animatedStyle]}
+      style={[style, animationsEnabled ? animatedStyle : null]}
     >
       {children}
     </AnimatedPressable>
@@ -63,15 +63,14 @@ export default function QuestsScreen() {
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
-  // ОПТИМІЗАЦІЯ 1: Тримаємо конфеті вимкненим, поки воно реально не знадобиться
   const [showConfetti, setShowConfetti] = useState(false);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
 
-  // Плавна анімація фону
   const overlayAnimatedStyle = useAnimatedStyle(() => {
     return {
-      backgroundColor: withTiming(c.overlay, { duration: 400 }),
+      backgroundColor: withTiming(c.overlay, { duration: animationsEnabled ? 400 : 0 }),
     };
-  }, [c.overlay]);
+  }, [c.overlay, animationsEnabled]);
 
   const loadQuests = async (showLoadingIndicator = true) => {
     if (showLoadingIndicator) setIsLoading(true);
@@ -85,23 +84,44 @@ export default function QuestsScreen() {
 
       if (response.ok) {
         const data = await response.json();
-        setQuests(data);
+        
+        const priority: Record<string, number> = {
+          'IN_PROGRESS': 1,
+          'AVAILABLE': 2,
+          'COMPLETED': 3
+        };
+
+        const sortedData = data.sort((a: any, b: any) => 
+          (priority[a.status] || 99) - (priority[b.status] || 99)
+        );
+
+        setQuests(sortedData);
       }
-    } catch (error) {
-      console.error("Помилка завантаження:", error);
-    } finally {
+    } catch (error) {} finally {
       setIsLoading(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
+      const fetchSettings = async () => {
+        try {
+          const savedSettings = await SecureStore.getItemAsync('userSettings');
+          if (savedSettings) {
+            const parsed = JSON.parse(savedSettings);
+            setAnimationsEnabled(parsed.animations !== false);
+          }
+        } catch (error) {}
+      };
+
+      fetchSettings();
       loadQuests(true);
       return () => {};
     }, [])
   );
 
   const handleUpdateStatus = async (questId: string, action: 'start' | 'complete') => {
+    playClickSound();
     setActionLoadingId(questId);
     try {
       const token = await SecureStore.getItemAsync('userToken');
@@ -111,32 +131,45 @@ export default function QuestsScreen() {
       });
 
       if (response.ok) {
-        await loadQuests(false); // Оновлюємо список у фоні без індикатора завантаження екрану
+        await loadQuests(false);
         
         if (action === 'complete') {
-          // Вмикаємо рендер конфеті!
-          setShowConfetti(true);
+          playSuccessSound();
           
-          setTimeout(() => {
+          let defaultAnonymous = false;
+          const savedSettings = await SecureStore.getItemAsync('userSettings');
+          if (savedSettings) {
+            try {
+              const parsed = JSON.parse(savedSettings);
+              defaultAnonymous = !!parsed.anonymousMode;
+            } catch (e) {}
+          }
+
+          if (animationsEnabled) {
+            setShowConfetti(true);
+            setTimeout(() => {
+              setQuestToShare(questId);
+              setIsAnonymous(defaultAnonymous); 
+              setShareModalVisible(true);
+            }, 1500); 
+            
+            setTimeout(() => {
+              setShowConfetti(false);
+            }, 4000);
+          } else {
             setQuestToShare(questId);
-            setIsAnonymous(false); 
+            setIsAnonymous(defaultAnonymous); 
             setShareModalVisible(true);
-          }, 1500); // Чекаємо 1.5 секунди поки салют відгримить
-          
-          // Вимикаємо конфеті з пам'яті через 4 секунди
-          setTimeout(() => {
-            setShowConfetti(false);
-          }, 4000);
+          }
         }
       }
-    } catch (error) {
-      console.error(`Помилка ${action}:`, error);
-    } finally {
+    } catch (error) {} finally {
       setActionLoadingId(null);
     }
   };
 
   const handleShareQuest = async () => {
+    playClickSound();
     if (!questToShare) return;
     setIsSharing(true);
     
@@ -169,6 +202,7 @@ export default function QuestsScreen() {
   };
 
   const handleEvaluate = async (questId: string, evaluation: 'BETTER' | 'SAME' | 'WORSE') => {
+    playClickSound();
     setActionLoadingId(questId);
     try {
       const token = await SecureStore.getItemAsync('userToken');
@@ -184,14 +218,13 @@ export default function QuestsScreen() {
       if (response.ok) {
         await loadQuests(false);
       }
-    } catch (error) {
-      console.error("Помилка оцінки:", error);
-    } finally {
+    } catch (error) {} finally {
       setActionLoadingId(null);
     }
   };
 
   const promptEvaluation = (questId: string) => {
+    playClickSound();
     Alert.alert(
       "Як ти почуваєшся?",
       "Оціни свій стан після виконання цього квесту",
@@ -220,18 +253,26 @@ export default function QuestsScreen() {
         
         <View style={s.header}>
           <AnimatedCard 
-            onPress={() => router.back()}
+            animationsEnabled={animationsEnabled}
+            onPress={() => {
+              playClickSound();
+              router.back();
+            }}
             style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}
           >
             <ArrowLeft color={c.textMain} size={24} strokeWidth={2} />
           </AnimatedCard>
 
           <View style={s.headerRight}>
-            <AnimatedCard style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+            <AnimatedCard animationsEnabled={animationsEnabled} style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}>
               <User color={c.textMain} size={24} strokeWidth={2} />
             </AnimatedCard>
             <AnimatedCard 
-              onPress={() => router.push({ pathname: '/profile', params: { theme } })}
+              animationsEnabled={animationsEnabled}
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/profile', params: { theme } });
+              }}
               style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}
             >
               <Settings color={c.textMain} size={24} strokeWidth={2} />
@@ -288,7 +329,7 @@ export default function QuestsScreen() {
               const isButtonDisabled = isItemLoading || (quest.status === 'COMPLETED' && !!quest.evaluation);
 
               return (
-                <View key={quest.id} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+                <View key={quest.id} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, isCompleted && { opacity: 0.85 }]}>
                   
                   <View style={[s.iconBoxInner, { backgroundColor: c.iconBg }]}>
                     <IconComponent color={c.iconColor} size={32} strokeWidth={2} />
@@ -315,14 +356,13 @@ export default function QuestsScreen() {
                       )}
                     </View>
 
-                    {/* ОПТИМІЗАЦІЯ 2: Повернули стандартний легкий Pressable замість AnimatedCard */}
                     <Pressable 
                       onPress={onPressAction}
                       disabled={isButtonDisabled}
                       style={({ pressed }) => [
                         s.actionButton,
                         { backgroundColor: c.accent },
-                        pressed && s.pressedLight,
+                        pressed && animationsEnabled && s.pressedLight,
                         isButtonDisabled && { opacity: 0.5, backgroundColor: c.textMuted }
                       ]}
                     >
@@ -355,7 +395,10 @@ export default function QuestsScreen() {
               </Text>
 
               <Pressable 
-                onPress={() => setIsAnonymous(!isAnonymous)}
+                onPress={() => {
+                  playClickSound();
+                  setIsAnonymous(!isAnonymous);
+                }}
                 style={[s.checkboxRow, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }]}
               >
                 <View style={[
@@ -376,8 +419,11 @@ export default function QuestsScreen() {
 
               <View style={s.modalButtons}>
                 <Pressable 
-                  onPress={() => setShareModalVisible(false)}
-                  style={({ pressed }) => [s.cancelBtn, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }, pressed && s.pressedLight]}
+                  onPress={() => {
+                    playClickSound();
+                    setShareModalVisible(false);
+                  }}
+                  style={({ pressed }) => [s.cancelBtn, { backgroundColor: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)' }, pressed && animationsEnabled && s.pressedLight]}
                 >
                   <Text style={[Typography.button, { color: c.textMain }]}>Ні, дякую</Text>
                 </Pressable>
@@ -385,7 +431,7 @@ export default function QuestsScreen() {
                 <Pressable 
                   onPress={handleShareQuest}
                   disabled={isSharing}
-                  style={({ pressed }) => [s.confirmBtn, { backgroundColor: c.accent }, pressed && s.pressedLight, isSharing && { opacity: 0.7 }]}
+                  style={({ pressed }) => [s.confirmBtn, { backgroundColor: c.accent }, pressed && animationsEnabled && s.pressedLight, isSharing && { opacity: 0.7 }]}
                 >
                   {isSharing ? (
                     <ActivityIndicator color="#FFF" />
@@ -399,8 +445,7 @@ export default function QuestsScreen() {
           </View>
         </Modal>
 
-        {/* Конфеті рендериться ТІЛЬКИ коли потрібно, і зменшено до 100 елементів */}
-        {showConfetti && (
+        {showConfetti && animationsEnabled && (
           <ConfettiCannon
             count={100}
             origin={{x: -10, y: 0}}

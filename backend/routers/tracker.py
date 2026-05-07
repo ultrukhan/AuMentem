@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models import DBAppUser, DBStateLog
-from backend.schemas import StateLogCreate, StateLogResponse, OnlyMessageResponse
-from backend.auth_utils import get_current_user
+from database import get_db
+from models import DBAppUser, DBStateLog
+from schemas import StateLogCreate, StateLogResponse, OnlyMessageResponse
+from auth_utils import get_current_user
 from sqlalchemy.exc import IntegrityError
 
 
 router = APIRouter(
-    prefix="/tracker",
-    tags=["tracker"]
+    prefix="/Tracker",
+    tags=["Tracker"]
 )
 
 @router.post("/state", response_model=StateLogResponse)

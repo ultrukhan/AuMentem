@@ -13,7 +13,7 @@ interface BottomNavProps {
 export default function BottomNav({ isDark = false }: BottomNavProps) {
   const router = useRouter();
   const pathname = usePathname(); 
-  const insets = useSafeAreaInsets(); // Дістаємо відступи телефону
+  const insets = useSafeAreaInsets(); // відступи телефону
   
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
@@ -29,7 +29,6 @@ export default function BottomNav({ isDark = false }: BottomNavProps) {
     <View style={[
       styles.container, 
       sh.nav, 
-      // Динамічний відступ знизу: якщо є свайп-бар/кнопки, піднімаємо вище, якщо ні - 24px
       { bottom: Math.max(insets.bottom + 12, 24) } 
     ]}>
       <BlurView 

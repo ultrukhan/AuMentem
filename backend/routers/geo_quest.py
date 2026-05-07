@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
-from backend.database import get_db
-from backend.models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from backend.schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
-from backend.auth_utils import get_current_user
-from backend.enums import QuestStatus
+from database import get_db
+from models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
+from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
+from auth_utils import get_current_user
+from enums import QuestStatus
 import uuid
 import os
 import shutil
@@ -14,7 +14,7 @@ from typing import List
 import time
 import cloudinary
 import cloudinary.utils
-from backend.config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
 
 router = APIRouter(
     prefix="/geo-quests",
@@ -102,7 +102,11 @@ async def start_geo_quest(
     ).first()
 
     if active_quest:
-        raise HTTPException(status_code=400, detail="Ви вже взяли цей квест, але ще не завершили його!")
+        active_quest_with_relations = db.query(DBUserGeoQuest).options(
+            joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place),
+            joinedload(DBUserGeoQuest.geo_quest.user)
+        ).filter(DBUserGeoQuest.id == active_quest.id).first()
+        return active_quest_with_relations
 
     completed_today = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,

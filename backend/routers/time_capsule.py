@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from backend.database import get_db
-from backend.models import DBAppUser, DBTimeCapsule
-from backend.schemas import TimeCapsuleCreate, TimeCapsuleResponse, OnlyMessageResponse
-from backend.auth_utils import get_current_user
+from database import get_db
+from models import DBAppUser, DBTimeCapsule
+from schemas import TimeCapsuleCreate, TimeCapsuleResponse, OnlyMessageResponse
+from auth_utils import get_current_user
 from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(
-    prefix="/time-capsule",
-    tags=["time-capsule"]
+    prefix="/Time-capsule",
+    tags=["Time-capsule"]
 )
 
 
@@ -43,7 +43,7 @@ async def get_latest_unread_message(
     """
     db_message = db.query(DBTimeCapsule) \
         .filter(DBTimeCapsule.user_id == user.id, DBTimeCapsule.is_viewed == False) \
-        .order_by(DBTimeCapsule.created_at.desc()) \
+        .order_by(DBTimeCapsule.created_at.asc()) \
         .first()
 
     if not db_message:
