@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Modal,
+  ScrollView
 } from "react-native";
 import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -92,7 +93,12 @@ export default function RegisterScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={s.content}>
+        <ScrollView
+          contentContainerStyle={s.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           <View style={s.header}>
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
@@ -169,7 +175,7 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           </View>
-        </View>
+       </ScrollView>
 
         <Modal visible={showSuccess} transparent animationType="fade">
           <View style={s.modalOverlay}>
@@ -177,14 +183,24 @@ export default function RegisterScreen() {
               <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
               <Text style={[Typography.titleLg, { color: c.textMain }]}>Майже готово! ✉️</Text>
               <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
-                Ми відправили лист на твою пошту. Будь ласка, перейди за посиланням у листі, щоб підтвердити акаунт.
+                Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.
               </Text>
-              <Pressable 
+              {/* <Pressable 
                 style={[s.modalBtn, { backgroundColor: c.accent }]} 
                 onPress={() => { setShowSuccess(false); router.back(); }}
               >
                 <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
-              </Pressable>
+              </Pressable> */}
+              <Pressable 
+  style={[s.modalBtn, { backgroundColor: c.accent }]} 
+  onPress={async () => { 
+    setShowSuccess(false); 
+    // Ми вже записали 'isFirstLogin' у handleRegister, тому просто повертаємось
+    router.replace('/'); // Повертаємось на екран авторизації
+  }}
+>
+  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
+</Pressable>
             </View>
           </View>
         </Modal>
@@ -195,6 +211,12 @@ export default function RegisterScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
+  scrollContent: { 
+    flexGrow: 1, 
+    paddingHorizontal: Spacing.screenX, 
+    justifyContent: "center",
+    paddingVertical: 40 
+  },
   content: { flex: 1, paddingHorizontal: Spacing.screenX, justifyContent: "center" },
   header: { alignItems: "center", marginBottom: 40 },
   iconGlow: { padding: Spacing.iconWideP, borderRadius: Radii.lg, marginBottom: 20 },
