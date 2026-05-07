@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 
 
 router = APIRouter(
-    prefix="/tracker",
-    tags=["tracker"]
+    prefix="/Tracker",
+    tags=["Tracker"]
 )
 
 @router.post("/state", response_model=StateLogResponse)

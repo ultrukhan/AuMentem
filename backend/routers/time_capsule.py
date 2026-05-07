@@ -7,8 +7,8 @@ from auth_utils import get_current_user
 from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(
-    prefix="/time-capsule",
-    tags=["time-capsule"]
+    prefix="/Time-capsule",
+    tags=["Time-capsule"]
 )
 
 
@@ -43,7 +43,7 @@ async def get_latest_unread_message(
     """
     db_message = db.query(DBTimeCapsule) \
         .filter(DBTimeCapsule.user_id == user.id, DBTimeCapsule.is_viewed == False) \
-        .order_by(DBTimeCapsule.created_at.desc()) \
+        .order_by(DBTimeCapsule.created_at.asc()) \
         .first()
 
     if not db_message:
