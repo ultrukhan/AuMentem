@@ -48,7 +48,7 @@ export default function TrackerScreen() {
       const token = await SecureStore.getItemAsync('userToken');
       const autoMessage = "Цей момент радості зафіксовано в трекері! Нехай цей промінь світла стане підтримкою у майбутньому. Все буде добре! ✨";
       
-      const response = await fetch(`${BASE_URL}/time-capsule/message`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/message`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: autoMessage })
@@ -76,7 +76,7 @@ export default function TrackerScreen() {
 
       if (response.ok) {
         if (selectedState === 'APATHY') {
-          const res = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
+          const res = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();

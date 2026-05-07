@@ -31,7 +31,7 @@ export default function TimeCapsuleScreen() {
     setIsLoading(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -60,7 +60,7 @@ export default function TimeCapsuleScreen() {
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/time-capsule/message`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/message`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

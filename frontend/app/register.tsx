@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Modal,
+  ScrollView
 } from "react-native";
 import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -92,7 +93,12 @@ export default function RegisterScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={s.content}>
+        <ScrollView
+          contentContainerStyle={s.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
           <View style={s.header}>
             <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
               <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
@@ -169,7 +175,7 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           </View>
-        </View>
+       </ScrollView>
 
         {/* МОДАЛКА УСПІХУ */}
         <Modal visible={showSuccess} transparent animationType="fade">
@@ -178,7 +184,7 @@ export default function RegisterScreen() {
               <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
               <Text style={[Typography.titleLg, { color: c.textMain }]}>Готово! 🎉</Text>
               <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
-                Акаунт створено. Тепер увійди, щоб обрати свої хобі.
+                Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.
               </Text>
               {/* <Pressable 
                 style={[s.modalBtn, { backgroundColor: c.accent }]} 
@@ -206,6 +212,12 @@ export default function RegisterScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
+  scrollContent: { 
+    flexGrow: 1, 
+    paddingHorizontal: Spacing.screenX, 
+    justifyContent: "center",
+    paddingVertical: 40 
+  },
   content: { flex: 1, paddingHorizontal: Spacing.screenX, justifyContent: "center" },
   header: { alignItems: "center", marginBottom: 40 },
   iconGlow: { padding: Spacing.iconWideP, borderRadius: Radii.lg, marginBottom: 20 },
