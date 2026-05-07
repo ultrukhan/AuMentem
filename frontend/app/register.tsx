@@ -179,24 +179,17 @@ export default function RegisterScreen() {
 
         <Modal visible={showSuccess} transparent animationType="fade">
           <View style={s.modalOverlay}>
-            <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }]}>
+            <View style={[s.modalContent, { backgroundColor: c.cardBg, borderColor: c.border }]}>
               <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
-              <Text style={[Typography.titleLg, { color: c.textMain }]}>Майже готово! ✉️</Text>
+              <Text style={[Typography.titleLg, { color: c.textMain }]}>Готово! 🎉</Text>
               <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
                 Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.
               </Text>
-              {/* <Pressable 
-                style={[s.modalBtn, { backgroundColor: c.accent }]} 
-                onPress={() => { setShowSuccess(false); router.back(); }}
-              >
-                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
-              </Pressable> */}
               <Pressable 
   style={[s.modalBtn, { backgroundColor: c.accent }]} 
   onPress={async () => { 
     setShowSuccess(false); 
-    // Ми вже записали 'isFirstLogin' у handleRegister, тому просто повертаємось
-    router.replace('/'); // Повертаємось на екран авторизації
+    router.replace('/');
   }}
 >
   <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
