@@ -48,7 +48,6 @@ def verify_email(token: str, db: Session = Depends(get_db)):
     """
     user = db.query(DBAppUser).filter(DBAppUser.verification_code == token).first()
     if not user:
-        # Повертаємо красиву помилку замість сирого JSON
         error_html = """
             <!DOCTYPE html>
             <html lang="uk">

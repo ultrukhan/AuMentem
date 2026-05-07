@@ -53,7 +53,7 @@ async def get_upload_signature(
 
     user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
     target_coordinates = user_quest.geo_quest.place.coordinates
-    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
+    distance = db.query(func.ST_DistanceSphere(target_coordinates, user_point)).scalar()
 
     if distance > 20.0:
         raise HTTPException(
@@ -182,18 +182,18 @@ async def get_nearest_geo_quests(
 
     results = db.query(
         DBGeoQuest,
-        func.ST_Distance(DBPlace.coordinates, user_point).label('distance')
+        func.ST_DistanceSphere(DBPlace.coordinates, user_point).label('distance')
     ).join(
         DBPlace, DBGeoQuest.place_id == DBPlace.id
     ).order_by(
-        func.ST_Distance(DBPlace.coordinates, user_point)
+        func.ST_DistanceSphere(DBPlace.coordinates, user_point)
     ).limit(limit).all()
 
     response = []
     for quest, distance in results:
         response.append({
             "geo_quest": quest,
-            "distance_meters": round(distance, 2)
+            "distance_meters": round(distance, 2) # Тепер це будуть реальні метри!
         })
 
     return response
