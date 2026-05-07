@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Altera",
+    "slug": "altera",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aumentem.altera",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +23,13 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.aumentem.altera",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBoGxA67xvqsrHVpPrm3dhrsza0j_o66Ro"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -39,11 +49,31 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Дозвольте додатку використовувати вашу геолокацію для проходження геоквестів."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Додаток потребує доступу до фотографій для завантаження доказів виконання квестів.",
+          "cameraPermission": "Додаток потребує доступу до камери для створення фотографій на місці квесту."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "49ae0b67-7cc6-4c15-8580-d2b8d834436e"
+      }
+    },
+    "owner": "aumentem"
   }
 }

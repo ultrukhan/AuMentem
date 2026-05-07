@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   View, Text, TextInput, Pressable, StyleSheet, 
   ActivityIndicator, KeyboardAvoidingView, Platform, 
-  ScrollView, Alert 
+  ScrollView, Alert, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
+import { playSuccessSound, playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio'; 
 
 export default function TimeCapsuleScreen() {
   const router = useRouter();
@@ -24,14 +25,40 @@ export default function TimeCapsuleScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
+
+  const fadeAnim1 = useRef(new Animated.Value(0)).current;
+  const fadeAnim2 = useRef(new Animated.Value(0)).current;
 
   const DEFAULT_SUPPORT_MESSAGE = "Ти робиш велику справу, дбаючи про свій ментальний стан. Навіть якщо зараз тут порожньо, пам'ятай: все вдасться! ✨";
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const saved = await SecureStore.getItemAsync('userSettings');
+        if (saved) {
+          const settings = JSON.parse(saved);
+          setAnimationsEnabled(settings.animations !== false);
+        }
+      } catch (e) {}
+    };
+    loadSettings();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      playAmbientSound(0, isDark);
+      return () => {
+        stopAmbientSound();
+      };
+    }, [isDark])
+  );
 
   const fetchLatestMessage = async () => {
     setIsLoading(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -40,7 +67,6 @@ export default function TimeCapsuleScreen() {
         setUnreadMessage(data && data.message ? data.message : null);
       }
     } catch (error) {
-      console.error("Помилка завантаження капсули:", error);
     } finally {
       setIsLoading(false);
     }
@@ -52,15 +78,35 @@ export default function TimeCapsuleScreen() {
     }, [])
   );
 
+  useEffect(() => {
+    if (!isLoading) {
+      if (animationsEnabled) {
+        Animated.stagger(150, [
+          Animated.timing(fadeAnim1, { toValue: 1, duration: 500, useNativeDriver: true }),
+          Animated.timing(fadeAnim2, { toValue: 1, duration: 500, useNativeDriver: true })
+        ]).start();
+      } else {
+        fadeAnim1.setValue(1);
+        fadeAnim2.setValue(1);
+      }
+    }
+  }, [isLoading, animationsEnabled]);
+
+  const handleBack = () => {
+    playClickSound();
+    router.back();
+  };
+
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
-
+    
+    playClickSound();
     setIsSaving(true);
     let isSuccess = false;
 
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/time-capsule/message`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/message`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -81,6 +127,7 @@ export default function TimeCapsuleScreen() {
     }
 
     if (isSuccess) {
+      playSuccessSound();
       Alert.alert(
         "Момент збережено! ✨", 
         "Твоє послання надійно сховане у Капсулу Часу. Коли тобі буде складно або знадобиться промінь тепла, воно обов'язково тобі покажеться. 🫂",
@@ -94,11 +141,21 @@ export default function TimeCapsuleScreen() {
     }
   };
 
+  const getAnimatedStyle = (animValue: Animated.Value) => ({
+    opacity: animValue,
+    transform: [{
+      translateY: animValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [20, 0]
+      })
+    }]
+  });
+
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]} edges={['top']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.header}>
-          <Pressable onPress={() => router.back()} style={s.backBtn}>
+          <Pressable onPress={handleBack} style={s.backBtn}>
             <ArrowLeft color={c.textMain} size={IconSizes.sm} />
           </Pressable>
           <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>Капсула часу</Text>
@@ -107,7 +164,7 @@ export default function TimeCapsuleScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
           {isLoading ? <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 50 }} /> : (
             <>
-              <View style={[s.letterCard, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+              <Animated.View style={[s.letterCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft, getAnimatedStyle(fadeAnim1)]}>
                 <View style={s.letterHeader}>
                   <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
                     {unreadMessage ? <MailOpen color={c.iconColor} size={20} /> : <Heart color={c.accent} size={20} />}
@@ -128,9 +185,9 @@ export default function TimeCapsuleScreen() {
                     — З любов'ю, ти
                   </Text>
                 )}
-              </View>
+              </Animated.View>
 
-              <View style={[s.writeCard, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+              <Animated.View style={[s.writeCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft, getAnimatedStyle(fadeAnim2)]}>
                 <TextInput
                   style={[s.inputArea, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
                   placeholder="Надішли слова підтримки собі крізь час..."
@@ -146,7 +203,7 @@ export default function TimeCapsuleScreen() {
                 >
                   {isSaving ? <ActivityIndicator color="#FFF" /> : <><Send color="#FFF" size={20} /><Text style={s.sendBtnText}>Сховати в капсулу</Text></>}
                 </Pressable>
-              </View>
+              </Animated.View>
             </>
           )}
         </ScrollView>
@@ -154,6 +211,7 @@ export default function TimeCapsuleScreen() {
     </SafeAreaView>
   );
 }
+
 const s = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screenX, paddingVertical: 16 },

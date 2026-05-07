@@ -13,7 +13,7 @@ interface BottomNavProps {
 export default function BottomNav({ isDark = false }: BottomNavProps) {
   const router = useRouter();
   const pathname = usePathname(); 
-  const insets = useSafeAreaInsets(); // відступи телефону
+  const insets = useSafeAreaInsets(); 
   
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
@@ -49,10 +49,14 @@ export default function BottomNav({ isDark = false }: BottomNavProps) {
           return (
             <Pressable 
               key={tab.name}
-              onPress={() => router.replace(tab.path as any)}
+              onPress={() => {
+                if (!active) {
+                  router.replace(tab.path as any);
+                }
+              }}
               style={({ pressed }) => [
                 styles.navItem,
-                pressed && styles.pressed
+                pressed && !active && styles.pressed
               ]}
             >
               <tab.Icon color={color} size={24} strokeWidth={active ? 2.5 : 2} />

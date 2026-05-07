@@ -206,25 +206,15 @@ export default function GeoQuestsScreen() {
   };
 
   const handleCompletePress = () => {
-    Alert.alert(
-      'Доказ виконання',
-      'Зробіть фото місця, щоб підтвердити виконання квесту!',
-      [
-        { text: 'Камера', onPress: () => pickImage('camera') },
-        { text: 'Галерея', onPress: () => pickImage('gallery') },
-        { text: 'Скасувати', style: 'cancel' },
-      ]
-    );
+    pickImage();
   };
 
-  const pickImage = async (source: 'camera' | 'gallery') => {
+  const pickImage = async () => {
     try {
-      const permissionResult = source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
 
       if (!permissionResult.granted) {
-        Alert.alert('Помилка', 'Додаток потребує дозволу для роботи з фото.');
+        Alert.alert('Помилка', 'Додаток потребує дозволу для роботи з камерою.');
         return;
       }
 
@@ -235,16 +225,14 @@ export default function GeoQuestsScreen() {
         quality: 0.5,
       };
 
-      const result = source === 'camera'
-        ? await ImagePicker.launchCameraAsync(options)
-        : await ImagePicker.launchImageLibraryAsync(options);
+      const result = await ImagePicker.launchCameraAsync(options);
 
       if (!result.canceled && result.assets?.length > 0) {
         processQuestCompletion(result.assets[0].uri);
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Помилка', 'Не вдалося відкрити камеру/галерею.');
+      Alert.alert('Помилка', 'Не вдалося відкрити камеру.');
     }
   };
 
@@ -495,7 +483,7 @@ export default function GeoQuestsScreen() {
               )}
             </Pressable>
           ) : (
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={s.activeActionRow}>
                 <Pressable
                   onPress={handleCompletePress}
@@ -606,7 +594,7 @@ const s = StyleSheet.create({
   locateBtn: { position: 'absolute', right: Spacing.screenX, top: -70, padding: 12, borderRadius: Radii.full, zIndex: 10 },
   dragArea: { width: '100%', alignItems: 'center', paddingVertical: 14 },
   dragLine: { width: 40, height: 4, borderRadius: 2 },
-  sheetContent: { paddingHorizontal: Spacing.screenX, flex: 1 },
+  sheetContent: { paddingHorizontal: Spacing.screenX, flex: 1, paddingBottom: Platform.OS === 'ios' ? 40 : 24 },
   headerRow: { marginBottom: Spacing.gap },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   primaryBtn: { padding: 18, borderRadius: Radii.full, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },

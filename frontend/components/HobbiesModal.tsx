@@ -78,7 +78,6 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         setError('Не вдалося завантажити інтереси з сервера');
       }
     } catch (err) {
-      console.error(err);
       setError('Помилка з\'єднання з сервером');
     } finally {
       setIsLoading(false);
@@ -104,7 +103,6 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     try {
       const token = await SecureStore.getItemAsync('userToken');
       
-      // 1. Відправляємо на бекенд, щоб сервер знав для квестів
       const response = await fetch(`${BASE_URL}/app_user/upd_hobbies`, {
         method: 'PUT',
         headers: {
@@ -127,7 +125,6 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         setError('Не вдалося зберегти зміни на сервері');
       }
     } catch (err) {
-      console.error(err);
       setError('Помилка мережі при збереженні');
     } finally {
       setIsSaving(false);
@@ -147,7 +144,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
               onPress={onClose}
               disabled={isSaving || isSuccess}
             >
-              <View style={[s.closeIconBg, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={[s.closeIconBg, { backgroundColor: c.cardBg, borderColor: c.border }]}>
                 <X color={c.textMuted} size={20} />
               </View>
             </Pressable>
@@ -159,7 +156,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
             <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
               <Sparkles color={c.iconColor} size={28} />
             </View>
-            <Text style={[Typography.titleXl, { color: c.text, textAlign: 'center', marginBottom: 6 }]}>
+            <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginBottom: 6 }]}>
               Що тебе надихає?
             </Text>
             <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', paddingHorizontal: 20 }]}>
@@ -174,9 +171,9 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
               <View style={s.hobbiesGrid}>
                 {hobbies.map(hobby => {
                   const isSelected = selectedIds.includes(hobby.id);
-                  const bgColor = isSelected ? c.accent : c.card;
+                  const bgColor = isSelected ? c.accent : c.cardBg;
                   const borderColor = isSelected ? c.accent : c.border;
-                  const textColor = isSelected ? '#FFFFFF' : c.text;
+                  const textColor = isSelected ? '#FFFFFF' : c.textMain;
                   const iconColor = isSelected ? '#FFFFFF' : c.textMuted;
 
                   return (

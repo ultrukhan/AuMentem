@@ -90,6 +90,16 @@ export default function HomeScreen() {
             const data = await response.json();
             setUserProfile(data); 
 
+            const today = new Date().toISOString().split('T')[0];
+            const lastTrackerDate = await SecureStore.getItemAsync('lastTrackerDate');
+            
+            if (lastTrackerDate !== today) {
+              await SecureStore.setItemAsync('lastTrackerDate', today);
+              setTimeout(() => {
+                router.push({ pathname: '/tracker', params: { theme } });
+              }, 500);
+            }
+
             const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
             if (isFirstLogin === 'true') {
               setShowHobbies(true);

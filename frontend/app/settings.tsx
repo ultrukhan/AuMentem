@@ -128,32 +128,38 @@ export default function SettingsScreen() {
     } catch (error) {}
   };
 
-  const handleSupportSubmit = async () => {
-    if (!supportMessage.trim()) return Alert.alert("Увага", "Напишіть повідомлення.");
-    playClickSound();
+const [contactEmail, setContactEmail] = useState('');
+
+const handleSupportSubmit = async () => {
+  if (!supportMessage.trim()) return Alert.alert("Увага", "Напишіть повідомлення.");
+  playClickSound();
+  
+  try {
+    const token = await SecureStore.getItemAsync('userToken');
+    const res = await fetch(`${BASE_URL}/support/contact`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ 
+        message: supportMessage,
+        email: contactEmail.trim() || undefined 
+      })
+    });
     
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(`${BASE_URL}/support`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: supportMessage })
-      });
-      
-      if (res.ok) {
-        Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
-        setSupportModalVisible(false);
-        setSupportMessage('');
-      } else {
-        Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
-      }
-    } catch (e) {
-      Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
+    if (res.ok) {
+      Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
+      setSupportModalVisible(false);
+      setSupportMessage('');
+      setContactEmail('');
+    } else {
+      Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
     }
-  };
+  } catch (e) {
+    Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
+  }
+};
 
   const openPrivacyPolicy = () => {
     Linking.openURL('https://aumentem.notion.site/ab1c6d5d49f049e8971d08c4ee5c0095?source=copy_link').catch(() => {
@@ -226,16 +232,28 @@ export default function SettingsScreen() {
       <Modal visible={isSupportModalVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
           <View style={[s.modalCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'ios' ? sh.soft : { elevation: 10 }]}>
+            
             <View style={s.modalHeader}>
               <Text style={[Typography.titleLg, { color: c.textMain }]}>Служба підтримки</Text>
               <Pressable onPress={() => { playClickSound(); setSupportModalVisible(false); }} style={s.closeBtn}>
                 <X color={c.textMuted} size={24} />
               </Pressable>
             </View>
+
             <Text style={[Typography.body, { color: c.textMuted, marginBottom: 16 }]}>
               Знайшли баг чи маєте ідею? Напишіть нам, і ми відповімо вам на email!
             </Text>
             
+            <TextInput
+              style={[s.textInput, { height: 50, marginBottom: 12, backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
+              placeholder="Твій email (необов'язково)"
+              placeholderTextColor={c.textMuted}
+              value={contactEmail}
+              onChangeText={setContactEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
             <TextInput
               style={[s.textInput, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
               placeholder="Твоє повідомлення..."
@@ -253,6 +271,7 @@ export default function SettingsScreen() {
               <Send color="#FFF" size={20} />
               <Text style={[Typography.button, { color: '#FFF', marginLeft: 8 }]}>Надіслати</Text>
             </Pressable>
+            
           </View>
         </View>
       </Modal>

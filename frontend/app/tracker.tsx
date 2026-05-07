@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   View, Text, Pressable, StyleSheet, ActivityIndicator, 
-  ScrollView, Linking, Modal
+  ScrollView, Linking, Modal, Animated, Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Activity, Check, HeartHandshake, X, Sparkles, MailOpen } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
+import { playSuccessSound, playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio';
 
 const DEFAULT_SUPPORT_MESSAGES = [
   "Ти все подолаєш! Навіть після найтемнішої ночі настає світанок ✨",
@@ -39,44 +40,99 @@ export default function TrackerScreen() {
   const [activeModal, setActiveModal] = useState<'NONE' | 'POSITIVE' | 'CRITICAL'>('NONE');
   const [apathyModalVisible, setApathyModalVisible] = useState(false);
   const [supportMessage, setSupportMessage] = useState("");
+  const [animationsEnabled, setAnimationsEnabled] = useState(true);
 
-  const callSupport = (number: string) => Linking.openURL(`tel:${number}`);
+  const fadeAnimTitle = useRef(new Animated.Value(0)).current;
+  const fadeAnimCards = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const saved = await SecureStore.getItemAsync('userSettings');
+        if (saved) {
+          const settings = JSON.parse(saved);
+          setAnimationsEnabled(settings.animations !== false);
+        }
+      } catch (e) {}
+    };
+    loadSettings();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      playAmbientSound(0, isDark);
+      return () => {
+        stopAmbientSound();
+      };
+    }, [isDark])
+  );
+
+  useEffect(() => {
+    if (animationsEnabled) {
+      Animated.stagger(150, [
+        Animated.timing(fadeAnimTitle, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(fadeAnimCards, { toValue: 1, duration: 500, useNativeDriver: true })
+      ]).start();
+    } else {
+      fadeAnimTitle.setValue(1);
+      fadeAnimCards.setValue(1);
+    }
+  }, [animationsEnabled]);
+
+  const callSupport = (number: string) => {
+    playClickSound();
+    Linking.openURL(`tel:${number}`);
+  };
+
+  const handleBack = () => {
+    playClickSound();
+    router.back();
+  };
+
+  const handleSelectState = (id: string) => {
+    playClickSound();
+    setSelectedState(id);
+  };
 
   const autoSaveToCapsule = async () => {
+    playClickSound();
     setIsAutoSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
       const autoMessage = "Цей момент радості зафіксовано в трекері! Нехай цей промінь світла стане підтримкою у майбутньому. Все буде добре! ✨";
       
-      const response = await fetch(`${BASE_URL}/time-capsule/message`, {
+      const response = await fetch(`${BASE_URL}/Time-capsule/message`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: autoMessage })
       });
 
       if (response.ok) {
+        playSuccessSound();
         router.replace('/(main)/home');
       }
     } catch (e) {
-      console.error(e);
+    } finally {
       setIsAutoSaving(false); 
     }
   };
 
   const handleSaveState = async () => {
     if (!selectedState) return;
+    playClickSound();
     setIsSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/tracker/state`, {
+      const response = await fetch(`${BASE_URL}/Tracker/state`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: selectedState })
       });
 
       if (response.ok) {
+        playSuccessSound();
         if (selectedState === 'APATHY') {
-          const res = await fetch(`${BASE_URL}/time-capsule/latest-unread`, {
+          const res = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const data = await res.json();
@@ -94,11 +150,20 @@ export default function TrackerScreen() {
         }
       }
     } catch (error) {
-      console.error(error);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const getAnimatedStyle = (animValue: Animated.Value) => ({
+    opacity: animValue,
+    transform: [{
+      translateY: animValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [20, 0]
+      })
+    }]
+  });
 
   const CustomModal = ({ type }: { type: typeof activeModal }) => {
     if (type === 'NONE') return null;
@@ -112,7 +177,11 @@ export default function TrackerScreen() {
         btnColor: "#10B981",
         onPrimary: autoSaveToCapsule,
         secondaryBtn: "Написати свій текст",
-        onSecondary: () => { setActiveModal('NONE'); router.push('/time-capsule'); }
+        onSecondary: () => { 
+          playClickSound(); 
+          setActiveModal('NONE'); 
+          router.push('/time-capsule'); 
+        }
       },
       CRITICAL: {
         title: "Підтримка поруч ❤️",
@@ -127,10 +196,10 @@ export default function TrackerScreen() {
     }[type as 'POSITIVE' | 'CRITICAL'];
 
     return (
-      <Modal transparent animationType="slide" visible={type !== 'NONE'}>
+      <Modal transparent animationType="slide" visible={true}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
-            <Pressable style={s.closeIcon} onPress={() => { setActiveModal('NONE'); router.back(); }}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft]}>
+            <Pressable style={s.closeIcon} onPress={() => { playClickSound(); setActiveModal('NONE'); }}>
               <X color={c.textMuted} size={24} />
             </Pressable>
             <View style={s.modalIconBox}>{config.icon}</View>
@@ -160,13 +229,13 @@ export default function TrackerScreen() {
       
       <Modal visible={apathyModalVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
-          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft]}>
             <View style={s.modalIconBox}><MailOpen color="#9CA3AF" size={40} /></View>
             <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center' }]}>Послання для тебе 🫂</Text>
             <Text style={[Typography.body, { color: c.textMain, fontStyle: 'italic', marginVertical: 20, textAlign: 'center', lineHeight: 24 }]}>
               "{supportMessage}"
             </Text>
-            <Pressable style={[s.modalBtn, { backgroundColor: '#9CA3AF' }]} onPress={() => { setApathyModalVisible(false); router.replace('/(main)/home'); }}>
+            <Pressable style={[s.modalBtn, { backgroundColor: '#9CA3AF' }]} onPress={() => { playClickSound(); setApathyModalVisible(false); router.replace('/(main)/home'); }}>
               <Text style={s.modalBtnText}>Дякую за підтримку</Text>
             </Pressable>
           </View>
@@ -174,25 +243,29 @@ export default function TrackerScreen() {
       </Modal>
 
       <View style={s.header}>
-        <Pressable onPress={() => router.back()} style={s.backBtn}><ArrowLeft color={c.textMain} size={24} /></Pressable>
+        <Pressable onPress={handleBack} style={s.backBtn}><ArrowLeft color={c.textMain} size={IconSizes.sm} /></Pressable>
         <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>Трекер стану</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-        <View style={s.titleContainer}>
+        <Animated.View style={[s.titleContainer, getAnimatedStyle(fadeAnimTitle)]}>
           <View style={[s.iconBox, { backgroundColor: c.iconBg }]}><Activity color={c.iconColor} size={28} /></View>
           <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginTop: 16 }]}>Як ти зараз?</Text>
           <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8 }]}>Твій стан — понад усе. Обери варіант, що підходить.</Text>
-        </View>
+        </Animated.View>
 
-        <View style={s.optionsContainer}>
+        <Animated.View style={[s.optionsContainer, getAnimatedStyle(fadeAnimCards)]}>
           {MOOD_OPTIONS.map((mood) => {
             const isSelected = selectedState === mood.id;
             return (
               <Pressable
                 key={mood.id}
-                onPress={() => setSelectedState(mood.id)}
-                style={[s.moodCard, { backgroundColor: isSelected ? mood.color + '15' : c.cardBg, borderColor: isSelected ? mood.color : c.border, borderWidth: isSelected ? 2 : 1 }, sh.soft]}
+                onPress={() => handleSelectState(mood.id)}
+                style={[
+                  s.moodCard, 
+                  { backgroundColor: isSelected ? mood.color + '15' : c.cardBg, borderColor: isSelected ? mood.color : c.border, borderWidth: isSelected ? 2 : 1 }, 
+                  isSelected ? { elevation: 0, shadowOpacity: 0 } : sh.soft
+                ]}
               >
                 <View style={s.cardInner}>
                   <Text style={s.emoji}>{mood.emoji}</Text>
@@ -207,14 +280,18 @@ export default function TrackerScreen() {
               </Pressable>
             );
           })}
-        </View>
+        </Animated.View>
       </ScrollView>
 
       <View style={[s.footer, { borderTopColor: c.border, backgroundColor: c.background }]}>
         <Pressable 
           onPress={handleSaveState}
           disabled={!selectedState || isSaving}
-          style={[s.saveBtn, { backgroundColor: selectedState ? MOOD_OPTIONS.find(m => m.id === selectedState)?.color : c.accent }, (!selectedState || isSaving) && { opacity: 0.5 }]}
+          style={[
+            s.saveBtn, 
+            { backgroundColor: selectedState ? MOOD_OPTIONS.find(m => m.id === selectedState)?.color : c.accent }, 
+            (!selectedState || isSaving) ? { opacity: 0.5, elevation: 0, shadowOpacity: 0 } : { elevation: 4 }
+          ]}
         >
           {isSaving ? <ActivityIndicator color="#FFF" /> : <Text style={s.saveBtnText}>Продовжити</Text>}
         </Pressable>
@@ -236,7 +313,7 @@ const s = StyleSheet.create({
   emoji: { fontSize: 32 },
   radioCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   footer: { padding: 24, borderTopWidth: 1 },
-  saveBtn: { height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  saveBtn: { height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { ...Typography.titleMd, color: '#FFF', fontSize: 18 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.9)', justifyContent: 'center', padding: 24 },
   modalContainer: { borderRadius: Radii.xl, padding: 28, borderWidth: 1, alignItems: 'center' },

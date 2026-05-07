@@ -171,14 +171,13 @@ export default function RegisterScreen() {
           </View>
         </View>
 
-        {/* МОДАЛКА УСПІХУ */}
         <Modal visible={showSuccess} transparent animationType="fade">
           <View style={s.modalOverlay}>
-            <View style={[s.modalContent, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+            <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }]}>
               <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
-              <Text style={[Typography.titleLg, { color: c.textMain }]}>Готово! 🎉</Text>
+              <Text style={[Typography.titleLg, { color: c.textMain }]}>Майже готово! ✉️</Text>
               <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
-                Акаунт створено. Тепер увійди, щоб обрати свої хобі.
+                Ми відправили лист на твою пошту. Будь ласка, перейди за посиланням у листі, щоб підтвердити акаунт.
               </Text>
               <Pressable 
                 style={[s.modalBtn, { backgroundColor: c.accent }]} 
