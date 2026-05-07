@@ -51,9 +51,9 @@ async def get_upload_signature(
     if not user_quest:
         raise HTTPException(status_code=404, detail="Квест не знайдено")
 
-    user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
+    user_point = func.ST_GeographyFromText(f'SRID=4326;POINT({lng} {lat})')
     target_coordinates = user_quest.geo_quest.place.coordinates
-    distance = db.query(func.ST_DistanceSphere(target_coordinates, user_point)).scalar()
+    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
 
     if distance > 20.0:
         raise HTTPException(
@@ -182,15 +182,15 @@ async def get_nearest_geo_quests(
     """
     Повертає список найближчих гео-квестів відносно переданих координат юзера.
     """
-    user_point = WKTElement(f'POINT({lng} {lat})', srid=4326)
+    user_point = func.ST_GeographyFromText(f'SRID=4326;POINT({lng} {lat})')
 
     results = db.query(
         DBGeoQuest,
-        func.ST_DistanceSphere(DBPlace.coordinates, user_point).label('distance')
+        func.ST_Distance(DBPlace.coordinates, user_point).label('distance')
     ).join(
         DBPlace, DBGeoQuest.place_id == DBPlace.id
     ).order_by(
-        func.ST_DistanceSphere(DBPlace.coordinates, user_point)
+        func.ST_Distance(DBPlace.coordinates, user_point)
     ).limit(limit).all()
 
     response = []
