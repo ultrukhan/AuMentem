@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from database import get_db
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,status
 from models import DBAppUser,DBHobby
-from auth_utils import get_current_user
-from schemas import AppUserUpdate, AppUserResponse, UserHobbiesUpdate
+from schemas import AppUserUpdate, AppUserResponse, UserHobbiesUpdate,PasswordChangeRequest
+from auth_utils import get_current_user,verify_password,get_password_hash
 
 router = APIRouter(
     prefix="/app_user",
@@ -52,4 +52,27 @@ async def set_hobbies(hobbies: UserHobbiesUpdate, user: DBAppUser = Depends(get_
     db.refresh(user)
 
     return user
+
+
+@router.post("/change-password")
+async def change_password(payload: PasswordChangeRequest,user: DBAppUser = Depends(get_current_user),db: Session = Depends(get_db)):
+    """
+               Ендпоінт зміни пароля
+    """
+
+    if not verify_password(payload.old_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Неправильний поточний пароль"
+        )
+
+    if payload.old_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Новий пароль не може бути таким самим, як старий"
+        )
+    user.hashed_password = get_password_hash(payload.new_password)
+    db.commit()
+
+    return {"detail": "Пароль успішно змінено!"}
 
