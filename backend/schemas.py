@@ -210,4 +210,7 @@ class OnlyMessageResponse(BaseModel):
 class SupportRequest(BaseModel):
     message: str = Field(..., min_length=10, description="Текст звернення в підтримку")
 
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=8)
 
