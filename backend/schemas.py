@@ -237,3 +237,8 @@ class PasswordChangeRequest(BaseModel):
 
         return value
 
+class PostReportCreate(BaseModel):
+    post_id: UUID
+    reason: ReportReason
+    details: Optional[str] = Field(None, max_length=500, description="Додаткові деталі скарги")
+

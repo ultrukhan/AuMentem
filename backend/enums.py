@@ -20,3 +20,13 @@ class QuestEvaluation(str, enum.Enum):
     BETTER = "BETTER"
     WORSE = "WORSE"
     SAME = "SAME"
+
+class ReportReason(str,enum.Enum):
+    SPAM = "SPAM"
+    OFFENSIVE = "OFFENSIVE"
+    SCAM = "SCAM"
+    NUDITY = "NUDITY"
+    VIOLENCE = "VIOLENCE"
+    ILLEGAL_CONTENT = "ILLEGAL_CONTENT"
+    COPYRIGHT = "COPYRIGHT"
+    OTHER = "OTHER"

@@ -144,3 +144,15 @@ class DBUserGeoQuest(Base):
 
     user = relationship("DBAppUser", backref="user_geo_quests")
     geo_quest = relationship("DBGeoQuest", backref="user_geo_quests")
+
+class DBPostReport(Base):
+    __tablename__ = "post_report"
+    id = Column(Uuid,default=uuid.uuid4, primary_key=True, index=True)
+    post_id = Column(Uuid, ForeignKey('post.id',ondelete="CASCADE"), nullable=False)
+    reporter_id = Column(Uuid, ForeignKey('app_user.id', ondelete="CASCADE"), nullable=False)
+    reason = Column(Enum(ReportReason), nullable=False)
+    details = Column(String, nullable=True)
+
+    user = relationship("DBAppUser", backref="post_report")
+    post = relationship("DBPost", backref="post_report")
+

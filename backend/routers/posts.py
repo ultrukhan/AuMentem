@@ -3,10 +3,10 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session,joinedload
 from sqlalchemy.exc import IntegrityError
 from database import get_db
-from fastapi import APIRouter, Depends, HTTPException
-from models import DBPost,DBAppUser,DBPostReaction
+from fastapi import APIRouter, Depends, HTTPException,status
+from models import DBPost,DBAppUser,DBPostReaction,DBPostReport
 from auth_utils import get_current_user
-from schemas import PostResponse,CreatePost,ReactionToggle
+from schemas import PostResponse,CreatePost,ReactionToggle,PostReportCreate
 from uuid import UUID
 
 router = APIRouter(
@@ -89,4 +89,46 @@ async def toggle_reaction(
         db.add(new_reaction)
         db.commit()
         return {"status": "added", "message": "Реакцію додано"}
+
+@router.delete('/{post_id}')
+async def delete_post(post_id: UUID, user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    post = db.query(DBPost).filter(DBPost.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404,detail = 'Пост не знайдено!')
+    if post.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Ви не можете видалити чужий пост!'
+        )
+    db.delete(post)
+    db.commit()
+    return {"detail":"Пост успішно видалено!"}
+
+
+@router.post("/post_report")
+async def post_report(
+        data: PostReportCreate,
+        db: Session = Depends(get_db),
+        user: DBAppUser = Depends(get_current_user)
+):
+    post = db.query(DBPost).filter(DBPost.id == data.post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail='Пост не знайдено!')
+
+    post_report_new = DBPostReport(
+        post_id=data.post_id,
+        reporter_id=user.id,
+        reason=data.reason,
+        details=data.details
+    )
+
+    db.add(post_report_new)
+
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ви вже скаржилися на цей пост.")
+
+    return {"detail": "Скаргу успішно надіслано. Дякуємо за допомогу!"}
 
