@@ -7,6 +7,7 @@ from models import DBAppUser, DBUserGeoQuest, DBUserMiniQuest, DBWeeklyStat, get
 from enums import QuestStatus
 from schemas import WeeklyStatResponse
 from auth_utils import get_current_user
+from email_utils import send_weekly_stats_email
 
 router = APIRouter(
     prefix="/stats",
@@ -49,6 +50,15 @@ def generate_weekly_stats():
                     mini_quests_completed=mini_count
                 )
                 db.add(new_stat)
+
+                try:
+                    send_weekly_stats_email(
+                        email_to=user.email,
+                        geo_count=geo_count,
+                        mini_count=mini_count
+                    )
+                except Exception as email_err:
+                    print(f"Не вдалося відправити лист юзеру {user.email}: {email_err}")
 
         db.commit()
         print(f"[{now}] Тижнева статистика успішно згенерована!")
