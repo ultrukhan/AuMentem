@@ -172,7 +172,7 @@ def send_weekly_stats_email(
 
                 <p>Заходьте в додаток, щоб побити свої рекорди!</p>
                 <br>
-                <p style="color: #777; font-size: 12px;"><i>З любов'ю, команда Altera 🧡</i></p>
+                <p style="color: #777; font-size: 12px;"><i>З любов'ю, команда AuMentem 🧡</i></p>
             </body>
         </html>
         """
