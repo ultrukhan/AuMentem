@@ -241,3 +241,20 @@ async def get_active_quests(
     ).all()
 
     return active_quests
+
+@router.get("/my-history", response_model=List[UserGeoQuestResponse])
+async def get_user_quest_history(
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Повертає історію всіх гео-квестів користувача (і ті, що в процесі, і завершені).
+    Тут є дати початку (started_at) і завершення (completed_at).
+    """
+    history = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id
+    ).order_by(DBUserGeoQuest.started_at.desc()).all()
+
+    return history
