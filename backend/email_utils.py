@@ -85,3 +85,44 @@ def send_support_email_to_admins(user_email: str, user_message: str):
         print("Повідомлення в підтримку успішно переслано адмінам")
     except Exception as e:
         print(f"Помилка відправки підтримки: {e}")
+
+
+def send_password_reset_email(email_to: str, token: str):
+    BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+    SENDER_EMAIL = os.getenv("SMTP_EMAIL")
+    BASE_URL = os.getenv("BASE_URL", "https://altera-v8cl.onrender.com")
+
+    reset_link = f"{BASE_URL}/auth/reset-password?token={token}"
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+
+    html_content = f"""
+    <html>
+        <body>
+            <h2>Відновлення пароля</h2>
+            <p>Ви отримали цей лист, бо хтось запитав скидання пароля для вашого акаунта у додатку AuMentem.</p>
+            <p>Щоб встановити новий пароль, натисніть на кнопку нижче:</p>
+            <a href="{reset_link}" style="display: inline-block; padding: 10px 20px; background-color: #f57c00; color: white; text-decoration: none; border-radius: 5px;">Змінити пароль</a>
+            <br><br>
+            <p>Якщо це були не ви, просто проігноруйте цей лист.</p>
+        </body>
+    </html>
+    """
+
+    payload = {
+        "sender": {"name": "AuMentem", "email": SENDER_EMAIL},
+        "to": [{"email": email_to}],
+        "subject": "Відновлення пароля",
+        "htmlContent": html_content
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Помилка відправки емейлу (Brevo): {e}")

@@ -210,4 +210,5 @@ class OnlyMessageResponse(BaseModel):
 class SupportRequest(BaseModel):
     message: str = Field(..., min_length=10, description="Текст звернення в підтримку")
 
-
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
