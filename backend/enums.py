@@ -30,3 +30,15 @@ class ReportReason(str,enum.Enum):
     ILLEGAL_CONTENT = "ILLEGAL_CONTENT"
     COPYRIGHT = "COPYRIGHT"
     OTHER = "OTHER"
+
+class EventCategory(str, enum.Enum):
+    SPORT = "SPORT"
+    MUSIC = "MUSIC"
+    ART = "ART"
+    EDUCATION = "EDUCATION"
+    MEETUP = "MEETUP"
+    ENTERTAINMENT = "ENTERTAINMENT"
+    CHARITY = "CHARITY"
+    FOOD = "FOOD"
+    HISTORY = "HISTORY"
+    OTHER = "OTHER"
