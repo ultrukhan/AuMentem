@@ -197,7 +197,47 @@ async def get_nearest_geo_quests(
     for quest, distance in results:
         response.append({
             "geo_quest": quest,
-            "distance_meters": round(distance, 2) # Тепер це будуть реальні метри!
+            "distance_meters": round(distance, 2)
         })
 
     return response
+
+@router.delete("/my-quests/{user_geo_quest_id}/cancel")
+async def cancel_quest(
+        user_geo_quest_id: uuid.UUID,
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Скасовує квест (видаляє запис), якщо він ще в процесі.
+    """
+    user_quest = db.query(DBUserGeoQuest).filter(
+        DBUserGeoQuest.id == user_geo_quest_id,
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).first()
+
+    if not user_quest:
+        raise HTTPException(status_code=404, detail="Активний квест не знайдено (можливо, він вже завершений або скасований)")
+
+    db.delete(user_quest)
+    db.commit()
+
+    return {"message": "Квест успішно скасовано"}
+
+@router.get("/my-active", response_model=List[UserGeoQuestResponse])
+async def get_active_quests(
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Повертає список усіх квестів, які користувач зараз проходить (IN_PROGRESS).
+    """
+    active_quests = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).all()
+
+    return active_quests
