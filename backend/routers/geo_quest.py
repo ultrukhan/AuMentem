@@ -4,7 +4,7 @@ from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
 from database import get_db
 from models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
+from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest, AlbumItemResponse, PaginatedAlbumResponse
 from auth_utils import get_current_user
 from enums import QuestStatus
 import uuid
@@ -258,3 +258,45 @@ async def get_user_quest_history(
     ).order_by(DBUserGeoQuest.started_at.desc()).all()
 
     return history
+
+@router.get("/album", response_model=PaginatedAlbumResponse)
+async def get_user_album(
+    limit: int = 20,
+    offset: int = 0,
+    user: DBAppUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Повна інформація про локацію та квест
+    """
+    query = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.photo_proof_url.isnot(None),
+        DBUserGeoQuest.status == QuestStatus.COMPLETED
+    )
+
+    total_count = query.count()
+
+    user_quests = query.order_by(DBUserGeoQuest.completed_at.desc())\
+                       .limit(limit)\
+                       .offset(offset)\
+                       .all()
+
+    album_items = [
+        AlbumItemResponse(
+            id=q.id,
+            photo_url=q.photo_proof_url,
+            quest_title=q.geo_quest.title,
+            location_name=q.geo_quest.place.name,
+            completed_at=q.completed_at
+        ) for q in user_quests
+    ]
+
+    return PaginatedAlbumResponse(
+        total_count=total_count,
+        items=album_items,
+        limit=limit,
+        offset=offset
+    )

@@ -6,7 +6,7 @@ from database import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from models import DBPost,DBAppUser,DBPostReaction
 from auth_utils import get_current_user
-from schemas import PostResponse,CreatePost,ReactionToggle
+from schemas import PostResponse,CreatePost,ReactionToggle#, PaginatedPostResponse
 from uuid import UUID
 
 router = APIRouter(
@@ -53,6 +53,42 @@ async def get_posts(user: DBAppUser = Depends(get_current_user),db: Session = De
 
     return posts
 
+
+# @router.get("/", response_model=PaginatedPostResponse)
+# async def get_posts(
+#     limit: int = 15,
+#     offset: int = 0,
+#     user: DBAppUser = Depends(get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     """
+#     Повертає соціальну стрічку з пагінацією (для нескінченного скролу).
+#     """
+#     query = db.query(DBPost).options(
+#         joinedload(DBPost.user),
+#         joinedload(DBPost.user_mini_quest),
+#         joinedload(DBPost.user_geo_quest),
+#         joinedload(DBPost.reactions)
+#     )
+#
+#     total_count = query.count()
+#
+#     posts = query.order_by(desc(DBPost.created_at)).limit(limit).offset(offset).all()
+#
+#     for post in posts:
+#         if post.is_anonymous:
+#             post.user = None
+#             if post.user_mini_quest:
+#                 post.user_mini_quest.user = None
+#             if post.user_geo_quest:
+#                 post.user_geo_quest.user = None
+#
+#     return PaginatedPostResponse(
+#         total_count=total_count,
+#         items=posts,
+#         limit=limit,
+#         offset=offset
+#     )
 
 
 @router.post("/{post_id}/react")

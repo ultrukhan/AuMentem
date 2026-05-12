@@ -237,3 +237,23 @@ class PasswordChangeRequest(BaseModel):
 
         return value
 
+class AlbumItemResponse(BaseModel):
+    id: UUID
+    photo_url: str
+    quest_title: str
+    location_name: str
+    completed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class PaginatedAlbumResponse(BaseModel):
+    total_count: int
+    items: List[AlbumItemResponse]
+    limit: int
+    offset: int
+
+class PaginatedPostResponse(BaseModel):
+    total_count: int
+    items: List[PostResponse]
+    limit: int
+    offset: int
