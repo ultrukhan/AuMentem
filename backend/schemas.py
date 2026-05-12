@@ -1,4 +1,4 @@
-from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
+from pydantic import BaseModel,ConfigDict,Field,EmailStr, field_validator,model_validator
 from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
@@ -264,16 +264,42 @@ class PaginatedPostResponse(BaseModel):
     offset: int
 
 class WeeklyStatResponse(BaseModel):
-    class WeeklyStatResponse(BaseModel):
-        id: UUID
-        user_id: UUID
-        week_start: datetime
-        week_end: datetime
-        geo_quests_completed: int
-        mini_quests_completed: int
-        active_days: int
-        top_hobby: Optional[str]
-        unique_locations: int
-        total_score: int
+    id: UUID
+    user_id: UUID
+    week_start: datetime
+    week_end: datetime
+    geo_quests_completed: int
+    mini_quests_completed: int
+    active_days: int
+    top_hobby: Optional[str]
+    unique_locations: int
+    total_score: int
 
-        model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True}
+
+
+class LocalEventBase(BaseModel):
+    name: str
+    city: str
+    address: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    description: Optional[str] = None
+    external_link: Optional[str] = None
+    image_url: Optional[str] = None
+    category: EventCategory
+    price: Optional[str] = None
+
+class LocalEventCreate(LocalEventBase):
+    pass
+
+class LocalEventResponse(LocalEventBase):
+    id: UUID
+    favorites_count: Optional[int] = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FavEventActionResponse(BaseModel):
+    detail: str
+    is_favorited: bool
+

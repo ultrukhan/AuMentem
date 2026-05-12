@@ -1,7 +1,7 @@
 from database import Base
 from datetime import datetime,timezone
 import uuid
-from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
+from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum,Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum
@@ -172,3 +172,31 @@ class DBWeeklyStat(Base):
     top_hobby = Column(String, nullable=True)
     unique_locations = Column(Integer, default=0)
     total_score = Column(Integer, default=0)
+
+class DBLocalEvents(Base):
+    __tablename__ = 'local_events'
+    id= Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    name = Column(Text,nullable=False,index=True)
+    city = Column(String,nullable=False,index=True)
+    address = Column(Text,nullable=False,index=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    description = Column(Text, nullable=True)
+    external_link = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
+    coordinates = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
+    category = Column(Enum(EventCategory),nullable=False)
+    price = Column(String, nullable=True)
+
+    favorited_by = relationship("DBFavEvent", back_populates="event",cascade="all, delete-orphan")
+
+
+class DBFavEvent(Base):
+    __tablename__ = "fav_events"
+
+    user_id = Column(Uuid, ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True)
+    event_id = Column(Uuid, ForeignKey("local_events.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+
+    user = relationship("DBAppUser", backref="favorite_events")
+    event = relationship("DBLocalEvents", back_populates="favorited_by")

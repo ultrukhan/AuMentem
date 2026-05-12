@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI,Depends,HTTPException
-from routers import auth,app_user,posts,tracker,time_capsule,mini_quest,geo_quest,feedback,stats_service
+from routers import auth,app_user,posts,tracker,time_capsule,mini_quest,geo_quest,feedback,stats_service,local_events
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from routers.stats_service import generate_weekly_stats
@@ -32,3 +32,4 @@ app.include_router(mini_quest.router)
 app.include_router(geo_quest.router)
 app.include_router(feedback.router)
 app.include_router(stats_service.router)
+app.include_router(local_events.router)
