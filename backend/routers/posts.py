@@ -3,10 +3,10 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session,joinedload
 from sqlalchemy.exc import IntegrityError
 from database import get_db
-from fastapi import APIRouter, Depends, HTTPException
-from models import DBPost,DBAppUser,DBPostReaction
+from fastapi import APIRouter, Depends, HTTPException,status
+from models import DBPost,DBAppUser,DBPostReaction,DBPostReport
 from auth_utils import get_current_user
-from schemas import PostResponse,CreatePost,ReactionToggle
+from schemas import PostResponse,CreatePost,ReactionToggle,PostReportCreate,PaginatedPostResponse
 from uuid import UUID
 
 router = APIRouter(
