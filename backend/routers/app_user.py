@@ -60,7 +60,7 @@ async def change_password(payload: PasswordChangeRequest,user: DBAppUser = Depen
                Ендпоінт зміни пароля
     """
 
-    if not verify_password(payload.old_password, user.hashed_password):
+    if not verify_password(payload.old_password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Неправильний поточний пароль"
@@ -71,7 +71,7 @@ async def change_password(payload: PasswordChangeRequest,user: DBAppUser = Depen
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Новий пароль не може бути таким самим, як старий"
         )
-    user.hashed_password = get_password_hash(payload.new_password)
+    user.password_hash = get_password_hash(payload.new_password)
     db.commit()
 
     return {"detail": "Пароль успішно змінено!"}

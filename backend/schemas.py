@@ -212,7 +212,22 @@ class SupportRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, value: str):
+        if not re.search(r'[A-Z]', value):
+            raise ValueError('Пароль має містити хоча б одну велику літеру')
+        if not re.search(r'[a-z]', value):
+            raise ValueError('Пароль має містити хоча б одну малу літеру')
+        if not re.search(r'\d', value):
+            raise ValueError('Пароль має містити хоча б одну цифру')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', value):
+            raise ValueError('Пароль має містити хоча б один спеціальний символ')
+
+        return value
 
