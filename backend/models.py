@@ -7,6 +7,8 @@ from sqlalchemy.sql import func
 from sqlalchemy import Enum
 from enums import *
 from geoalchemy2 import Geography
+from sqlalchemy import Column, Integer, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 
 def get_utc_now():
     return datetime.now(timezone.utc)
@@ -156,3 +158,14 @@ class DBPostReport(Base):
     user = relationship("DBAppUser", backref="post_report")
     post = relationship("DBPost", backref="post_report")
 
+
+class DBWeeklyStat(Base):
+    __tablename__ = 'weekly_stats'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id', ondelete="CASCADE"), nullable=False)
+    week_start = Column(DateTime(timezone=True), nullable=False)
+    week_end = Column(DateTime(timezone=True), nullable=False)
+    geo_quests_completed = Column(Integer, default=0)
+    mini_quests_completed = Column(Integer, default=0)
+    total_score = Column(Integer, default=0)

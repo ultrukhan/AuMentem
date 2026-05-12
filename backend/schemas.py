@@ -262,3 +262,14 @@ class PaginatedPostResponse(BaseModel):
     items: List[PostResponse]
     limit: int
     offset: int
+
+class WeeklyStatResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    week_start: datetime
+    week_end: datetime
+    geo_quests_completed: int
+    mini_quests_completed: int
+    total_score: int
+
+    model_config = {"from_attributes": True}
