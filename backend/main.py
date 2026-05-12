@@ -12,7 +12,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         generate_weekly_stats,
         # CronTrigger(day_of_week='mon', hour=0, minute=0)
-        CronTrigger(day_of_week='tue', hour=21, minute=48)
+        CronTrigger(day_of_week='tue', hour=21, minute=58, timezone='Europe/Kiev')
 
     )
     scheduler.start()
