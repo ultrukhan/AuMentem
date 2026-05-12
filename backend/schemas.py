@@ -270,6 +270,9 @@ class WeeklyStatResponse(BaseModel):
     week_end: datetime
     geo_quests_completed: int
     mini_quests_completed: int
+    active_days: int
+    top_hobby: Optional[str]
+    unique_locations: int
     total_score: int
 
     model_config = {"from_attributes": True}

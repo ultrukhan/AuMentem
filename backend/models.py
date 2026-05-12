@@ -168,6 +168,9 @@ class DBWeeklyStat(Base):
     week_end = Column(DateTime(timezone=True), nullable=False)
     geo_quests_completed = Column(Integer, default=0)
     mini_quests_completed = Column(Integer, default=0)
+    active_days = Column(Integer, default=0)
+    top_hobby = Column(String, nullable=True)
+    unique_locations = Column(Integer, default=0)
     total_score = Column(Integer, default=0)
 
 class DBLocalEvents(Base):
