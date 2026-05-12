@@ -212,6 +212,12 @@ class SupportRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
+
+    @field_validator('email')
+    @classmethod
+    def email_to_lower(cls, value: str):
+        return value.lower()
+
 class PasswordChangeRequest(BaseModel):
     old_password: str
     new_password: str = Field(..., min_length=8)
