@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse
 from fastapi import Form
 from schemas import ForgotPasswordRequest
 from email_utils import send_password_reset_email
+import re
 
 router = APIRouter(
     prefix="/auth",
@@ -229,11 +230,48 @@ def process_reset_password(
     db: Session = Depends(get_db)
 ):
     """
-    3. Зберігає новий пароль у базу і показує галочку "Успіх".
+    Зберігає новий пароль у базу з жорсткою бекенд-валідацією.
     """
     user = db.query(DBAppUser).filter(DBAppUser.verification_code == token).first()
     if not user:
         return HTMLResponse(content="<h1>Помилка</h1><p>Недійсний токен.</p>", status_code=400)
+
+    error_msg = None
+    if len(new_password) < 8:
+        error_msg = "Пароль має містити щонайменше 8 символів"
+    elif not re.search(r'[A-Z]', new_password):
+        error_msg = "Пароль має містити хоча б одну велику літеру"
+    elif not re.search(r'[a-z]', new_password):
+        error_msg = "Пароль має містити хоча б одну малу літеру"
+    elif not re.search(r'\d', new_password):
+        error_msg = "Пароль має містити хоча б одну цифру"
+    elif not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', new_password):
+        error_msg = "Пароль має містити хоча б один спеціальний символ"
+
+    if error_msg:
+        error_html = f"""
+        <!DOCTYPE html>
+        <html lang="uk">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Помилка валідації</title>
+            <style>
+                body {{ font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f4f7f6; margin: 0; text-align: center; }}
+                .container {{ background-color: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; }}
+                a {{ display: inline-block; margin-top: 20px; padding: 10px 20px; background-color: #f57c00; color: white; text-decoration: none; border-radius: 5px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h2 style="color: #d32f2f; margin-top: 0;">Слабкий пароль</h2>
+                <p>{error_msg}.</p>
+                <a href="/auth/reset-password?token={token}">Спробувати ще раз</a>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=error_html, status_code=400)
 
     user.password_hash = get_password_hash(new_password)
     user.verification_code = None

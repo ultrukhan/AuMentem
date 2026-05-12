@@ -242,3 +242,23 @@ class PostReportCreate(BaseModel):
     reason: ReportReason
     details: Optional[str] = Field(None, max_length=500, description="Додаткові деталі скарги")
 
+class AlbumItemResponse(BaseModel):
+    id: UUID
+    photo_url: str
+    quest_title: str
+    location_name: str
+    completed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class PaginatedAlbumResponse(BaseModel):
+    total_count: int
+    items: List[AlbumItemResponse]
+    limit: int
+    offset: int
+
+class PaginatedPostResponse(BaseModel):
+    total_count: int
+    items: List[PostResponse]
+    limit: int
+    offset: int
