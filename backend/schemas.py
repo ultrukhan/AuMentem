@@ -32,7 +32,7 @@ class AppUserCreate(BaseModel):
             raise ValueError('Пароль має містити хоча б одну малу літеру')
         if not re.search(r'\d', value):
             raise ValueError('Пароль має містити хоча б одну цифру')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', value):
             raise ValueError('Пароль має містити хоча б один спеціальний символ')
 
         return value

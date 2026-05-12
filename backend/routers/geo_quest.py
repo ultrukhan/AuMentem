@@ -197,7 +197,7 @@ async def get_nearest_geo_quests(
     for quest, distance in results:
         response.append({
             "geo_quest": quest,
-            "distance_meters": round(distance, 2) # Тепер це будуть реальні метри!
+            "distance_meters": round(distance, 2)
         })
 
     return response
