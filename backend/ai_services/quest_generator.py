@@ -1,10 +1,9 @@
 import os
 import json
-import google.generativeai as genai
+from google import genai
 from typing import List, Dict
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
 
 
 async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
@@ -16,7 +15,7 @@ async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
         print("Помилка: Не знайдено GEMINI_API_KEY")
         return []
 
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
     hobbies_str = ", ".join(hobbies)
 
@@ -26,16 +25,18 @@ async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
 
         Користувач має такі хобі: {hobbies_str}.
 
-        Придумай 3 коротких, нескладних міні-квести, які витягнуть користувача з дому або допоможуть спробувати щось нове, пов'язане з його хобі.
+        Придумай 3 коротких, нескладних, лагідних міні-квести, які допоможуть спробувати щось нове, пов'язане з його хобі, враховуючи його стан апатії та відсутності сил"
         Завдання не повинні вимагати багато грошей або складної підготовки.
-        
+
         ВАЖЛИВО: Твоя відповідь має бути ТІЛЬКИ у форматі валідного JSON-масиву, без жодних додаткових пояснень чи форматування Markdown. 
         Структура: ["title1", "title2", "title3"]
-        
         """
 
     try:
-        response = await model.generate_content_async(prompt)
+        response = await client.aio.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt
+        )
         raw_text = response.text.strip()
 
         if raw_text.startswith("```json"):
