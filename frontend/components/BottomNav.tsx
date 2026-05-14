@@ -22,7 +22,8 @@ export default function BottomNav({ isDark = false }: BottomNavProps) {
   const tabs = [
     { name: 'Головна', path: '/home', Icon: Home },
     { name: 'Альбом', path: '/album', Icon: ImageIcon },
-    { name: 'Локальні', path: '/local', Icon: CalendarHeart },
+    // { name: 'Локальні', path: '/local', Icon: CalendarHeart },
+    { name: 'Локальні', path: '/localEventsScreen', Icon: CalendarHeart }
   ];
 
   return (

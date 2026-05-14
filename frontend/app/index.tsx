@@ -174,7 +174,11 @@ export default function AuthScreen() {
               <Text style={s.errorText}>{errorMessage}</Text>
             ) : null}
 
-            <Pressable style={s.forgotBtn}>
+            <Pressable style={s.forgotBtn}
+            onPress={() => {
+    playClickSound();
+    router.push('/forgot-password'); 
+  }}>
               <Text style={[s.forgotText, { color: c.accent }]}>Забули пароль?</Text>
             </Pressable>
           </View>
