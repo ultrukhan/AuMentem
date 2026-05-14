@@ -128,38 +128,34 @@ export default function SettingsScreen() {
     } catch (error) {}
   };
 
-const [contactEmail, setContactEmail] = useState('');
-
-const handleSupportSubmit = async () => {
-  if (!supportMessage.trim()) return Alert.alert("Увага", "Напишіть повідомлення.");
-  playClickSound();
-  
-  try {
-    const token = await SecureStore.getItemAsync('userToken');
-    const res = await fetch(`${BASE_URL}/support/contact`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ 
-        message: supportMessage,
-        email: contactEmail.trim() || undefined 
-      })
-    });
+  const handleSupportSubmit = async () => {
+    if (!supportMessage.trim()) return Alert.alert("Увага", "Напишіть повідомлення.");
+    playClickSound();
     
-    if (res.ok) {
-      Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
-      setSupportModalVisible(false);
-      setSupportMessage('');
-      setContactEmail('');
-    } else {
-      Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const res = await fetch(`${BASE_URL}/support/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          message: supportMessage 
+        })
+      });
+      
+      if (res.ok) {
+        Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
+        setSupportModalVisible(false);
+        setSupportMessage('');
+      } else {
+        Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
+      }
+    } catch (e) {
+      Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
     }
-  } catch (e) {
-    Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
-  }
-};
+  };
 
   const openPrivacyPolicy = () => {
     Linking.openURL('https://aumentem.notion.site/ab1c6d5d49f049e8971d08c4ee5c0095?source=copy_link').catch(() => {
@@ -244,16 +240,6 @@ const handleSupportSubmit = async () => {
               Знайшли баг чи маєте ідею? Напишіть нам, і ми відповімо вам на email!
             </Text>
             
-            <TextInput
-              style={[s.textInput, { height: 50, marginBottom: 12, backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
-              placeholder="Твій email (необов'язково)"
-              placeholderTextColor={c.textMuted}
-              value={contactEmail}
-              onChangeText={setContactEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-
             <TextInput
               style={[s.textInput, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
               placeholder="Твоє повідомлення..."

@@ -11,12 +11,27 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Modal,
-  ScrollView
+  ScrollView,
+  Image
 } from "react-native";
-import { Mail, Lock, Sparkles, ArrowRight, User } from "lucide-react-native";
+import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { Colors, Typography, Radii, Shadows, Spacing } from "@/constants/theme";
+import { Colors, Typography, Radii, Spacing } from "@/constants/theme";
 import * as SecureStore from "expo-secure-store";
+
+const ReqItem = ({ met, text, c }: { met: boolean, text: string, c: any }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+    <View style={{ 
+      width: 16, height: 16, borderRadius: 8, 
+      borderWidth: met ? 0 : 1, borderColor: c.textMuted, 
+      backgroundColor: met ? '#34D399' : 'transparent', 
+      alignItems: 'center', justifyContent: 'center' 
+    }}>
+      {met && <Check color="#FFF" size={10} strokeWidth={3} />}
+    </View>
+    <Text style={[Typography.nav, { color: met ? c.textMain : c.textMuted }]}>{text}</Text>
+  </View>
+);
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -26,13 +41,20 @@ export default function RegisterScreen() {
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const theme = isDark ? "dark" : "light";
   const c = Colors[theme];
-  const sh = Shadows[theme];
+
+  const appIcon = require('@/assets/images/icon.png');
+
+  const reqLength = password.length >= 8;
+  const reqUpper = /[A-Z]/.test(password);
+  const reqNumber = /\d/.test(password);
+  const allReqsMet = reqLength && reqUpper && reqNumber;
 
   const handleRegister = async () => {
     if (!nickname || !email || !password) {
@@ -45,8 +67,8 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMessage("Пароль має містити щонайменше 6 символів");
+    if (!allReqsMet) {
+      setErrorMessage("Будь ласка, виконайте всі вимоги до паролю");
       return;
     }
 
@@ -100,16 +122,14 @@ export default function RegisterScreen() {
           bounces={false}
         >
           <View style={s.header}>
-            <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
-              <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
-            </View>
+            <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
             <Text style={[s.mainTitle, { color: c.textMain }]}>Реєстрація</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
               Почни свій шлях в AuMentem 🌱
             </Text>
           </View>
 
-          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
             <View style={s.inputGroup}>
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
@@ -140,11 +160,21 @@ export default function RegisterScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                  {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
+                </Pressable>
               </View>
+            </View>
+
+            <View style={s.requirementsBox}>
+              <Text style={[Typography.nav, { color: c.textMuted, marginBottom: 8 }]}>Вимоги до паролю:</Text>
+              <ReqItem met={reqLength} text="Мінімум 8 символів" c={c} />
+              <ReqItem met={reqUpper} text="Хоча б одна велика літера (A-Z)" c={c} />
+              <ReqItem met={reqNumber} text="Хоча б одна цифра" c={c} />
             </View>
 
             {errorMessage ? <Text style={s.errorText}>{errorMessage}</Text> : null}
@@ -156,10 +186,10 @@ export default function RegisterScreen() {
                 s.primaryBtn,
                 { backgroundColor: c.accent },
                 pressed && s.btnPressed,
-                isLoading && { opacity: 0.7 },
+                (isLoading || !allReqsMet) && { opacity: 0.7 },
               ]}
               onPress={handleRegister}
-              disabled={isLoading}
+              disabled={isLoading || !allReqsMet}
             >
               {isLoading ? <ActivityIndicator color="#FFF" /> : (
                 <>
@@ -175,7 +205,7 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           </View>
-       </ScrollView>
+        </ScrollView>
 
         <Modal visible={showSuccess} transparent animationType="fade">
           <View style={s.modalOverlay}>
@@ -186,14 +216,14 @@ export default function RegisterScreen() {
                 Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.
               </Text>
               <Pressable 
-  style={[s.modalBtn, { backgroundColor: c.accent }]} 
-  onPress={async () => { 
-    setShowSuccess(false); 
-    router.replace('/');
-  }}
->
-  <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
-</Pressable>
+                style={[s.modalBtn, { backgroundColor: c.accent }]} 
+                onPress={async () => { 
+                  setShowSuccess(false); 
+                  router.replace('/');
+                }}
+              >
+                <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
+              </Pressable>
             </View>
           </View>
         </Modal>
@@ -210,15 +240,15 @@ const s = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 40 
   },
-  content: { flex: 1, paddingHorizontal: Spacing.screenX, justifyContent: "center" },
   header: { alignItems: "center", marginBottom: 40 },
-  iconGlow: { padding: Spacing.iconWideP, borderRadius: Radii.lg, marginBottom: 20 },
+  headerIcon: { width: 100, height: 100, borderRadius: 20, marginBottom: 20 },
   mainTitle: { ...Typography.titleXl, marginBottom: 4 },
   subtitle: { ...Typography.body, textAlign: "center" },
   card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: Spacing.headMb },
   inputGroup: { gap: 12 },
   inputWrapper: { flexDirection: "row", alignItems: "center", borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
   input: { flex: 1, ...Typography.body },
+  requirementsBox: { marginTop: 20, paddingHorizontal: 4 },
   errorText: { color: "#FF3B30", marginTop: 16, textAlign: "center", fontSize: 14, fontWeight: "500" },
   footer: { gap: Spacing.gap },
   primaryBtn: { flexDirection: "row", height: 60, borderRadius: Radii.full, alignItems: "center", justifyContent: "center", gap: 8 },

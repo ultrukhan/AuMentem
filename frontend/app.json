@@ -2,7 +2,7 @@
   "expo": {
     "name": "Altera",
     "slug": "altera",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -29,7 +29,15 @@
         "googleMaps": {
           "apiKey": "AIzaSyBoGxA67xvqsrHVpPrm3dhrsza0j_o66Ro"
         }
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -37,6 +45,19 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-dynamic-app-icon",
+        {
+          "default": {
+            "image": "./assets/images/icon.png",
+            "prerendered": true
+          },
+          "done": {
+            "image": "./assets/images/icon-done.png",
+            "prerendered": true
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -62,7 +83,8 @@
           "photosPermission": "Додаток потребує доступу до фотографій для завантаження доказів виконання квестів.",
           "cameraPermission": "Додаток потребує доступу до камери для створення фотографій на місці квесту."
         }
-      ]
+      ],
+      "expo-dynamic-app-icon"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -74,6 +96,12 @@
         "projectId": "49ae0b67-7cc6-4c15-8580-d2b8d834436e"
       }
     },
-    "owner": "aumentem"
+    "owner": "aumentem",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/49ae0b67-7cc6-4c15-8580-d2b8d834436e"
+    }
   }
 }

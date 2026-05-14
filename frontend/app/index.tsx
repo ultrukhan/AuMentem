@@ -2,13 +2,14 @@ import { BASE_URL } from '@/constants/api';
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator ,ScrollView
+  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator, ScrollView,
+  Image
 } from 'react-native';
-import { User, Lock, Sparkles, ArrowRight } from 'lucide-react-native';
+import { User, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store'; 
 
-import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
 
 export default function AuthScreen() {
@@ -17,6 +18,7 @@ export default function AuthScreen() {
   
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   
@@ -24,7 +26,8 @@ export default function AuthScreen() {
 
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
-  const sh = Shadows[theme];
+
+  const appIcon = require('@/assets/images/icon.png');
 
   useEffect(() => {
     const checkTokenAndAutoLogin = async () => {
@@ -45,7 +48,6 @@ export default function AuthScreen() {
             }
             return; 
           } else {
-           
             await SecureStore.deleteItemAsync('userToken');
           }
         }
@@ -110,9 +112,7 @@ export default function AuthScreen() {
   if (isCheckingToken) {
     return (
       <SafeAreaView style={[s.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
-          <Sparkles color={c.iconColor} size={60} strokeWidth={2} />
-        </View>
+        <Image source={appIcon} style={s.loaderIcon} resizeMode="cover" />
         <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 20 }} />
       </SafeAreaView>
     );
@@ -132,16 +132,14 @@ export default function AuthScreen() {
         >
           
           <View style={s.header}>
-            <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
-              <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
-            </View>
+            <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
             <Text style={[s.mainTitle, { color: c.textMain }]}>AuMentem</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
               Твій простір для відновлення 🌿
             </Text>
           </View>
 
-          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
             <View style={s.inputGroup}>
               
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
@@ -162,10 +160,13 @@ export default function AuthScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry
+                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                  {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
+                </Pressable>
               </View>
             </View>
 
@@ -229,9 +230,9 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 40 
   },
-  content: { flex: 1, paddingHorizontal: Spacing.screenX, justifyContent: 'center' },
+  loaderIcon: { width: 80, height: 80, borderRadius: 40 },
   header: { alignItems: 'center', marginBottom: 40 },
-  iconGlow: { padding: 16, borderRadius: Radii.lg, marginBottom: 20 },
+  headerIcon: { width: 100, height: 100, borderRadius: 20, marginBottom: 20 },
   mainTitle: { ...Typography.titleXl, marginBottom: 4 },
   subtitle: { ...Typography.body, textAlign: 'center' },
   card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: 32 },
@@ -239,7 +240,7 @@ const s = StyleSheet.create({
   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
   input: { flex: 1, ...Typography.body },
   errorText: { color: '#FF3B30', marginTop: 12, textAlign: 'center', fontSize: 14, fontWeight: '500' },
-  forgotBtn: { alignSelf: 'flex-end', marginTop: 16 },
+  forgotBtn: { alignSelf: 'flex-end', marginTop: 16, paddingHorizontal: 4 },
   forgotText: { ...Typography.muted, fontWeight: '700' },
   footer: { gap: 16 },
   primaryBtn: { flexDirection: 'row', height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', gap: 8 },
