@@ -1,15 +1,20 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Home, Image as ImageIcon, CalendarHeart } from 'lucide-react-native';
 import { useRouter, usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Shadows, Radii } from '@/constants/theme';
 
-export default function BottomNav() {
+interface BottomNavProps {
+  isDark?: boolean;
+}
+
+export default function BottomNav({ isDark = false }: BottomNavProps) {
   const router = useRouter();
-  const pathname = usePathname(); // Щоб знати, на якому ми екрані
+  const pathname = usePathname(); 
+  const insets = useSafeAreaInsets(); 
   
-  const isDark = false; // Тимчасово світла тема
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
   const sh = Shadows[theme];
@@ -21,11 +26,21 @@ export default function BottomNav() {
   ];
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container, 
+      sh.nav, 
+      { bottom: Math.max(insets.bottom + 12, 24) } 
+    ]}>
       <BlurView 
-        intensity={isDark ? 80 : 60} 
+        intensity={isDark ? 40 : 60} 
         tint={isDark ? 'dark' : 'light'} 
-        style={[styles.navBar, { borderColor: c.border }, sh.nav]}
+        style={[
+          styles.navBar, 
+          { 
+            backgroundColor: c.navBg, 
+            borderColor: c.border,
+          }
+        ]}
       >
         {tabs.map((tab) => {
           const active = pathname.includes(tab.path);
@@ -34,11 +49,20 @@ export default function BottomNav() {
           return (
             <Pressable 
               key={tab.name}
-              onPress={() => router.replace(tab.path as any)}
-              style={styles.navItem}
+              onPress={() => {
+                if (!active) {
+                  router.replace(tab.path as any);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.navItem,
+                pressed && !active && styles.pressed
+              ]}
             >
               <tab.Icon color={color} size={24} strokeWidth={active ? 2.5 : 2} />
-              <Text style={[Typography.nav, { color, marginTop: 4 }]}>{tab.name}</Text>
+              <Text style={[Typography.nav, { color, marginTop: 4 }]}>
+                {tab.name}
+              </Text>
             </Pressable>
           );
         })}
@@ -50,23 +74,26 @@ export default function BottomNav() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 30 : 20,
     left: 24,
     right: 24,
-    zIndex: 100, // Щоб меню завжди було поверх котика
+    zIndex: 100, 
   },
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     paddingVertical: 16,
-    borderRadius: Radii.full,
-    borderWidth: 1,
+    borderRadius: Radii.lg, 
+    borderWidth: 1, 
     overflow: 'hidden',
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 60,
+    width: 64, 
   },
+  pressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }] 
+  }
 });
