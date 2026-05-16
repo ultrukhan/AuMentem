@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -7,15 +7,23 @@ import {
   FlatList, 
   ActivityIndicator,
   RefreshControl,
-  Image
+  Image,
+  Animated,
+  Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, Sparkles, MapPin, Ghost } from 'lucide-react-native';
+import { ArrowLeft, Sparkles, MapPin, Ghost, Trash2, Flag, X, CheckCircle2, Circle } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
+import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
+import { playClickSound } from '@/utils/audio';
 
 interface Reaction {
   reaction_type: 'SUPPORT' | 'HUG' | 'PROUD' | 'HEART';
@@ -24,6 +32,7 @@ interface Reaction {
 
 interface Post {
   id: string;
+  user_id: string; 
   is_anonymous: boolean;
   created_at: string;
   user: { nickname: string } | null; 
@@ -38,11 +47,147 @@ interface Post {
 }
 
 const REACTION_OPTIONS = [
-  { type: 'HEART', emoji: '🧡' },
-  { type: 'HUG', emoji: '🫂' },
-  { type: 'SUPPORT', emoji: '🙌' },
+  { type: 'HEART', emoji: '❤️‍🔥' },  
+  { type: 'HUG', emoji: '🏆' },
+  { type: 'SUPPORT', emoji: '✨' },
   { type: 'PROUD', emoji: '🔥' },
 ] as const;
+
+// МЕПІНГ ПРИЧИН СКАРГ (Синхронізовано з бекендом ReportReason)
+const REPORT_REASONS = [
+  { id: 'SPAM', label: 'Спам або реклама' },
+  { id: 'OFFENSIVE', label: 'Образливий контент або цькування' },
+  { id: 'SCAM', label: 'Шахрайство' },
+  { id: 'NUDITY', label: 'Неприйнятний контент (18+)' },
+  { id: 'VIOLENCE', label: 'Насильство або загрози' },
+  { id: 'ILLEGAL_CONTENT', label: 'Заборонений контент' },
+  { id: 'COPYRIGHT', label: 'Порушення прав' },
+  { id: 'OTHER', label: 'Інше' },
+];
+
+const Particle = ({ emoji }: { emoji: string }) => {
+  const randomX = (Math.random() - 0.5) * 160; 
+  const randomY = -100 - Math.random() * 80;   
+
+  const moveAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.5)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      Animated.parallel([
+        Animated.timing(moveAnim, {
+          toValue: { x: randomX, y: randomY },
+          duration: 1200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 1200,
+          delay: 150, 
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1.4,
+          friction: 4,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }, [])
+  );
+
+  return (
+    <Animated.Text
+      style={[
+        s.particle,
+        {
+          transform: [
+            { translateX: moveAnim.x },
+            { translateY: moveAnim.y },
+            { scale: scaleAnim }
+          ],
+          opacity: opacityAnim
+        }
+      ]}
+    >
+      {emoji}
+    </Animated.Text>
+  );
+};
+
+const ReactionButton = ({ 
+  reaction, 
+  count, 
+  isActive, 
+  onPress, 
+  c 
+}: { 
+  reaction: typeof REACTION_OPTIONS[number]; 
+  count: number; 
+  isActive: boolean; 
+  onPress: () => void;
+  c: any;
+}) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [particles, setParticles] = useState<{ id: number }[]>([]);
+  const particleIdCounter = useRef(0);
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scaleAnim, { toValue: 0.9, duration: 30, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1.3, friction: 3, tension: 60, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 4, useNativeDriver: true })
+    ]).start();
+
+    if (!isActive) {
+      const newParticles = Array.from({ length: 6 }).map(() => ({
+        id: particleIdCounter.current++
+      }));
+      
+      setParticles(prev => [...prev, ...newParticles]);
+
+      setTimeout(() => {
+        setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+      }, 1500);
+    }
+
+    onPress();
+  };
+
+  return (
+    <View style={s.buttonWrapper}>
+      {particles.map(p => (
+        <Particle key={p.id} emoji={reaction.emoji} />
+      ))}
+
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <Pressable 
+          onPress={handlePress}
+          style={[
+            s.reactionChip,
+            { 
+              backgroundColor: isActive ? c.accent + '25' : (count > 0 ? c.cardBg : 'transparent'),
+              borderColor: isActive ? c.accent : (count > 0 ? c.border : 'transparent'),
+              borderWidth: isActive || count > 0 ? 1 : 0,
+              shadowColor: isActive ? c.accent : 'transparent',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: isActive ? 0.4 : 0,
+              shadowRadius: 6,
+              elevation: isActive ? 4 : 0
+            }
+          ]}
+        >
+          <Text style={s.reactionEmoji}>{reaction.emoji}</Text>
+          {count > 0 && (
+            <Text style={[Typography.titleMd, { color: isActive ? c.accent : c.textMuted, fontSize: 13, marginLeft: 6, fontWeight: isActive ? '700' : '500' }]}>
+              {count}
+            </Text>
+          )}
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -53,9 +198,31 @@ export default function FeedScreen() {
   const sh = Shadows[isDark ? 'dark' : 'light'];
 
   const [posts, setPosts] = useState<Post[]>([]);
+  const [myUserId, setMyUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [myReactions, setMyReactions] = useState<Record<string, string | null>>({});
+
+  // СТЕЙТИ ДЛЯ СКАРГ (REPORT)
+  const [reportingPostId, setReportingPostId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState<string | null>(null);
+  const [reportDetails, setReportDetails] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const response = await fetch(`${BASE_URL}/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMyUserId(data.id);
+      }
+    } catch (error) {
+      console.error("Помилка завантаження профілю:", error);
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -66,7 +233,6 @@ export default function FeedScreen() {
 
       if (response.ok) {
         const data = await response.json();
-        // Сортування за датою (свіжі зверху)
         const sortedData = data.sort((a: Post, b: Post) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
@@ -82,11 +248,13 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      fetchCurrentUser();
       fetchPosts();
     }, [])
   );
 
   const handleReact = async (postId: string, reactionType: string) => {
+    playClickSound();
     const currentMyReaction = myReactions[postId];
     const isRemoving = currentMyReaction === reactionType;
     const newReaction = isRemoving ? null : reactionType;
@@ -126,24 +294,101 @@ export default function FeedScreen() {
     }
   };
 
+  const handleDeletePost = (postId: string) => {
+    playClickSound();
+    Alert.alert(
+      "Видалити пост?",
+      "Ви дійсно хочете видалити цей пост? Цю дію неможливо буде скасувати.",
+      [
+        { text: "Скасувати", style: "cancel" },
+        { 
+          text: "Видалити", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const token = await SecureStore.getItemAsync('userToken');
+              const response = await fetch(`${BASE_URL}/posts/${postId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              if (response.ok) {
+                setPosts(prev => prev.filter(p => p.id !== postId));
+              } else {
+                Alert.alert("Помилка", "Не вдалося видалити пост.");
+              }
+            } catch (error) {
+              Alert.alert("Помилка", "Перевірте з'єднання з інтернетом.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // ФУНКЦІЯ НАДІСЛАННЯ СКАРГИ
+  const submitReport = async () => {
+    if (!reportReason || !reportingPostId) return;
+    
+    playClickSound();
+    setIsSubmittingReport(true);
+    
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      const response = await fetch(`${BASE_URL}/posts/post_report`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          post_id: reportingPostId, 
+          reason: reportReason, 
+          details: reportDetails.trim() || null 
+        })
+      });
+
+      if (response.ok) {
+        Alert.alert("Дякуємо!", "Скаргу успішно надіслано. Наші модератори перевірять цей пост.");
+        closeReportModal();
+      } else {
+        const errData = await response.json();
+        // Якщо помилка 400 - швидше за все користувач вже скаржився
+        Alert.alert("Увага", errData.detail || "Не вдалося надіслати скаргу.");
+      }
+    } catch (error) {
+      Alert.alert("Помилка", "Перевірте з'єднання з інтернетом.");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
+
+  const closeReportModal = () => {
+    setReportingPostId(null);
+    setReportReason(null);
+    setReportDetails('');
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('uk-UA', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
   };
 
   const renderPost = ({ item }: { item: Post }) => {
-    // Якщо анонімно — бекенд затирає юзера
     const authorName = (item.is_anonymous || !item.user) ? "Таємний мандрівник" : item.user.nickname;
     
     const questTitle = item.user_mini_quest?.mini_quest?.title 
-                     || item.user_geo_quest?.geo_quest?.title 
-                     || "Завдання виконано";
+                       || item.user_geo_quest?.geo_quest?.title 
+                       || "Завдання виконано";
     
     const isGeo = !!item.user_geo_quest;
     const photoUrl = item.user_geo_quest?.photo_proof_url;
 
+    const isMyPost = item.user_id === myUserId;
+
     return (
       <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+        
         <View style={s.cardHeader}>
           <View style={s.authorInfo}>
             <View style={[s.avatar, { backgroundColor: (item.is_anonymous || !item.user) ? c.border : c.accent + '20' }]}>
@@ -160,6 +405,31 @@ export default function FeedScreen() {
               <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>{formatDate(item.created_at)}</Text>
             </View>
           </View>
+
+          {/* ЯКЩО МІЙ ПОСТ -> КНОПКА ВИДАЛИТИ. ЯКЩО ЧУЖИЙ -> СКАРГА */}
+          {isMyPost ? (
+            <Pressable 
+              onPress={() => handleDeletePost(item.id)}
+              style={({ pressed }) => [
+                s.actionBtn,
+                { backgroundColor: isDark ? '#FF3B3015' : '#FF3B3010' },
+                pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] }
+              ]}
+            >
+              <Trash2 color="#FF3B30" size={18} />
+            </Pressable>
+          ) : (
+            <Pressable 
+              onPress={() => { playClickSound(); setReportingPostId(item.id); }}
+              style={({ pressed }) => [
+                s.actionBtn,
+                { backgroundColor: c.border },
+                pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] }
+              ]}
+            >
+              <Flag color={c.textMuted} size={18} />
+            </Pressable>
+          )}
         </View>
 
         <View style={[s.questBadge, { backgroundColor: isGeo ? '#3B82F615' : c.accent + '15' }]}>
@@ -178,27 +448,16 @@ export default function FeedScreen() {
             {REACTION_OPTIONS.map((reaction) => {
               const count = item.reactions?.filter(r => r.reaction_type === reaction.type).length || 0;
               const isActive = myReactions[item.id] === reaction.type;
+              
               return (
-                <Pressable 
+                <ReactionButton 
                   key={reaction.type}
+                  reaction={reaction}
+                  count={count}
+                  isActive={isActive}
+                  c={c}
                   onPress={() => handleReact(item.id, reaction.type)}
-                  style={({ pressed }) => [
-                    s.reactionChip,
-                    { 
-                      backgroundColor: isActive ? c.accent + '25' : (count > 0 ? c.cardBg : 'transparent'),
-                      borderColor: isActive ? c.accent : (count > 0 ? c.border : 'transparent'),
-                      borderWidth: isActive || count > 0 ? 1 : 0
-                    },
-                    pressed && s.pressed
-                  ]}
-                >
-                  <Text style={[s.reactionEmoji, isActive && { transform: [{ scale: 1.1 }] }]}>{reaction.emoji}</Text>
-                  {count > 0 && (
-                    <Text style={[Typography.titleMd, { color: isActive ? c.accent : c.textMuted, fontSize: 13, marginLeft: 6 }]}>
-                      {count}
-                    </Text>
-                  )}
-                </Pressable>
+                />
               );
             })}
           </View>
@@ -230,6 +489,91 @@ export default function FeedScreen() {
           }
         />
       )}
+
+      {/* МОДАЛКА ДЛЯ СКАРГИ (REPORT BOTTOM SHEET) */}
+      <Modal visible={!!reportingPostId} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={{ width: '100%', justifyContent: 'flex-end' }}
+          >
+            <View style={[s.modalContent, { backgroundColor: c.cardBg }]}>
+              
+              <View style={s.modalHeader}>
+                <Text style={[Typography.titleLg, { color: c.textMain }]}>Поскаржитися на пост</Text>
+                <Pressable onPress={closeReportModal} style={s.closeBtn}>
+                  <X color={c.textMain} size={24} />
+                </Pressable>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.modalScroll}>
+                <Text style={[Typography.body, { color: c.textMuted, marginBottom: 16 }]}>
+                  Виберіть причину, чому цей пост порушує правила спільноти:
+                </Text>
+
+                {/* СПИСОК ПРИЧИН */}
+                <View style={s.reasonsContainer}>
+                  {REPORT_REASONS.map((item) => {
+                    const isSelected = reportReason === item.id;
+                    return (
+                      <Pressable 
+                        key={item.id}
+                        style={[
+                          s.reasonRow, 
+                          { borderColor: isSelected ? c.accent : c.border, backgroundColor: isSelected ? `${c.accent}10` : c.cardBg }
+                        ]}
+                        onPress={() => { playClickSound(); setReportReason(item.id); }}
+                      >
+                        {isSelected ? <CheckCircle2 color={c.accent} size={20} /> : <Circle color={c.textMuted} size={20} />}
+                        <Text style={[Typography.body, { color: isSelected ? c.accent : c.textMain, marginLeft: 12, fontWeight: isSelected ? '600' : '400' }]}>
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={[Typography.titleMd, { color: c.textMain, marginTop: 24, marginBottom: 8 }]}>
+                  Додаткові деталі (необов'язково)
+                </Text>
+                <TextInput
+                  style={[s.textInput, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
+                  placeholder="Опишіть проблему детальніше..."
+                  placeholderTextColor={c.textMuted}
+                  multiline
+                  maxLength={500}
+                  value={reportDetails}
+                  onChangeText={setReportDetails}
+                  textAlignVertical="top"
+                />
+                <Text style={[Typography.muted, { color: c.textMuted, textAlign: 'right', marginTop: 4, fontSize: 12 }]}>
+                  {reportDetails.length}/500
+                </Text>
+              </ScrollView>
+
+              <View style={[s.modalFooter, { borderTopColor: c.border }]}>
+                <Pressable 
+                  style={[
+                    s.submitReportBtn, 
+                    { backgroundColor: c.accent },
+                    (!reportReason || isSubmittingReport) && { opacity: 0.5 }
+                  ]}
+                  onPress={submitReport}
+                  disabled={!reportReason || isSubmittingReport}
+                >
+                  {isSubmittingReport ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={s.submitReportBtnText}>Надіслати скаргу</Text>
+                  )}
+                </Pressable>
+              </View>
+
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -240,14 +584,90 @@ const s = StyleSheet.create({
   backBtn: { padding: 8 },
   listContent: { paddingHorizontal: Spacing.screenX, paddingBottom: 40 },
   card: { borderRadius: Radii.lg, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
-  cardHeader: { padding: 16, paddingBottom: 12 },
+  
+  cardHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 16, 
+    paddingBottom: 12 
+  },
   authorInfo: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  
+  actionBtn: {
+    padding: 8,
+    borderRadius: Radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   questBadge: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, padding: 12, borderRadius: Radii.md, marginBottom: 16 },
   postImage: { width: '100%', height: 250 },
-  cardFooter: { padding: 10, borderTopWidth: 1 },
-  reactionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardFooter: { padding: 12, borderTopWidth: 1 },
+  reactionsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  
+  buttonWrapper: { position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  particle: { position: 'absolute', fontSize: 16, zIndex: 99, pointerEvents: 'none' },
+  
   reactionChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: Radii.full },
-  reactionEmoji: { fontSize: 18 },
-  pressed: { opacity: 0.7, transform: [{ scale: 0.9 }] },
+  reactionEmoji: { fontSize: 18, lineHeight: 22 },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingBottom: 16,
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  reasonsContainer: {
+    gap: 10,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+  },
+  textInput: {
+    ...Typography.body,
+    height: 100,
+    borderWidth: 1,
+    borderRadius: Radii.md,
+    padding: 12,
+  },
+  modalFooter: {
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    borderTopWidth: 1,
+  },
+  submitReportBtn: {
+    height: 52,
+    borderRadius: Radii.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitReportBtnText: {
+    ...Typography.titleMd,
+    color: '#FFF',
+    fontSize: 16,
+  },
 });

@@ -8,6 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api'; 
 import HobbiesModal from '@/components/HobbiesModal';
+import { BarChart3 } from 'lucide-react-native'; 
 
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 
@@ -182,7 +183,7 @@ export default function HomeScreen() {
               )}
             </AnimatedCard>
 
-            <AnimatedCard 
+            {/* <AnimatedCard 
               animationsEnabled={animationsEnabled}
               onPress={() => {
                 playClickSound();
@@ -191,6 +192,17 @@ export default function HomeScreen() {
               style={getIconBtnStyle()}
             >
               <Activity color={c.textMain} size={20} strokeWidth={2} />
+            </AnimatedCard> */}
+
+            <AnimatedCard 
+              animationsEnabled={animationsEnabled}
+              onPress={() => {
+                playClickSound();
+                router.push({ pathname: '/statsScreen', params: { theme } });
+              }} 
+              style={getIconBtnStyle()}
+            >
+              <BarChart3 color={c.textMain} size={20} strokeWidth={2} />
             </AnimatedCard>
 
             <AnimatedCard 
@@ -258,7 +270,7 @@ export default function HomeScreen() {
             </View>
           </AnimatedCard>
 
-          <AnimatedCard 
+          {/* <AnimatedCard 
             animationsEnabled={animationsEnabled}
             onPress={() => {
               playClickSound();
@@ -277,7 +289,7 @@ export default function HomeScreen() {
                 Напиши собі в майбутнє
               </Text>
             </View>
-          </AnimatedCard>
+          </AnimatedCard> */}
         </View>
       </View>
 

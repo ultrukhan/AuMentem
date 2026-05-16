@@ -199,9 +199,16 @@ export default function TrackerScreen() {
       <Modal transparent animationType="slide" visible={true}>
         <View style={s.modalOverlay}>
           <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft]}>
-            <Pressable style={s.closeIcon} onPress={() => { playClickSound(); setActiveModal('NONE'); }}>
-              <X color={c.textMuted} size={24} />
-            </Pressable>
+           <Pressable 
+  style={s.closeIcon} 
+  onPress={() => { 
+    playClickSound(); 
+    setActiveModal('NONE'); 
+    router.replace('/(main)/home'); 
+  }}
+>
+  <X color={c.textMuted} size={24} />
+</Pressable>
             <View style={s.modalIconBox}>{config.icon}</View>
             <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center' }]}>{config.title}</Text>
             <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 16, lineHeight: 22 }]}>{config.desc}</Text>
