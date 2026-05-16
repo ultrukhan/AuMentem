@@ -347,7 +347,6 @@
 //     borderColor: '#FF3B3020',
 //   },
 // });
-
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet,
@@ -376,7 +375,7 @@ export default function ProfileScreen() {
   const c = Colors[theme];
   const sh = Shadows[theme];
   
-  // Стан для Нікнейма
+  // Стан для Нікнейма та Статистики
   const [nickname, setNickname] = useState('');
   const [completedQuests, setCompletedQuests] = useState(0); 
   const [isSavingNick, setIsSavingNick] = useState(false);
@@ -400,30 +399,42 @@ export default function ProfileScreen() {
   const hasNumber = /\d/.test(newPassword);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-]/.test(newPassword);
   
-  // Пароль валідний, тільки якщо виконані всі умови
   const isNewPasswordValid = hasMinLength && hasUpper && hasLower && hasNumber && hasSpecial;
 
   useEffect(() => {
-    const fetchCurrentProfile = async () => {
+    const fetchProfileData = async () => {
       try {
         const token = await SecureStore.getItemAsync('userToken');
         if (!token) return;
 
-        const response = await fetch(`${BASE_URL}/auth/me`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        // ПАРАЛЕЛЬНО ТЯГНЕМО ПРОФІЛЬ І СТАТИСТИКУ!
+        const [profileRes, statsRes] = await Promise.all([
+          fetch(`${BASE_URL}/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${BASE_URL}/stats/my-weekly-stats`, { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
 
-        if (response.ok) {
-          const data = await response.json();
+        if (profileRes.ok) {
+          const data = await profileRes.json();
           setNickname(data.nickname);
         }
+
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          // Рахуємо всі-всі квести за всі тижні
+          let totalQuests = 0;
+          statsData.forEach((stat: any) => {
+            totalQuests += (stat.mini_quests_completed || 0) + (stat.geo_quests_completed || 0);
+          });
+          setCompletedQuests(totalQuests);
+        }
+
       } catch (error) {
         console.error("Помилка завантаження:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchCurrentProfile();
+    fetchProfileData();
   }, []);
 
   const handleLogout = async () => {
@@ -508,17 +519,20 @@ export default function ProfileScreen() {
     }
   };
 
+  // === ОНОВЛЕНИЙ ШЕРИНГ ===
   const handleShareApp = async () => {
     playClickSound();
     try {
-      const shareMessage = `Привіт! Я використовую додаток AuMentem. Мій нік: ${nickname}, і я вже виконав(ла) ${completedQuests} квестів для свого ментального здоров'я! Приєднуйся: https://aumentem.app 🚀`;
+      const shareMessage = completedQuests > 0 
+        ? `Привіт! Це ${nickname} 👋 Я прокачую своє ментальне здоров'я в AuMentem і маю вже ${completedQuests} виконаних квестів! 🌟 Долучайся, давай покращувати себе разом: https://aumentem.app 🚀`
+        : `Привіт! Це ${nickname} 👋 Я починаю свій шлях в AuMentem — крутому додатку для ментального здоров'я та цікавих квестів! 🌟 Приєднуйся до мене: https://aumentem.app 🚀`;
+      
       await Share.share({ message: shareMessage });
     } catch (error) {
       console.error("Помилка при шерингу", error);
     }
   };
 
-  // Компонент для відображення одного пункту вимог до пароля
   const RequirementItem = ({ text, isValid }: { text: string, isValid: boolean }) => (
     <View style={s.requirementRow}>
       {isValid ? <CheckCircle2 color="#34C759" size={16} /> : <Circle color={c.textMuted} size={16} />}
@@ -625,7 +639,6 @@ export default function ProfileScreen() {
                 />
               </View>
 
-              {/* ДИНАМІЧНИЙ СПИСОК ВИМОГ ДО ПАРОЛЯ */}
               {newPassword.length > 0 && !isNewPasswordValid && (
                 <View style={s.requirementsContainer}>
                   <RequirementItem text="Мінімум 8 символів" isValid={hasMinLength} />
@@ -649,7 +662,6 @@ export default function ProfileScreen() {
                 style={({ pressed }) => [
                   s.primaryBtn,
                   { backgroundColor: c.textMain, marginTop: 16 },
-                  /* Кнопка неактивна, якщо не введено старий пароль АБО новий не відповідає вимогам */
                   (!oldPassword || !isNewPasswordValid) && { opacity: 0.5 },
                   pressed && s.pressed,
                   isChangingPwd && { opacity: 0.7 }
@@ -747,8 +759,6 @@ const s = StyleSheet.create({
     ...Typography.body,
     height: '100%',
   },
-  
-  // Стилі для вимог до пароля
   requirementsContainer: {
     marginTop: 12,
     gap: 6,
@@ -763,7 +773,6 @@ const s = StyleSheet.create({
     ...Typography.body,
     fontSize: 13,
   },
-
   messageBox: {
     flexDirection: 'row',
     alignItems: 'center',
