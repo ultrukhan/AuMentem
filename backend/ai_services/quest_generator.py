@@ -1,58 +1,71 @@
 import os
 import json
 from google import genai
-from typing import List
-from google import genai
+from google.genai.errors import APIError
 from typing import List, Dict
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-
-
-async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
+async def generate_quests_by_hobbies(hobbies: List[str]) -> List[Dict[str, str]]:
     """
-    Асинхронно генерує 3 міні-квести на основі списку хобі за допомогою Gemini API.
-    Повертає список рядків (JSON).
+    Асинхронно генерує 3 міні-квести.
+    Повертає список словників у форматі: [{"title": "...", "hobby_name": "..."}]
     """
-    if not client:
-        print("Помилка: Не знайдено GEMINI_API_KEY. Перевірте файл .env")
+    if not GEMINI_API_KEY:
+        print("Помилка: Не знайдено GEMINI_API_KEY")
         return []
 
+    client = genai.Client(api_key=GEMINI_API_KEY)
     hobbies_str = ", ".join(hobbies)
 
     prompt = f"""
-        Ти — креативний генератор завдань для мобільного додатку Altera. 
-        Мета додатку: допомагати людям боротися із соціальною ізоляцією через цікаві мікро-завдання в реальному світі.
+        Ти — креативний геймдизайнер мобільного додатку Altera. Твоя задача — генерувати цікаві міні-квести на основі хобі користувача.
 
-        Користувач має такі хобі: {hobbies_str}.
+        Доступні хобі користувача: {hobbies_str}
 
-        Придумай 3 коротких, нескладних міні-квести, які витягнуть користувача з дому або допоможуть спробувати щось нове, пов'язане з його хобі.
-        Завдання не повинні вимагати багато грошей або складної підготовки.
-        
-        ВАЖЛИВО: Твоя відповідь має бути ТІЛЬКИ у форматі валідного JSON-масиву, без жодних додаткових пояснень чи форматування Markdown. 
-        Структура: ["title1", "title2", "title3"]
-        
+        Придумай рівно 3 лаконічні міні-квести. Кожен квест має відповідати ЛИШЕ ОДНОМУ КОНКРЕТНОМУ хобі зі списку вище.
+
+        Жорсткі правила для квестів:
+        1. Абсолютно безкоштовні (не вимагають покупок чи витрат).
+        2. Максимально прості та легкі на підйом (займають 10-30 хвилин, без надзусиль чи складної підготовки).
+        3. Лаконічні (одне коротке речення).
+        4. Квести мають бути в реальному світі (не просто "погугли щось").
+
+        ВАЖЛИВО: Твоя відповідь має бути ТІЛЬКИ у форматі валідного JSON-масиву об'єктів. Жодних вступних чи завершальних слів, без коментарів і без Markdown-тегів (без ```json).
+        Кожен об'єкт повинен мати два поля:
+        - "title": текст квесту.
+        - "hobby_name": точна назва хобі зі списку користувача (регістр має значення), якому відповідає цей квест.
         """
 
-    try:
-        response = await client.aio.models.generate_content(
-            model='gemini-3.1-flash-lite',
-            contents=prompt
-        )
-        raw_text = response.text.strip()
+    models_to_try = ['gemini-3.1-flash-lite', 'gemini-2.5-flash']
 
-        if raw_text.startswith("```json"):
-            raw_text = raw_text[7:-3]
-        elif raw_text.startswith("```"):
-            raw_text = raw_text[3:-3]
+    for model_name in models_to_try:
+        try:
+            print(f"Генерація квестів через {model_name}...")
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt
+            )
+            raw_text = response.text.strip()
 
-        quests_data = json.loads(raw_text.strip())
-        return quests_data
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:-3]
+            elif raw_text.startswith("```"):
+                raw_text = raw_text[3:-3]
 
-    except json.JSONDecodeError as e:
-        print(f"ШІ повернув невалідний JSON: {raw_text}\nПомилка: {e}")
-        return []
-    except Exception as e:
-        print(f"Помилка при генерації квестів: {e}")
-        return []
+            quests_data = json.loads(raw_text.strip())
+            print(f"Успішно згенеровано через {model_name}!")
+            return quests_data
+
+        except APIError as e:
+            print(f" Модель {model_name} недоступна (Помилка {e.code}). Перемикаюсь...")
+            continue
+        except json.JSONDecodeError as e:
+            print(f"ШІ повернув кривий JSON через {model_name}, пробую наступну...")
+            continue
+        except Exception as e:
+            print(f"Непередбачувана помилка з {model_name}: {e}")
+            continue
+
+    print("[CRITICAL] Всі моделі ШІ недоступні. Переходимо на локальну базу даних.")
+    return []
