@@ -22,23 +22,19 @@ async def get_daily_quests(
         db: Session = Depends(get_db)
 ):
     """
-    Генерує або повертає 5 щоденних квестів.
-    Пріоритет: квести, згенеровані ШІ на основі хобі, решта — рандом з бази.
+    Генерує або повертає 5 щоденних квестів (2 за хобі, 3 рандомних).
+    Усі видані квести мають початковий статус AVAILABLE.
     """
     now = get_utc_now()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    expired_quests = db.query(DBUserMiniQuest).filter(
+    db.query(DBUserMiniQuest).filter(
         DBUserMiniQuest.user_id == user.id,
         DBUserMiniQuest.created_at < start_of_today,
         DBUserMiniQuest.status == QuestStatus.AVAILABLE
-    ).all()
+    ).delete(synchronize_session=False)
 
-    for eq in expired_quests:
-        db.delete(eq)
-
-    if expired_quests:
-        db.commit()
+    db.commit()
 
     todays_quests = db.query(DBUserMiniQuest).options(
         joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
@@ -53,7 +49,8 @@ async def get_daily_quests(
     user_with_hobbies = db.query(DBAppUser).options(joinedload(DBAppUser.hobbies)).filter(
         DBAppUser.id == user.id).first()
 
-    hobby_names = [h.name for h in user_with_hobbies.hobbies] if user_with_hobbies else []
+    current_hobbies = user_with_hobbies.hobbies if user_with_hobbies else []
+    hobby_names = [h.name for h in current_hobbies]
 
     ai_quests = []
 
@@ -93,14 +90,12 @@ async def get_daily_quests(
 
     db.commit()
 
-    todays_generated_quests = db.query(DBUserMiniQuest).options(
+    return db.query(DBUserMiniQuest).options(
         joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
     ).filter(
         DBUserMiniQuest.user_id == user.id,
         DBUserMiniQuest.created_at >= start_of_today
     ).all()
-
-    return todays_generated_quests
 
 
 @router.patch("/my-quests/{user_mini_quest_id}/start", response_model=UserMiniQuestResponse)
