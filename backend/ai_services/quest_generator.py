@@ -1,21 +1,23 @@
 import os
 import json
 from google import genai
+from typing import List
+from google import genai
 from typing import List, Dict
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
 async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
     """
     Асинхронно генерує 3 міні-квести на основі списку хобі за допомогою Gemini API.
-    Повертає список словників (JSON).
+    Повертає список рядків (JSON).
     """
-    if not GEMINI_API_KEY:
-        print("Помилка: Не знайдено GEMINI_API_KEY")
+    if not client:
+        print("Помилка: Не знайдено GEMINI_API_KEY. Перевірте файл .env")
         return []
-
-    client = genai.Client(api_key=GEMINI_API_KEY)
 
     hobbies_str = ", ".join(hobbies)
 
@@ -25,16 +27,17 @@ async def generate_quests_by_hobbies(hobbies: List[str]) -> List[str]:
 
         Користувач має такі хобі: {hobbies_str}.
 
-        Придумай 3 коротких, нескладних, лагідних міні-квести, які допоможуть спробувати щось нове, пов'язане з його хобі, враховуючи його стан апатії та відсутності сил"
+        Придумай 3 коротких, нескладних міні-квести, які витягнуть користувача з дому або допоможуть спробувати щось нове, пов'язане з його хобі.
         Завдання не повинні вимагати багато грошей або складної підготовки.
-
+        
         ВАЖЛИВО: Твоя відповідь має бути ТІЛЬКИ у форматі валідного JSON-масиву, без жодних додаткових пояснень чи форматування Markdown. 
         Структура: ["title1", "title2", "title3"]
+        
         """
 
     try:
         response = await client.aio.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.1-flash-lite',
             contents=prompt
         )
         raw_text = response.text.strip()
