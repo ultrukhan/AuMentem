@@ -38,7 +38,7 @@ export default function LocalEventsScreen() {
 
   return (
     <ImageBackground 
-      source={require('@/assets/images/background.jpg')} 
+      source={require('@/assets/images/background.png')} 
       style={s.container}
       resizeMode="cover"
     >

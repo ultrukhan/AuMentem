@@ -125,7 +125,7 @@ export default function RegisterScreen() {
             <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
             <Text style={[s.mainTitle, { color: c.textMain }]}>Реєстрація</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Почни свій шлях в AuMentem 🌱
+              Почни свій шлях в Altera 🌱
             </Text>
           </View>
 
@@ -160,7 +160,6 @@ export default function RegisterScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />

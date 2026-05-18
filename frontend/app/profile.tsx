@@ -618,7 +618,6 @@ export default function ProfileScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Поточний пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry={!showPassword}
                   value={oldPassword}
                   onChangeText={(t) => { setOldPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
                 />
@@ -633,7 +632,6 @@ export default function ProfileScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Новий пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry={!showPassword}
                   value={newPassword}
                   onChangeText={(t) => { setNewPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
                 />

@@ -54,8 +54,8 @@ export default function HomeScreen() {
   const sh = Shadows[theme];
 
   const backgroundImage = isDark 
-    ? require('@/assets/images/background_dark.jpg') 
-    : require('@/assets/images/background.jpg');
+    ? require('@/assets/images/background_dark.png') 
+    : require('@/assets/images/background.png');
 
   useEffect(() => {
     playAmbientSound(0, isDark);

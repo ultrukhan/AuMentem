@@ -52,7 +52,6 @@ export default function AuthScreen() {
           }
         }
       } catch (error) {
-        console.error("Помилка при перевірці токена:", error);
       } finally {
         setIsCheckingToken(false);
       }
@@ -102,7 +101,6 @@ export default function AuthScreen() {
       }
 
     } catch (error) {
-      console.error("Помилка мережі:", error);
       setErrorMessage('Не вдалося з\'єднатися з сервером. Перевірте підключення.');
     } finally {
       setIsLoading(false);
@@ -133,7 +131,7 @@ export default function AuthScreen() {
           
           <View style={s.header}>
             <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
-            <Text style={[s.mainTitle, { color: c.textMain }]}>AuMentem</Text>
+            <Text style={[s.mainTitle, { color: c.textMain }]}>Altera</Text>
             <Text style={[s.subtitle, { color: c.textMuted }]}>
               Твій простір для відновлення 🌿
             </Text>
@@ -160,7 +158,6 @@ export default function AuthScreen() {
                   style={[s.input, { color: c.textMain }]}
                   placeholder="Пароль"
                   placeholderTextColor={c.textMuted}
-                  secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
                 />
@@ -174,11 +171,13 @@ export default function AuthScreen() {
               <Text style={s.errorText}>{errorMessage}</Text>
             ) : null}
 
-            <Pressable style={s.forgotBtn}
-            onPress={() => {
-    playClickSound();
-    router.push('/forgot-password'); 
-  }}>
+            <Pressable 
+              style={s.forgotBtn}
+              onPress={() => {
+                playClickSound();
+                router.push('/forgot-password'); 
+              }}
+            >
               <Text style={[s.forgotText, { color: c.accent }]}>Забули пароль?</Text>
             </Pressable>
           </View>

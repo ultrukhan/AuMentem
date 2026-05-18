@@ -118,7 +118,7 @@ export default function QuestsScreen() {
   const completedQuestsCount = quests.filter(q => q.status === 'COMPLETED').length;
   shouldChangeIcon.current = completedQuestsCount > 0;
 
-  const backgroundImage = isDark ? require('@/assets/images/background_dark.jpg') : require('@/assets/images/background.jpg');
+  const backgroundImage = isDark ? require('@/assets/images/background_dark.png') : require('@/assets/images/background.png');
   const overlayAnimatedStyle = useAnimatedStyle(() => ({ backgroundColor: withTiming(c.overlay, { duration: animationsEnabled ? 400 : 0 }) }), [c.overlay, animationsEnabled]);
 
   const safePlayClick = () => { if (soundsEnabled) playClickSound(); };
