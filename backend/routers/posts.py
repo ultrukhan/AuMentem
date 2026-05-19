@@ -128,6 +128,9 @@ async def toggle_reaction(
 
 @router.delete('/{post_id}')
 async def delete_post(post_id: UUID, user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+       Ендпоінт для видалення поста зі стрічки.
+    """
     post = db.query(DBPost).filter(DBPost.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404,detail = 'Пост не знайдено!')
@@ -147,6 +150,11 @@ async def post_report(
         db: Session = Depends(get_db),
         user: DBAppUser = Depends(get_current_user)
 ):
+    """
+       Ендпоінт для додавання жалоби на пост в стрічці.
+
+    """
+
     post = db.query(DBPost).filter(DBPost.id == data.post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail='Пост не знайдено!')

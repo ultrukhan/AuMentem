@@ -55,7 +55,7 @@ async def get_upload_signature(
     target_coordinates = user_quest.geo_quest.place.coordinates
     distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
 
-    if distance > 20.0:
+    if distance > 50.0:
         raise HTTPException(
             status_code=400,
             detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підпис не згенеровано."
