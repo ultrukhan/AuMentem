@@ -59,12 +59,11 @@ async def get_daily_quests(
 
         hobby_map = {h.name.lower().strip(): h for h in current_hobbies}
 
-        for q_data in generated_quests:
+        for q_data in generated_quests[:3]:
             title = q_data.get("title", "Новий цікавий квест")
             ai_hobby_name = q_data.get("hobby_name", "").lower().strip()
 
             matched_hobby = None
-
             matched_hobby = hobby_map.get(ai_hobby_name)
 
             if not matched_hobby:
@@ -75,6 +74,7 @@ async def get_daily_quests(
                         break
 
             if not matched_hobby and current_hobbies:
+                import random
                 matched_hobby = random.choice(current_hobbies)
 
             new_quest = DBMiniQuest(
