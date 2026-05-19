@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, SafeAreaView,
   ActivityIndicator, ScrollView, Animated, PanResponder,
-  Dimensions, Platform, Alert, Modal
+  Dimensions, Platform, Alert, Modal, Linking
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -19,24 +19,38 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 
-import { Colors, Typography, Radii, Spacing, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { cardShadow } from '@/utils/shadowStyle';
+import { parseApiError } from '@/utils/apiErrors';
+import { playClickSound } from '@/utils/audio';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const INITIAL_PAN_Y = SCREEN_HEIGHT - 160;
+const DEFAULT_REGION = {
+  latitude: 49.8397,
+  longitude: 24.0297,
+  latitudeDelta: 0.08,
+  longitudeDelta: 0.08,
+};
 
 export default function GeoQuestsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
-  const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
+  const c = Colors[themeKey];
+  const { animationsEnabled } = useAppSettings();
 
   const mapRef = useRef<MapView>(null);
   const panY = useRef(new Animated.Value(INITIAL_PAN_Y)).current;
 
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
+  const [locationDenied, setLocationDenied] = useState(false);
+  const [locationReady, setLocationReady] = useState(false);
+  const [pendingRouteRestore, setPendingRouteRestore] = useState(false);
   const [nearestQuests, setNearestQuests] = useState<any[]>([]);
   const [selectedQuest, setSelectedQuest] = useState<any>(null);
   const [activeUserQuestId, setActiveUserQuestId] = useState<string | null>(null);
@@ -58,39 +72,46 @@ export default function GeoQuestsScreen() {
   const [isSharing, setIsSharing] = useState(false);
 
   const [showConfetti, setShowConfetti] = useState(false);
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-
   const isNavigatingRef = useRef(isNavigating);
   useEffect(() => {
     isNavigatingRef.current = isNavigating;
   }, [isNavigating]);
 
+  const animateToCoords = useCallback((coords: { latitude: number; longitude: number }) => {
+    mapRef.current?.animateToRegion({
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    }, 600);
+  }, []);
+
   useEffect(() => {
     (async () => {
-      const savedSettings = await SecureStore.getItemAsync('userSettings');
-      if (savedSettings) {
-        try {
-          const parsed = JSON.parse(savedSettings);
-          setAnimationsEnabled(parsed.animations !== false);
-        } catch {}
-      }
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationDenied(true);
+          return;
+        }
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Помилка', 'Потрібен доступ до геопозиції');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({});
-      setUserLocation(loc.coords);
-      fetchNearestQuests(loc.coords.latitude, loc.coords.longitude);
+        const loc = await Location.getCurrentPositionAsync({});
+        setUserLocation(loc.coords);
+        await fetchNearestQuests(loc.coords.latitude, loc.coords.longitude);
 
-      const saved = await SecureStore.getItemAsync('activeQuest');
-      if (saved) {
-        const { userQuestId, quest } = JSON.parse(saved);
-        setActiveUserQuestId(userQuestId);
-        setSelectedQuest(quest);
-        setIsNavigating(true);
-        Animated.spring(panY, { toValue: SCREEN_HEIGHT * 0.55, useNativeDriver: false }).start();
+        const saved = await SecureStore.getItemAsync('activeQuest');
+        if (saved) {
+          const { userQuestId, quest } = JSON.parse(saved);
+          setActiveUserQuestId(userQuestId);
+          setSelectedQuest(quest);
+          setIsNavigating(true);
+          setPendingRouteRestore(true);
+          Animated.spring(panY, { toValue: SCREEN_HEIGHT * 0.55, useNativeDriver: false }).start();
+        }
+      } catch {
+        setLocationDenied(true);
+      } finally {
+        setLocationReady(true);
       }
     })();
   }, []);
@@ -119,8 +140,12 @@ export default function GeoQuestsScreen() {
     }
   };
 
-  const buildRoute = async (quest: any) => {
-    if (!userLocation) return;
+  const buildRoute = async (quest: any, coordsOverride?: Location.LocationObjectCoords) => {
+    const origin = coordsOverride ?? userLocation;
+    if (!origin) {
+      Alert.alert('Геолокація', 'Увімкніть доступ до геопозиції, щоб прокласти маршрут.');
+      return;
+    }
     const destLat = quest.place.coordinates?.lat;
     const destLng = quest.place.coordinates?.lng;
     if (!destLat || !destLng) {
@@ -128,7 +153,7 @@ export default function GeoQuestsScreen() {
       return;
     }
 
-    const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${userLocation.longitude},${userLocation.latitude};${destLng},${destLat}?overview=full&geometries=polyline&steps=true`;
+    const url = `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${origin.longitude},${origin.latitude};${destLng},${destLat}?overview=full&geometries=polyline&steps=true`;
     const response = await fetch(url);
     const json = await response.json();
 
@@ -165,8 +190,28 @@ export default function GeoQuestsScreen() {
     }
   };
 
+  useEffect(() => {
+    if (pendingRouteRestore && userLocation && selectedQuest && isNavigating) {
+      buildRoute(selectedQuest);
+      setPendingRouteRestore(false);
+    }
+  }, [pendingRouteRestore, userLocation, selectedQuest, isNavigating]);
+
   const startNavigationAndQuest = async () => {
-    if (!userLocation || !selectedQuest) return;
+    if (!selectedQuest) return;
+    if (!userLocation) {
+      Alert.alert(
+        'Геолокація',
+        'Для прокладання маршруту потрібен доступ до вашої позиції.',
+        locationDenied
+          ? [
+              { text: 'Скасувати', style: 'cancel' },
+              { text: 'Налаштування', onPress: () => Linking.openSettings() },
+            ]
+          : [{ text: 'OK' }]
+      );
+      return;
+    }
     setIsLoading(true);
 
     try {
@@ -188,8 +233,7 @@ export default function GeoQuestsScreen() {
       });
 
       if (!startRes.ok) {
-        const err = await startRes.json();
-        Alert.alert('Увага', err.detail || 'Не вдалося почати квест');
+        Alert.alert('Увага', await parseApiError(startRes, 'Не вдалося почати квест'));
         setIsLoading(false);
         return;
       }
@@ -298,6 +342,11 @@ export default function GeoQuestsScreen() {
 
       if (res.ok) {
         const savedQuestId = activeUserQuestId;
+        const lat = selectedQuest?.place?.coordinates?.lat;
+        const lng = selectedQuest?.place?.coordinates?.lng;
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          animateToCoords({ latitude: lat, longitude: lng });
+        }
         clearFullRoute();
 
         if (animationsEnabled) {
@@ -315,8 +364,7 @@ export default function GeoQuestsScreen() {
         setIsAnonymous(defaultAnonymous);
         setTimeout(() => setShareModalVisible(true), animationsEnabled ? 1500 : 0);
       } else {
-        const err = await res.json();
-        Alert.alert('Не вийшло', err.detail || 'Підійдіть ближче до цілі!');
+        Alert.alert('Не вийшло', await parseApiError(res, 'Підійдіть ближче до цілі!'));
       }
     } catch (e) {
       Alert.alert('Помилка', 'Не вдалося завантажити фото або підтвердити координати');
@@ -341,7 +389,7 @@ export default function GeoQuestsScreen() {
         setCompletedQuestId(null);
         Alert.alert('Супер! 🎉', 'Твій успіх вже у стрічці підтримки.');
       } else {
-        Alert.alert('Помилка', 'Не вдалося опублікувати пост');
+        Alert.alert('Помилка', await parseApiError(response, 'Не вдалося опублікувати пост'));
       }
     } catch {
       Alert.alert('Помилка мережі', 'Перевір підключення до інтернету');
@@ -396,7 +444,8 @@ export default function GeoQuestsScreen() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
-        showsUserLocation
+        initialRegion={DEFAULT_REGION}
+        showsUserLocation={!locationDenied}
         showsMyLocationButton={false}
       >
         {nearestQuests.map((item) => {
@@ -409,15 +458,21 @@ export default function GeoQuestsScreen() {
             <Marker
               key={quest.id}
               coordinate={{ latitude: lat, longitude: lng }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              centerOffset={{ x: 0, y: 0 }}
+              tracksViewChanges={false}
               onPress={() => !isNavigating && setSelectedQuest(quest)}
             >
-              <View style={s.markerWrapper}>
+              <View style={s.markerWrapper} collapsable={false}>
                 <View style={[
                   s.markerCircle,
-                  { backgroundColor: isSelected ? c.accent : c.background, borderColor: isSelected ? '#FFF' : c.border },
-                  !isSelected && (Platform.OS === 'ios' ? sh.soft : { elevation: 4 }),
+                  {
+                    backgroundColor: isSelected ? c.accent : c.background,
+                    borderColor: isSelected ? '#FFF' : c.border,
+                    borderWidth: isSelected ? 3 : 2,
+                  },
                 ]}>
-                  <MapPin color={isSelected ? '#FFF' : c.textMain} size={22} />
+                  <MapPin color={isSelected ? '#FFF' : c.textMain} size={20} />
                 </View>
               </View>
             </Marker>
@@ -428,7 +483,7 @@ export default function GeoQuestsScreen() {
 
       <SafeAreaView style={s.topHudContainer}>
         {showHud && isNavigating && steps.length > 0 ? (
-          <View style={[s.navHud, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, Platform.OS === 'ios' ? sh.soft : { elevation: 8 }]}>
+          <View style={[s.navHud, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, cardShadow(themeKey, 'soft')]}>
             <Pressable onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }} style={[s.hudBackBtn, { backgroundColor: c.iconBg }]}>
               <ArrowLeft color={c.iconColor} size={24} />
             </Pressable>
@@ -445,7 +500,7 @@ export default function GeoQuestsScreen() {
         ) : (
           <Pressable
             onPress={() => { if (router.canGoBack()) router.back(); else router.replace('/'); }}
-            style={[s.standaloneBack, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, Platform.OS === 'ios' ? sh.soft : { elevation: 5 }]}
+            style={[s.standaloneBack, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, cardShadow(themeKey, 'soft')]}
           >
             <ArrowLeft color={c.textMain} size={24} />
           </Pressable>
@@ -455,7 +510,7 @@ export default function GeoQuestsScreen() {
       <Animated.View style={[s.bottomSheet, { top: panY, backgroundColor: c.background, borderColor: c.border, paddingBottom: Math.max(insets.bottom, 24) }]}>
         <Pressable
           onPress={centerOnUser}
-          style={[s.locateBtn, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, Platform.OS === 'ios' ? sh.soft : { elevation: 5 }]}
+          style={[s.locateBtn, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, cardShadow(themeKey, 'soft')]}
         >
           <LocateFixed color={c.accent} size={24} />
         </Pressable>
@@ -465,6 +520,20 @@ export default function GeoQuestsScreen() {
         </View>
 
         <View style={s.sheetContent}>
+          {locationDenied && locationReady && (
+            <View style={[s.permissionBanner, { backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : '#FEE2E2', borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#FECACA' }]}>
+              <Text style={[Typography.body, { color: c.textMain, marginBottom: 8 }]}>
+                Увімкніть геолокацію, щоб бачити маршрут і відстань до квесту.
+              </Text>
+              <Pressable
+                onPress={() => Linking.openSettings()}
+                style={[s.permissionBtn, { backgroundColor: c.accent }]}
+              >
+                <Text style={[Typography.button, { color: '#FFF' }]}>Відкрити налаштування</Text>
+              </Pressable>
+            </View>
+          )}
+
           {selectedQuest && (
             <View style={s.headerRow}>
               <Text style={[Typography.titleLg, { color: c.textMain }]}>{selectedQuest.title}</Text>
@@ -485,7 +554,13 @@ export default function GeoQuestsScreen() {
           {!isNavigating ? (
             <Pressable
               onPress={startNavigationAndQuest}
-              style={({ pressed }) => [s.primaryBtn, { backgroundColor: c.accent }, pressed && { opacity: 0.8 }]}
+              disabled={!userLocation && locationReady}
+              style={({ pressed }) => [
+                s.primaryBtn,
+                { backgroundColor: c.accent },
+                pressed && { opacity: 0.8 },
+                !userLocation && locationReady && { opacity: 0.5 },
+              ]}
             >
               {isLoading ? <ActivityIndicator color="#FFF" /> : (
                 <>
@@ -640,8 +715,21 @@ const s = StyleSheet.create({
   hudBackBtn: { padding: 10, borderRadius: Radii.md },
   hudInfo: { flex: 1, marginLeft: 12 },
   hudClose: { padding: 8 },
-  markerWrapper: { padding: 6, alignItems: 'center', justifyContent: 'center' },
-  markerCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', borderWidth: 2 },
+  markerWrapper: {
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  markerCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
+  },
   bottomSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: Radii.xl, borderTopRightRadius: Radii.xl, borderWidth: 1, borderBottomWidth: 0 },
   locateBtn: { position: 'absolute', right: Spacing.screenX, top: -70, padding: 12, borderRadius: Radii.full, zIndex: 10 },
   dragArea: { width: '100%', alignItems: 'center', paddingVertical: 14 },
@@ -663,4 +751,6 @@ const s = StyleSheet.create({
   modalButtons: { flexDirection: 'row', gap: 12 },
   cancelBtn: { flex: 1, paddingVertical: 16, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center' },
   confirmBtn: { flex: 1, paddingVertical: 16, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center' },
+  permissionBanner: { padding: 14, borderRadius: Radii.md, borderWidth: 1, marginBottom: 16 },
+  permissionBtn: { paddingVertical: 10, borderRadius: Radii.full, alignItems: 'center' },
 });

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Altera",
     "slug": "altera",
-    "version": "1.0.1",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -50,10 +50,6 @@
         {
           "default": {
             "image": "./assets/images/icon.png",
-            "prerendered": true
-          },
-          "done": {
-            "image": "./assets/images/icon-done.png",
             "prerendered": true
           }
         }

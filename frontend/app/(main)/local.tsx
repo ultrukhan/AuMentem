@@ -16,16 +16,20 @@ import {
   Coffee 
 } from 'lucide-react-native';
 
-import { Colors, Typography, Radii, Spacing, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
-import BottomNav from '@/components/BottomNav'; // <-- Імпорт нижнього меню
+import BottomNav from '@/components/BottomNav';
+import { cardShadow } from '@/utils/shadowStyle';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import AnimatedCard from '@/components/AnimatedCard';
 
 export default function LocalEventsScreen() {
   const router = useRouter();
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
-  const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
+  const c = Colors[themeKey];
+  const { animationsEnabled } = useAppSettings();
 
   const handleGoBack = () => {
     playClickSound();
@@ -52,7 +56,7 @@ export default function LocalEventsScreen() {
             style={({ pressed }) => [
               s.iconBtn, 
               { backgroundColor: c.cardBg, borderColor: c.border },
-              Platform.OS === 'ios' ? sh.soft : { elevation: 0 },
+              cardShadow(themeKey, 'soft'),
               pressed && { opacity: 0.7 }
             ]}
           >
@@ -64,7 +68,7 @@ export default function LocalEventsScreen() {
           <View style={[
             s.card, 
             { backgroundColor: c.cardBg, borderColor: c.border },
-            Platform.OS === 'ios' ? sh.soft : { elevation: 0 }
+            cardShadow(themeKey, 'soft')
           ]}>
             
             <View style={[s.iconWrapper, { backgroundColor: c.iconBg }]}>
@@ -89,23 +93,20 @@ export default function LocalEventsScreen() {
               </Text>
             </View>
 
-            <Pressable 
+            <AnimatedCard
+              animationsEnabled={animationsEnabled}
               onPress={handleGoBack}
-              style={({ pressed }) => [
-                s.primaryBtn, 
-                { backgroundColor: c.accent },
-                pressed && { opacity: 0.8 }
-              ]}
+              style={[s.primaryBtn, { backgroundColor: c.accent }]}
             >
               <Text style={[Typography.button, { color: '#FFF' }]}>
                 Зрозуміло, чекаю!
               </Text>
-            </Pressable>
+            </AnimatedCard>
 
           </View>
         </View>
         
-        <BottomNav isDark={isDark} />
+        <BottomNav isDark={isDark} theme={isDark ? 'dark' : 'light'} />
         
       </SafeAreaView>
     </ImageBackground>

@@ -9,7 +9,11 @@ import {
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api';
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii } from '@/constants/theme';
+import { textLayout } from '@/utils/textLayout';
+import { cardShadow } from '@/utils/shadowStyle';
+import { parseApiError } from '@/utils/apiErrors';
+import { playClickSound } from '@/utils/audio';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -41,7 +45,6 @@ const getHobbyIcon = (name: string, color: string, size: number) => {
 export default function HobbiesModal({ visible, onSuccess, onClose, isDark = false }: Props) {
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
-  const sh = Shadows[theme];
 
   const [hobbies, setHobbies] = useState<Hobby[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -122,7 +125,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         }, 1000);
 
       } else {
-        setError('Не вдалося зберегти зміни на сервері');
+        setError(await parseApiError(response, 'Не вдалося зберегти зміни на сервері'));
       }
     } catch (err) {
       setError('Помилка мережі при збереженні');
@@ -132,11 +135,11 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={s.overlay}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={[s.overlay, { zIndex: 1000 }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }, sh.hard]}>
+        <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }, cardShadow(theme, 'hard')]}>
           
           {onClose && (
             <Pressable 
@@ -188,13 +191,19 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
                     >
                       <View style={s.chipInner}>
                         {getHobbyIcon(hobby.name, iconColor, 18)}
-                        <Text style={[Typography.body, { color: textColor, fontWeight: '500', marginLeft: 8 }]}>
+                        <Text
+                          style={[Typography.body, s.chipLabel, { color: textColor }]}
+                          numberOfLines={2}
+                          ellipsizeMode="tail"
+                        >
                           {hobby.name}
                         </Text>
                       </View>
-                      <View style={[s.checkCircle, { opacity: isSelected ? 1 : 0 }]}>
-                        <Check color={c.accent} size={14} strokeWidth={3} />
-                      </View>
+                      {isSelected && (
+                        <View style={s.checkCircle}>
+                          <Check color={c.accent} size={14} strokeWidth={3} />
+                        </View>
+                      )}
                     </Pressable>
                   );
                 })}
@@ -246,9 +255,34 @@ const s = StyleSheet.create({
   iconBox: { padding: 14, borderRadius: Radii.full, marginBottom: 16 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   hobbiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
-  hobbyChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, paddingLeft: 16, paddingRight: 12, borderRadius: Radii.full, borderWidth: 1 },
-  chipInner: { flexDirection: 'row', alignItems: 'center' },
-  checkCircle: { backgroundColor: '#FFF', borderRadius: 10, padding: 2, marginLeft: 8 },
+  hobbyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Radii.full,
+    borderWidth: 1,
+    width: '47%',
+    minHeight: 48,
+    position: 'relative',
+  },
+  chipInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+    maxWidth: '100%',
+  },
+  chipLabel: { fontWeight: '500', textAlign: 'center', fontSize: 13, flex: 1, ...textLayout },
+  checkCircle: {
+    position: 'absolute',
+    right: 10,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    padding: 2,
+  },
   errorText: { color: '#FF3B30', textAlign: 'center', marginTop: 20, fontWeight: '500' },
   footer: { padding: 24, paddingBottom: Platform.OS === 'ios' ? 34 : 24, borderTopWidth: 1 },
   saveBtn: { height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center' },

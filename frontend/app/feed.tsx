@@ -21,9 +21,14 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Sparkles, MapPin, Ghost, Trash2, Flag, X, CheckCircle2, Circle } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 import { playClickSound } from '@/utils/audio';
+import { parseApiError } from '@/utils/apiErrors';
+import { cardShadow } from '@/utils/shadowStyle';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { MotiView } from 'moti';
+import { Skeleton } from 'moti/skeleton';
 
 interface Reaction {
   reaction_type: 'SUPPORT' | 'HUG' | 'PROUD' | 'HEART';
@@ -53,7 +58,6 @@ const REACTION_OPTIONS = [
   { type: 'PROUD', emoji: '🔥' },
 ] as const;
 
-// МЕПІНГ ПРИЧИН СКАРГ (Синхронізовано з бекендом ReportReason)
 const REPORT_REASONS = [
   { id: 'SPAM', label: 'Спам або реклама' },
   { id: 'OFFENSIVE', label: 'Образливий контент або цькування' },
@@ -173,7 +177,7 @@ const ReactionButton = ({
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: isActive ? 0.4 : 0,
               shadowRadius: 6,
-              elevation: isActive ? 4 : 0
+              opacity: isActive ? 1 : 0.85
             }
           ]}
         >
@@ -189,13 +193,25 @@ const ReactionButton = ({
   );
 };
 
+const FeedSkeleton = ({ isDark }: { isDark: boolean }) => {
+  const c = Colors[isDark ? 'dark' : 'light'];
+  return (
+    <View style={{ gap: 16, paddingTop: 8 }}>
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} colorMode={isDark ? 'dark' : 'light'} width="100%" height={180} radius={24} />
+      ))}
+    </View>
+  );
+};
+
 export default function FeedScreen() {
   const router = useRouter();
   const { theme: themeParam } = useLocalSearchParams();
   const isDark = themeParam === 'dark';
-  
-  const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const { animationsEnabled } = useAppSettings();
+  const themeKey = isDark ? 'dark' : 'light';
+
+  const c = Colors[themeKey];
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
@@ -203,7 +219,6 @@ export default function FeedScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [myReactions, setMyReactions] = useState<Record<string, string | null>>({});
 
-  // СТЕЙТИ ДЛЯ СКАРГ (REPORT)
   const [reportingPostId, setReportingPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<string | null>(null);
   const [reportDetails, setReportDetails] = useState('');
@@ -326,7 +341,6 @@ export default function FeedScreen() {
     );
   };
 
-  // ФУНКЦІЯ НАДІСЛАННЯ СКАРГИ
   const submitReport = async () => {
     if (!reportReason || !reportingPostId) return;
     
@@ -352,9 +366,7 @@ export default function FeedScreen() {
         Alert.alert("Дякуємо!", "Скаргу успішно надіслано. Наші модератори перевірять цей пост.");
         closeReportModal();
       } else {
-        const errData = await response.json();
-        // Якщо помилка 400 - швидше за все користувач вже скаржився
-        Alert.alert("Увага", errData.detail || "Не вдалося надіслати скаргу.");
+        Alert.alert("Увага", await parseApiError(response, "Не вдалося надіслати скаргу."));
       }
     } catch (error) {
       Alert.alert("Помилка", "Перевірте з'єднання з інтернетом.");
@@ -374,7 +386,7 @@ export default function FeedScreen() {
     return date.toLocaleDateString('uk-UA', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
   };
 
-  const renderPost = ({ item }: { item: Post }) => {
+  const renderPost = ({ item, index }: { item: Post; index: number }) => {
     const authorName = (item.is_anonymous || !item.user) ? "Таємний мандрівник" : item.user.nickname;
     
     const questTitle = item.user_mini_quest?.mini_quest?.title 
@@ -386,8 +398,8 @@ export default function FeedScreen() {
 
     const isMyPost = item.user_id === myUserId;
 
-    return (
-      <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+    const card = (
+      <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
         
         <View style={s.cardHeader}>
           <View style={s.authorInfo}>
@@ -400,13 +412,12 @@ export default function FeedScreen() {
                 </Text>
               )}
             </View>
-            <View>
-              <Text style={[Typography.titleMd, { color: c.textMain, fontSize: 15 }]}>{authorName}</Text>
-              <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>{formatDate(item.created_at)}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[Typography.titleMd, { color: c.textMain, fontSize: 15 }]} numberOfLines={1}>{authorName}</Text>
+              <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]} numberOfLines={1}>{formatDate(item.created_at)}</Text>
             </View>
           </View>
 
-          {/* ЯКЩО МІЙ ПОСТ -> КНОПКА ВИДАЛИТИ. ЯКЩО ЧУЖИЙ -> СКАРГА */}
           {isMyPost ? (
             <Pressable 
               onPress={() => handleDeletePost(item.id)}
@@ -434,7 +445,7 @@ export default function FeedScreen() {
 
         <View style={[s.questBadge, { backgroundColor: isGeo ? '#3B82F615' : c.accent + '15' }]}>
           {isGeo ? <MapPin color="#3B82F6" size={16} /> : <Sparkles color={c.accent} size={16} />}
-          <Text style={[Typography.body, { color: c.textMain, marginLeft: 8, flex: 1 }]}>
+          <Text style={[Typography.body, { color: c.textMain, marginLeft: 8, flex: 1 }]} numberOfLines={3}>
             Досягнення: <Text style={{ fontWeight: '600' }}>{questTitle}</Text>
           </Text>
         </View>
@@ -464,6 +475,18 @@ export default function FeedScreen() {
         </View>
       </View>
     );
+
+    if (!animationsEnabled) return card;
+
+    return (
+      <MotiView
+        from={{ opacity: 0, translateY: 16 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'timing', duration: 400, delay: Math.min(index * 60, 300) }}
+      >
+        {card}
+      </MotiView>
+    );
   };
 
   return (
@@ -474,14 +497,18 @@ export default function FeedScreen() {
       </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 50 }} />
+        <View style={s.listContent}><FeedSkeleton isDark={isDark} /></View>
       ) : (
         <FlatList
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={7}
+          removeClippedSubviews
           contentContainerStyle={s.listContent}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={fetchPosts} tintColor={c.accent} />}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => { setIsRefreshing(true); fetchPosts(); }} tintColor={c.accent} />}
           ListEmptyComponent={
             <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 40 }]}>
               Стрічка поки порожня. Створи перший привід для гордості в цій стрічці! 🌟
@@ -490,7 +517,6 @@ export default function FeedScreen() {
         />
       )}
 
-      {/* МОДАЛКА ДЛЯ СКАРГИ (REPORT BOTTOM SHEET) */}
       <Modal visible={!!reportingPostId} animationType="slide" transparent>
         <View style={s.modalOverlay}>
           <KeyboardAvoidingView 
@@ -511,7 +537,6 @@ export default function FeedScreen() {
                   Виберіть причину, чому цей пост порушує правила спільноти:
                 </Text>
 
-                {/* СПИСОК ПРИЧИН */}
                 <View style={s.reasonsContainer}>
                   {REPORT_REASONS.map((item) => {
                     const isSelected = reportReason === item.id;
@@ -587,12 +612,12 @@ const s = StyleSheet.create({
   
   cardHeader: { 
     flexDirection: 'row', 
-    justifyContent: 'space-between', 
     alignItems: 'center', 
     padding: 16, 
-    paddingBottom: 12 
+    paddingBottom: 12,
+    gap: 12,
   },
-  authorInfo: { flexDirection: 'row', alignItems: 'center' },
+  authorInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   
   actionBtn: {
@@ -600,6 +625,7 @@ const s = StyleSheet.create({
     borderRadius: Radii.full,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
 
   questBadge: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, padding: 12, borderRadius: Radii.md, marginBottom: 16 },

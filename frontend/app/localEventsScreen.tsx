@@ -1,7 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, Pressable, 
-  ActivityIndicator, Linking, Modal, ScrollView, Alert, Image, Platform
+  Linking, Modal, ScrollView, Alert, RefreshControl, Platform
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -14,6 +14,14 @@ import {
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 import { playClickSound } from '@/utils/audio';
+import { parseApiError } from '@/utils/apiErrors';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { useSinglePress } from '@/hooks/useSinglePress';
+import { cardShadow } from '@/utils/shadowStyle';
+import { MotiView } from 'moti';
+import EventCover from '@/components/EventCover';
+import EventCardSkeleton from '@/components/EventCardSkeleton';
+import BottomNav from '@/components/BottomNav';
 
 interface LocalEvent {
   id: string;
@@ -31,13 +39,47 @@ interface LocalEvent {
 
 const CITIES = ['Всі міста', 'Львів', 'Київ', 'Одеса', 'Дніпро', 'Харків'];
 
+type DateFilter = 'ALL' | 'TODAY' | 'WEEK' | 'MONTH';
+
+const DATE_FILTERS: { id: DateFilter; label: string }[] = [
+  { id: 'ALL', label: 'Усі дати' },
+  { id: 'TODAY', label: 'Сьогодні' },
+  { id: 'WEEK', label: 'Цей тиждень' },
+  { id: 'MONTH', label: 'Цей місяць' },
+];
+
+function matchesDateFilter(startTime: string, filter: DateFilter): boolean {
+  const start = new Date(startTime);
+  const now = new Date();
+  if (filter === 'ALL') return true;
+  if (filter === 'TODAY') {
+    return start.toDateString() === now.toDateString();
+  }
+  if (filter === 'WEEK') {
+    const weekStart = new Date(now);
+    const day = weekStart.getDay() || 7;
+    weekStart.setDate(weekStart.getDate() - day + 1);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 7);
+    return start >= weekStart && start < weekEnd;
+  }
+  if (filter === 'MONTH') {
+    return start.getMonth() === now.getMonth() && start.getFullYear() === now.getFullYear();
+  }
+  return true;
+}
+
 export default function LocalEventsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets(); 
   
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
-  const c = Colors[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
+  const c = Colors[themeKey];
+  const { animationsEnabled } = useAppSettings();
+  const runOnce = useSinglePress();
 
   const [activeTab, setActiveTab] = useState<'EXPLORE' | 'SAVED'>('EXPLORE');
   
@@ -46,14 +88,22 @@ export default function LocalEventsScreen() {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listRefreshEpoch, setListRefreshEpoch] = useState(0);
+  const hasLoadedOnceRef = useRef(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
   const [selectedEvent, setSelectedEvent] = useState<LocalEvent | null>(null);
   const [attendeesCount, setAttendeesCount] = useState<number | null>(null);
   const [isTogglingFav, setIsTogglingFav] = useState(false);
 
   const [currentCity, setCurrentCity] = useState('Львів');
 
-  const fetchEventsAndFavorites = useCallback(async () => {
-    setIsLoading(true);
+  const fetchEventsAndFavorites = useCallback(async (options?: { refresh?: boolean }) => {
+    if (!hasLoadedOnceRef.current) {
+      setIsLoading(true);
+    } else if (options?.refresh) {
+      setIsRefreshing(true);
+    }
     try {
       const token = await SecureStore.getItemAsync('userToken');
       const headers = { 'Authorization': `Bearer ${token}` };
@@ -82,14 +132,33 @@ export default function LocalEventsScreen() {
       console.error('Помилка завантаження подій:', error);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
+      hasLoadedOnceRef.current = true;
+      if (options?.refresh) {
+        setListRefreshEpoch((n) => n + 1);
+      }
     }
   }, [currentCity]);
+
+  const filteredEvents = useMemo(
+    () => events.filter((e) => matchesDateFilter(e.start_time, dateFilter)),
+    [events, dateFilter]
+  );
+
+  const handleRefresh = () => {
+    fetchEventsAndFavorites({ refresh: true });
+  };
 
   useFocusEffect(
     useCallback(() => {
       fetchEventsAndFavorites();
     }, [fetchEventsAndFavorites])
   );
+
+  useEffect(() => {
+    if (!hasLoadedOnceRef.current) return;
+    fetchEventsAndFavorites({ refresh: true });
+  }, [currentCity]);
 
   const handleToggleFavorite = async (event: LocalEvent) => {
     setIsTogglingFav(true);
@@ -120,6 +189,8 @@ export default function LocalEventsScreen() {
         if (selectedEvent && selectedEvent.id === event.id) {
           setAttendeesCount(prev => (prev !== null ? (data.is_favorited ? prev + 1 : prev - 1) : null));
         }
+      } else {
+        Alert.alert('Помилка', await parseApiError(response, 'Не вдалося оновити статус події'));
       }
     } catch (error) {
       Alert.alert('Помилка', 'Не вдалося оновити статус події');
@@ -157,29 +228,71 @@ export default function LocalEventsScreen() {
     };
   };
 
-  const renderEventCard = ({ item }: { item: LocalEvent }) => {
+  const listBottomPadding = Math.max(insets.bottom + 88, 108);
+
+  const renderExploreFilters = () => (
+    <View style={s.filtersPanel}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterScroll}>
+        {CITIES.map((city) => {
+          const isActive = currentCity === city;
+          return (
+            <Pressable
+              key={city}
+              style={[
+                s.filterChip,
+                { backgroundColor: c.cardBg, borderColor: c.border },
+                isActive && { backgroundColor: c.accent, borderColor: c.accent, ...s.badgeShadow },
+              ]}
+              onPress={() => { playClickSound(); setCurrentCity(city); }}
+            >
+              <Text style={[s.filterChipText, { color: c.textMuted }, isActive && { color: '#FFF' }]}>
+                {city}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterScroll}>
+        {DATE_FILTERS.map((df) => {
+          const isActive = dateFilter === df.id;
+          return (
+            <Pressable
+              key={df.id}
+              style={[
+                s.filterChip,
+                { backgroundColor: c.cardBg, borderColor: c.border },
+                isActive && { backgroundColor: c.textMain, borderColor: c.textMain, ...s.badgeShadow },
+              ]}
+              onPress={() => { playClickSound(); setDateFilter(df.id); }}
+            >
+              <Text style={[s.filterChipText, { color: c.textMuted }, isActive && { color: c.background }]}>
+                {df.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  const renderEventCard = ({ item, index = 0 }: { item: LocalEvent; index?: number }) => {
     const isFav = favoriteIds.has(item.id);
     const { day, time } = formatDate(item.start_time);
     const isFree = !item.price || item.price === '0' || item.price.toLowerCase().includes('безкоштовно');
 
-    return (
+    const card = (
       <Pressable 
         style={({ pressed }) => [
-          s.cardContainer, 
-          { backgroundColor: c.cardBg }, // Рятує тіні на Android від сірого контуру
-          s.beautifulShadow,
-          pressed && { opacity: 0.95, transform: [{ scale: 0.98 }] }
-        ]} 
-        onPress={() => { playClickSound(); openEventDetails(item); }}
+          s.cardContainer,
+          { backgroundColor: c.cardBg, borderColor: c.border },
+          cardShadow(themeKey, 'soft'),
+          pressed && { opacity: 0.95, transform: [{ scale: 0.98 }] },
+        ]}
+        onPress={() => runOnce(() => { playClickSound(); openEventDetails(item); })}
       >
-        <View style={[s.cardInner, { backgroundColor: c.cardBg }]}>
+        <View style={[s.cardInner, { backgroundColor: c.cardBg, borderColor: c.border }]}>
           <View style={s.imageContainer}>
-            <Image 
-              source={{ uri: item.image_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' }} 
-              style={s.cardImage} 
-              resizeMode="cover" 
-            />
-            <View style={s.imageOverlay} />
+            <EventCover imageUrl={item.image_url} theme={themeKey} style={s.cardImage} category={item.category} />
             <View style={[s.categoryBadgeTop, s.badgeShadow, { backgroundColor: c.cardBg }]}>
               <Text style={[s.categoryTextTop, { color: c.textMain }]}>{item.category}</Text>
             </View>
@@ -225,6 +338,19 @@ export default function LocalEventsScreen() {
         </View>
       </Pressable>
     );
+
+    if (!animationsEnabled) return card;
+
+    return (
+      <MotiView
+        key={`${item.id}-${listRefreshEpoch}`}
+        from={{ opacity: 0, translateY: 14 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'timing', duration: 380, delay: Math.min(index * 45, 220) }}
+      >
+        {card}
+      </MotiView>
+    );
   };
 
   return (
@@ -232,11 +358,15 @@ export default function LocalEventsScreen() {
       
       <View style={s.screenHeader}>
         <Pressable 
-          onPress={() => { playClickSound(); router.replace('/'); }} 
+          onPress={() => runOnce(() => {
+            playClickSound();
+            if (router.canGoBack()) router.back();
+            else router.replace({ pathname: '/(main)/home', params: { theme: themeKey } });
+          })}
           style={({ pressed }) => [
             s.roundBackBtn, 
             { backgroundColor: c.cardBg, borderColor: c.border },
-            s.badgeShadow,
+            cardShadow(themeKey, 'soft'),
             pressed && { opacity: 0.7 }
           ]}
         >
@@ -274,71 +404,88 @@ export default function LocalEventsScreen() {
           )}
         </Pressable>
       </View>
+
+      {activeTab === 'EXPLORE' ? renderExploreFilters() : null}
       
-      {isLoading ? (
-        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 80 }} />
-      ) : activeTab === 'EXPLORE' ? (
-        <>
-          <View style={s.cityFilterContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.cityFilterScroll}>
-              {CITIES.map(city => {
-                const isActive = currentCity === city;
-                return (
-                  <Pressable
-                    key={city}
-                    style={[
-                      s.cityChip, 
-                      { backgroundColor: c.cardBg, borderColor: c.border },
-                      isActive && { backgroundColor: c.accent, borderColor: c.accent, ...s.badgeShadow }
-                    ]}
-                    onPress={() => { playClickSound(); setCurrentCity(city); }}
-                  >
-                    <Text style={[s.cityChipText, { color: c.textMuted }, isActive && { color: '#FFF' }]}>{city}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-          
+      <View style={s.listArea}>
+        {activeTab === 'EXPLORE' ? (
           <FlatList
-            data={events}
-            keyExtractor={item => item.id}
+            style={s.list}
+            data={isLoading ? [] : filteredEvents}
+            keyExtractor={(item) => item.id}
             renderItem={renderEventCard}
-            contentContainerStyle={s.listContent}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            windowSize={7}
+            contentContainerStyle={[
+              s.listContent,
+              (isLoading || filteredEvents.length === 0) && s.listContentGrow,
+              { paddingBottom: listBottomPadding },
+            ]}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />
+            }
             ListEmptyComponent={
-              <View style={s.emptyStateBox}>
-                <Sparkles color={c.textMuted} size={48} style={{ marginBottom: 16 }} opacity={0.5} />
-                <Text style={[s.emptyTitle, { color: c.textMain }]}>Тут поки тихо</Text>
-                <Text style={[s.emptyText, { color: c.textMuted }]}>
-                  {currentCity === 'Всі міста' ? 'В Україні' : `У місті ${currentCity}`} наразі немає запланованих подій. Зазирни сюди трохи згодом! 🌱
-                </Text>
-              </View>
+              isLoading ? (
+                <EventCardSkeleton isDark={isDark} count={2} />
+              ) : (
+                <View style={s.emptyStateBox}>
+                  <Sparkles color={c.textMuted} size={48} style={{ marginBottom: 16 }} opacity={0.5} />
+                  <Text style={[s.emptyTitle, { color: c.textMain }]}>Тут поки тихо</Text>
+                  <Text style={[s.emptyText, { color: c.textMuted }]}>
+                    {dateFilter !== 'ALL'
+                      ? 'За обраним періодом подій немає. Спробуй інший фільтр.'
+                      : `${currentCity === 'Всі міста' ? 'В Україні' : `У місті ${currentCity}`} наразі немає запланованих подій. Зазирни сюди трохи згодом! 🌱`}
+                  </Text>
+                </View>
+              )
             }
           />
-        </>
-      ) : (
-        <FlatList
-          data={savedEvents}
-          keyExtractor={item => item.id}
-          renderItem={renderEventCard}
-          contentContainerStyle={s.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={s.emptyStateBox}>
-              <Bookmark color={c.textMuted} size={56} style={{ marginBottom: 16 }} strokeWidth={1.5} opacity={0.5} />
-              <Text style={[s.emptyTitle, { color: c.textMain }]}>Збереженого немає</Text>
-              <Text style={[s.emptyText, { color: c.textMuted }]}>Ви ще не додали жодної події до своїх планів. Знайдіть щось цікаве в афіші!</Text>
-              <Pressable 
-                style={({ pressed }) => [s.findEventsBtn, { backgroundColor: c.accent }, pressed && { opacity: 0.8 }, s.beautifulShadow]} 
-                onPress={() => { playClickSound(); setActiveTab('EXPLORE'); }}
-              >
-                <Text style={s.findEventsBtnText}>Шукати події 🔎</Text>
-              </Pressable>
-            </View>
-          }
-        />
-      )}
+        ) : (
+          <FlatList
+            style={s.list}
+            data={isLoading ? [] : savedEvents}
+            keyExtractor={(item) => item.id}
+            renderItem={renderEventCard}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
+            contentContainerStyle={[
+              s.listContent,
+              (isLoading || savedEvents.length === 0) && s.listContentGrow,
+              { paddingBottom: listBottomPadding },
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />
+            }
+            ListEmptyComponent={
+              isLoading ? (
+                <EventCardSkeleton isDark={isDark} count={2} />
+              ) : (
+                <View style={s.emptyStateBox}>
+                  <Bookmark color={c.textMuted} size={56} style={{ marginBottom: 16 }} strokeWidth={1.5} opacity={0.5} />
+                  <Text style={[s.emptyTitle, { color: c.textMain }]}>Збереженого немає</Text>
+                  <Text style={[s.emptyText, { color: c.textMuted }]}>
+                    Ви ще не додали жодної події до своїх планів. Знайдіть щось цікаве в афіші!
+                  </Text>
+                  <Pressable
+                    style={({ pressed }) => [
+                      s.findEventsBtn,
+                      { backgroundColor: c.accent },
+                      pressed && { opacity: 0.8 },
+                      s.beautifulShadow,
+                    ]}
+                    onPress={() => { playClickSound(); setActiveTab('EXPLORE'); }}
+                  >
+                    <Text style={s.findEventsBtnText}>Шукати події 🔎</Text>
+                  </Pressable>
+                </View>
+              )
+            }
+          />
+        )}
+      </View>
 
       <Modal visible={!!selectedEvent} animationType="slide" transparent={false}>
         {selectedEvent && (() => {
@@ -351,19 +498,22 @@ export default function LocalEventsScreen() {
               <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={{ paddingBottom: 140 }}>
                 
                 <View style={s.modalImageContainer}>
-                  <Image 
-                    source={{ uri: selectedEvent.image_url || 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30' }} 
-                    style={s.modalImage} 
+                  <EventCover
+                    imageUrl={selectedEvent.image_url}
+                    theme={themeKey}
+                    style={s.modalImage}
+                    large
+                    category={selectedEvent.category}
                   />
                   <Pressable 
                     style={({ pressed }) => [
                       s.floatingModalBackBtn, 
-                      { top: Math.max(insets.top + 10, 20) }, 
+                      { top: Math.max(insets.top + 10, 20), backgroundColor: c.cardBg, borderColor: c.border }, 
                       pressed && { opacity: 0.7 }
                     ]} 
-                    onPress={() => setSelectedEvent(null)}
+                    onPress={() => { playClickSound(); setSelectedEvent(null); }}
                   >
-                    <ChevronLeft color="#333" size={28} strokeWidth={2.5} />
+                    <ChevronLeft color={c.textMain} size={28} strokeWidth={2.5} />
                   </Pressable>
                 </View>
 
@@ -438,41 +588,46 @@ export default function LocalEventsScreen() {
           );
         })()}
       </Modal>
+
+      <BottomNav isDark={isDark} theme={themeKey} />
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  screenHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screenX, marginTop: 8, marginBottom: 16 },
+  screenHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.screenX, marginTop: 4, marginBottom: 10 },
   roundBackBtn: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginRight: 16 },
   screenTitle: { ...Typography.titleXl, fontSize: 26 },
   
-  beautifulShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3 },
-  badgeShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  lightShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  stickyFooterShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 16 },
+  beautifulShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10 },
+  badgeShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 4 },
+  lightShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 6 },
+  stickyFooterShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.06, shadowRadius: 16 },
 
-  tabsContainer: { flexDirection: 'row', paddingHorizontal: Spacing.screenX, marginBottom: 16, gap: 12 },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: Radii.full, flexDirection: 'row', justifyContent: 'center' },
+  tabsContainer: { flexDirection: 'row', paddingHorizontal: Spacing.screenX, marginBottom: 8, gap: 10 },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: Radii.full, flexDirection: 'row', justifyContent: 'center' },
   tabText: { ...Typography.titleMd, fontSize: 15 },
   badgeCounter: { borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 8 },
   badgeCounterText: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
 
-  cityFilterContainer: { marginBottom: 16 },
-  cityFilterScroll: { paddingHorizontal: Spacing.screenX, gap: 10 },
-  cityChip: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: Radii.full, borderWidth: 1, overflow: 'hidden' }, 
-  cityChipText: { ...Typography.body, fontSize: 14, fontWeight: '600' },
+  listArea: { flex: 1 },
+  list: { flex: 1 },
+  filtersPanel: { paddingHorizontal: Spacing.screenX, gap: 6, marginBottom: 6 },
+  filterScroll: { gap: 8, paddingRight: Spacing.screenX },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radii.full, borderWidth: 1 },
+  filterChipText: { ...Typography.body, fontSize: 13, fontWeight: '600' },
 
-  listContent: { paddingHorizontal: Spacing.screenX, paddingBottom: 120 },
-  emptyStateBox: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: 20 },
+  listContent: { paddingHorizontal: Spacing.screenX },
+  listContentGrow: { flexGrow: 1 },
+  emptyStateBox: { alignItems: 'center', justifyContent: 'center', marginTop: 40, paddingHorizontal: 20 },
   emptyTitle: { ...Typography.titleLg, marginBottom: 12 },
   emptyText: { ...Typography.body, textAlign: 'center', lineHeight: 24, marginBottom: 24 },
   findEventsBtn: { paddingVertical: 14, paddingHorizontal: 24, borderRadius: Radii.full },
   findEventsBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   
-  cardContainer: { marginBottom: 20, borderRadius: Radii.xl }, 
-  cardInner: { borderRadius: Radii.xl, overflow: 'hidden' }, 
+  cardContainer: { marginBottom: 14, borderRadius: Radii.xl, borderWidth: 1 },
+  cardInner: { borderRadius: Radii.xl, overflow: 'hidden', borderWidth: 1 }, 
   imageContainer: { width: '100%', height: 180, position: 'relative' },
   cardImage: { width: '100%', height: '100%' },
   imageOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.1)' },
@@ -506,7 +661,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)', 
     alignItems: 'center', 
     justifyContent: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4 
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6,
   },
 
   modalBody: { padding: 24, borderTopLeftRadius: 32, borderTopRightRadius: 32, marginTop: -30 }, 

@@ -1,12 +1,15 @@
 import React, { useState, useRef } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, Dimensions, 
-  SafeAreaView, Pressable, Animated 
+  Pressable, Animated 
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Sparkles, Map, MessageCircleHeart, ArrowRight } from 'lucide-react-native';
-import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
+import { Typography, Radii } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import AnimatedCard from '@/components/AnimatedCard';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,7 +39,11 @@ const SLIDES = [
 
 export default function IntroScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { animationsEnabled } = useAppSettings();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const footerBottom = Math.max(insets.bottom + 16, 32);
+  const slidePaddingBottom = footerBottom + 100;
   const scrollX = useRef(new Animated.Value(0)).current;
   const slidesRef = useRef(null);
 
@@ -49,13 +56,12 @@ export default function IntroScreen() {
       (slidesRef.current as any).scrollToIndex({ index: currentIndex + 1 });
     } else {
       playClickSound();
-      // Після завершення йдемо на головну (там спрацює логіка показу хобі)
       router.replace('/(main)/home');
     }
   };
 
   const renderItem = ({ item }: any) => (
-    <View style={[s.slide, { backgroundColor: item.color }]}>
+    <View style={[s.slide, { backgroundColor: item.color, paddingBottom: slidePaddingBottom }]}>
       <View style={s.iconContainer}>{item.icon}</View>
       <View style={s.textContainer}>
         <Text style={s.title}>{item.title}</Text>
@@ -81,8 +87,7 @@ export default function IntroScreen() {
         ref={slidesRef}
       />
 
-      <View style={s.footer}>
-        {/* Індикатори (крапочки) */}
+      <View style={[s.footer, { bottom: footerBottom }]}>
         <View style={s.indicatorContainer}>
           {SLIDES.map((_, i) => {
             const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
@@ -95,12 +100,12 @@ export default function IntroScreen() {
           })}
         </View>
 
-        <Pressable style={s.button} onPress={handleNext}>
+        <AnimatedCard animationsEnabled={animationsEnabled} style={s.button} onPress={handleNext}>
           <Text style={s.buttonText}>
             {currentIndex === SLIDES.length - 1 ? 'Почати' : 'Далі'}
           </Text>
           <ArrowRight color="#FFF" size={20} />
-        </Pressable>
+        </AnimatedCard>
       </View>
     </SafeAreaView>
   );
@@ -108,16 +113,15 @@ export default function IntroScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFF' },
-  slide: { width, justifyContent: 'center', alignItems: 'center', padding: 40 },
-  iconContainer: { marginBottom: 40 },
-  textContainer: { alignItems: 'center' },
-  title: { ...Typography.titleXl, textAlign: 'center', marginBottom: 20, color: '#1F2937' },
-  description: { ...Typography.body, textAlign: 'center', color: '#4B5563', lineHeight: 24 },
+  slide: { width, flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingTop: 24 },
+  iconContainer: { marginBottom: height < 700 ? 24 : 40 },
+  textContainer: { alignItems: 'center', maxWidth: 320 },
+  title: { ...Typography.titleXl, textAlign: 'center', marginBottom: 16, color: '#1F2937', fontSize: height < 700 ? 26 : 32 },
+  description: { ...Typography.body, textAlign: 'center', color: '#4B5563', lineHeight: 24, fontSize: height < 700 ? 14 : 16 },
   footer: {
     position: 'absolute',
-    bottom: 50,
     width: '100%',
-    paddingHorizontal: 30,
+    paddingHorizontal: 24,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

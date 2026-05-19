@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, Platform, Alert, Pressable, Modal, TextInput, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, Platform, Alert, Pressable, Modal, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send } from 'lucide-react-native';
@@ -7,9 +7,12 @@ import * as SecureStore from 'expo-secure-store';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
-import { Colors, Typography, Radii, Spacing, Shadows } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
+import { cardShadow } from '@/utils/shadowStyle';
+import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound, stopAmbientSound, setAmbientVolume, playAmbientSound } from '@/utils/audio';
 import { BASE_URL } from '@/constants/api';
+import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -27,7 +30,7 @@ const SettingsLink = ({ icon: Icon, title, onPress, isDark, animationsEnabled }:
         if (animationsEnabled) scale.value = withSpring(1);
       }}
       onPress={() => { playClickSound(); onPress(); }}
-      style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border }, animationsEnabled ? animatedStyle : null]}
+      style={[s.settingRow, { backgroundColor: c.cardBg, borderColor: c.border, flexDirection: 'row', alignItems: 'center' }, animationsEnabled ? animatedStyle : null]}
     >
       <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
         <Icon color={c.iconColor} size={20} strokeWidth={2} />
@@ -81,7 +84,7 @@ export default function SettingsScreen() {
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
   const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
 
   const [settings, setSettings] = useState({
     music: true,
@@ -150,17 +153,11 @@ export default function SettingsScreen() {
         setSupportModalVisible(false);
         setSupportMessage('');
       } else {
-        Alert.alert("Помилка", "Не вдалося надіслати повідомлення.");
+        Alert.alert("Помилка", await parseApiError(res, "Не вдалося надіслати повідомлення."));
       }
     } catch (e) {
       Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
     }
-  };
-
-  const openPrivacyPolicy = () => {
-    Linking.openURL('https://aumentem.notion.site/ab1c6d5d49f049e8971d08c4ee5c0095?source=copy_link').catch(() => {
-      Alert.alert("Політика", "Сторінка в розробці.");
-    });
   };
 
   return (
@@ -177,7 +174,7 @@ export default function SettingsScreen() {
 
         <Text style={[Typography.titleXl, s.mainTitle, { color: c.textMain }]}>Налаштування</Text>
 
-        <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
           
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ВРАЖЕННЯ ВІД ДОДАТКУ</Text>
           <View style={s.section}>
@@ -222,12 +219,18 @@ export default function SettingsScreen() {
             <SettingsLink icon={MessageCircleQuestion} title="Написати в підтримку" isDark={isDark} animationsEnabled={settings.animations} onPress={() => setSupportModalVisible(true)} />
             <SettingsLink icon={ShieldCheck} title="Умови та Політика" isDark={isDark} animationsEnabled={settings.animations} onPress={openPrivacyPolicy} />
           </View>
+          <View style={s.footerContainer}>
+            <Image source={require('@/assets/images/team_icon.png')} style={s.footerIcon} />
+            <Text style={[Typography.muted, { color: c.textMuted, opacity: 0.6, marginTop: 8 }]}>
+              Розроблено командою AuMentem
+            </Text>
+          </View>
         </ScrollView>
       </SafeAreaView>
 
       <Modal visible={isSupportModalVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
-          <View style={[s.modalCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'ios' ? sh.soft : { elevation: 10 }]}>
+          <View style={[s.modalCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
             
             <View style={s.modalHeader}>
               <Text style={[Typography.titleLg, { color: c.textMain }]}>Служба підтримки</Text>
@@ -274,6 +277,18 @@ const s = StyleSheet.create({
   sectionTitle: { marginBottom: 8, marginLeft: 4, letterSpacing: 1, fontSize: 12 },
   section: { marginBottom: 32, gap: 8 },
   settingRow: { padding: 16, borderRadius: Radii.lg, borderWidth: 1 },
+  footerContainer: {
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  footerIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    marginBottom: 8,
+    opacity: 0.6,
+  },
   iconBox: { width: 40, height: 40, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: Spacing.screenX },
   modalCard: { width: '100%', padding: 24, borderRadius: Radii.xl, borderWidth: 1 },

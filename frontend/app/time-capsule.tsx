@@ -9,41 +9,31 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Send, MailOpen, Heart } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
-import { playSuccessSound, playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio'; 
+import { playSuccessSound, playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { cardShadow } from '@/utils/shadowStyle';
+import { parseApiError } from '@/utils/apiErrors';
+import AnimatedCard from '@/components/AnimatedCard'; 
 
 export default function TimeCapsuleScreen() {
   const router = useRouter();
   const { theme: themeParam } = useLocalSearchParams();
   const isDark = themeParam === 'dark';
   
-  const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
+  const c = Colors[themeKey];
+  const { animationsEnabled } = useAppSettings();
 
   const [unreadMessage, setUnreadMessage] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-
   const fadeAnim1 = useRef(new Animated.Value(0)).current;
   const fadeAnim2 = useRef(new Animated.Value(0)).current;
 
   const DEFAULT_SUPPORT_MESSAGE = "Ти робиш велику справу, дбаючи про свій ментальний стан. Навіть якщо зараз тут порожньо, пам'ятай: все вдасться! ✨";
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const saved = await SecureStore.getItemAsync('userSettings');
-        if (saved) {
-          const settings = JSON.parse(saved);
-          setAnimationsEnabled(settings.animations !== false);
-        }
-      } catch (e) {}
-    };
-    loadSettings();
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,7 +108,7 @@ export default function TimeCapsuleScreen() {
       if (response.ok) {
         isSuccess = true;
       } else {
-        Alert.alert("Помилка", "Не вдалося зберегти лист.");
+        Alert.alert("Помилка", await parseApiError(response, "Не вдалося зберегти лист."));
       }
     } catch (error) {
       Alert.alert("Помилка", "Перевір підключення до інтернету.");
@@ -164,7 +154,7 @@ export default function TimeCapsuleScreen() {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scrollContent}>
           {isLoading ? <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 50 }} /> : (
             <>
-              <Animated.View style={[s.letterCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft, getAnimatedStyle(fadeAnim1)]}>
+              <Animated.View style={[s.letterCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft'), getAnimatedStyle(fadeAnim1)]}>
                 <View style={s.letterHeader}>
                   <View style={[s.iconBox, { backgroundColor: c.iconBg }]}>
                     {unreadMessage ? <MailOpen color={c.iconColor} size={20} /> : <Heart color={c.accent} size={20} />}
@@ -187,7 +177,7 @@ export default function TimeCapsuleScreen() {
                 )}
               </Animated.View>
 
-              <Animated.View style={[s.writeCard, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft, getAnimatedStyle(fadeAnim2)]}>
+              <Animated.View style={[s.writeCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft'), getAnimatedStyle(fadeAnim2)]}>
                 <TextInput
                   style={[s.inputArea, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
                   placeholder="Надішли слова підтримки собі крізь час..."
@@ -196,13 +186,14 @@ export default function TimeCapsuleScreen() {
                   value={newMessage}
                   onChangeText={setNewMessage}
                 />
-                <Pressable 
-                  onPress={handleSendMessage} 
-                  disabled={isSaving || !newMessage.trim()} 
+                <AnimatedCard
+                  animationsEnabled={animationsEnabled}
+                  onPress={handleSendMessage}
+                  disabled={isSaving || !newMessage.trim()}
                   style={[s.sendBtn, { backgroundColor: c.accent }, (isSaving || !newMessage.trim()) && { opacity: 0.5 }]}
                 >
                   {isSaving ? <ActivityIndicator color="#FFF" /> : <><Send color="#FFF" size={20} /><Text style={s.sendBtnText}>Сховати в капсулу</Text></>}
-                </Pressable>
+                </AnimatedCard>
               </Animated.View>
             </>
           )}

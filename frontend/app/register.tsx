@@ -1,32 +1,24 @@
 import { BASE_URL } from "@/constants/api";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  Image
+  View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, 
+  Platform, SafeAreaView, ActivityIndicator, Modal, ScrollView, Image, Keyboard
 } from "react-native";
-import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check } from "lucide-react-native";
+import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { Colors, Typography, Radii, Spacing } from "@/constants/theme";
+import { Colors, Typography, Radii, Spacing, AuthLayout } from "@/constants/theme";
+import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 import * as SecureStore from "expo-secure-store";
+import { playClickSound } from '@/utils/audio';
+import { useSavedTheme } from '@/hooks/useSavedTheme';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { parseApiError } from '@/utils/apiErrors';
+import AnimatedCard from '@/components/AnimatedCard';
+import FadeInView from '@/components/FadeInView';
 
 const ReqItem = ({ met, text, c }: { met: boolean, text: string, c: any }) => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-    <View style={{ 
-      width: 16, height: 16, borderRadius: 8, 
-      borderWidth: met ? 0 : 1, borderColor: c.textMuted, 
-      backgroundColor: met ? '#34D399' : 'transparent', 
-      alignItems: 'center', justifyContent: 'center' 
-    }}>
+  <View style={s.reqItemRow}>
+    <View style={[s.checkboxSmall, { borderWidth: met ? 0 : 1, borderColor: c.textMuted, backgroundColor: met ? '#34D399' : 'transparent' }]}>
       {met && <Check color="#FFF" size={10} strokeWidth={3} />}
     </View>
     <Text style={[Typography.nav, { color: met ? c.textMain : c.textMuted }]}>{text}</Text>
@@ -35,42 +27,47 @@ const ReqItem = ({ met, text, c }: { met: boolean, text: string, c: any }) => (
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false);
+  const { isDark, theme, toggleTheme } = useSavedTheme();
+  const { animationsEnabled } = useAppSettings();
   const [showSuccess, setShowSuccess] = useState(false);
 
   const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-  const theme = isDark ? "dark" : "light";
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const c = Colors[theme];
-
   const appIcon = require('@/assets/images/icon.png');
 
   const reqLength = password.length >= 8;
   const reqUpper = /[A-Z]/.test(password);
+  const reqLower = /[a-z]/.test(password);
   const reqNumber = /\d/.test(password);
-  const allReqsMet = reqLength && reqUpper && reqNumber;
+  const reqSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const allReqsMet = reqLength && reqUpper && reqLower && reqNumber && reqSpecial;
 
   const handleRegister = async () => {
-    if (!nickname || !email || !password) {
-      setErrorMessage("Будь ласка, заповніть всі поля");
-      return;
-    }
-
-    if (!email.includes("@") || !email.includes(".")) {
-      setErrorMessage("Введіть коректний email (наприклад: user@mail.com)");
-      return;
-    }
-
-    if (!allReqsMet) {
-      setErrorMessage("Будь ласка, виконайте всі вимоги до паролю");
-      return;
-    }
+    playClickSound();
+    if (!nickname || !email || !password) return setErrorMessage("Будь ласка, заповніть всі поля");
+    if (!email.includes("@") || !email.includes(".")) return setErrorMessage("Введіть коректний email");
+    if (!allReqsMet) return setErrorMessage("Виконайте всі вимоги до паролю");
+    if (!agreed) return setErrorMessage("Погодьтеся з політикою конфіденційності");
 
     setIsLoading(true);
     setErrorMessage("");
@@ -78,30 +75,19 @@ export default function RegisterScreen() {
     try {
       await SecureStore.deleteItemAsync('userToken');
       await SecureStore.deleteItemAsync('isFirstLogin');
-      await SecureStore.deleteItemAsync('user_saved_hobbies');
-      await SecureStore.deleteItemAsync('has_hobbies');
-
+      
       const response = await fetch(`${BASE_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nickname: nickname,
-          email: email,
-          password: password,
-          hobby_ids: [],
-        }),
+        body: JSON.stringify({ nickname, email, password, hobby_ids: [] }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        const detail = errorData.detail?.[0]?.msg || errorData.detail || "Сталася помилка при реєстрації";
-        setErrorMessage(detail);
-        return;
+        return setErrorMessage(await parseApiError(response, "Сталася помилка при реєстрації"));
       }
 
       await SecureStore.setItemAsync("isFirstLogin", "true");
       setShowSuccess(true);
-
     } catch (error) {
       setErrorMessage("Не вдалося з'єднатися з сервером.");
     } finally {
@@ -111,58 +97,40 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <Pressable style={s.themeToggle} onPress={toggleTheme}>
+        {isDark ? <Sun color={c.textMain} size={24} /> : <Moon color={c.textMain} size={24} />}
+      </Pressable>
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
-          contentContainerStyle={s.scrollContent}
+          scrollEnabled={keyboardVisible}
+          contentContainerStyle={[s.scrollContent, !keyboardVisible && s.scrollContentCentered]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
-          bounces={false}
+          bounces={keyboardVisible}
         >
-          <View style={s.header}>
+          
+          <FadeInView animationsEnabled={animationsEnabled} style={s.header}>
             <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
             <Text style={[s.mainTitle, { color: c.textMain }]}>Реєстрація</Text>
-            <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Почни свій шлях в Altera 🌱
-            </Text>
-          </View>
+            <Text style={[s.subtitle, { color: c.textMuted }]}>Почни свій шлях в Altera 🌱</Text>
+          </FadeInView>
 
-          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
+          <FadeInView animationsEnabled={animationsEnabled} delay={80} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
             <View style={s.inputGroup}>
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <User color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Твій нікнейм"
-                  placeholderTextColor={c.textMuted}
-                  value={nickname}
-                  onChangeText={setNickname}
-                />
+                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Твій нікнейм" placeholderTextColor={c.textMuted} value={nickname} onChangeText={setNickname} />
               </View>
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Mail color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Твій email"
-                  placeholderTextColor={c.textMuted}
-                  autoCapitalize="none"
-                  value={email}
-                  onChangeText={setEmail}
-                />
+                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Твій email" placeholderTextColor={c.textMuted} autoCapitalize="none" value={email} onChangeText={setEmail} />
               </View>
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Lock color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Пароль"
-                  placeholderTextColor={c.textMuted}
-                  value={password}
-                  onChangeText={setPassword}
-                />
+                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Пароль" placeholderTextColor={c.textMuted} value={password} onChangeText={setPassword} />
                 <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
                   {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
                 </Pressable>
@@ -173,37 +141,38 @@ export default function RegisterScreen() {
               <Text style={[Typography.nav, { color: c.textMuted, marginBottom: 8 }]}>Вимоги до паролю:</Text>
               <ReqItem met={reqLength} text="Мінімум 8 символів" c={c} />
               <ReqItem met={reqUpper} text="Хоча б одна велика літера (A-Z)" c={c} />
-              <ReqItem met={reqNumber} text="Хоча б одна цифра" c={c} />
+              <ReqItem met={reqLower} text="Хоча б одна мала літера (a-z)" c={c} />
+              <ReqItem met={reqNumber} text="Хоча б одна цифра (0-9)" c={c} />
+              <ReqItem met={reqSpecial} text='Спецсимвол (напр. !@#$%^&*)' c={c} />
+            </View>
+
+            <View style={s.checkboxRow}>
+              <Pressable onPress={() => { playClickSound(); setAgreed(!agreed); }} hitSlop={8}>
+                <View style={[s.checkbox, { borderColor: c.textMuted, backgroundColor: agreed ? c.accent : 'transparent' }, agreed && { borderColor: c.accent }]}>
+                  {agreed && <Check color="#FFF" size={14} strokeWidth={3} />}
+                </View>
+              </Pressable>
+              <Text style={[Typography.nav, { color: c.textMuted, flex: 1, marginLeft: 10, lineHeight: 18 }]}>
+                Я погоджуюсь з{' '}
+                <Text style={{ color: c.accent, textDecorationLine: 'underline' }} onPress={() => { playClickSound(); openPrivacyPolicy(); }}>
+                  умовами використання та політикою конфіденційності
+                </Text>
+              </Text>
             </View>
 
             {errorMessage ? <Text style={s.errorText}>{errorMessage}</Text> : null}
-          </View>
+          </FadeInView>
 
-          <View style={s.footer}>
-            <Pressable
-              style={({ pressed }) => [
-                s.primaryBtn,
-                { backgroundColor: c.accent },
-                pressed && s.btnPressed,
-                (isLoading || !allReqsMet) && { opacity: 0.7 },
-              ]}
-              onPress={handleRegister}
-              disabled={isLoading || !allReqsMet}
-            >
-              {isLoading ? <ActivityIndicator color="#FFF" /> : (
-                <>
-                  <Text style={s.primaryBtnText}>Створити акаунт</Text>
-                  <ArrowRight color="#FFF" size={20} strokeWidth={3} />
-                </>
-              )}
-            </Pressable>
+          <FadeInView animationsEnabled={animationsEnabled} delay={160} style={s.footer}>
+            <AnimatedCard animationsEnabled={animationsEnabled} style={[s.primaryBtn, { backgroundColor: c.accent }, (isLoading || !allReqsMet || !agreed) && { opacity: 0.7 }]} onPress={handleRegister} disabled={isLoading || !allReqsMet || !agreed}>
+              {isLoading ? <ActivityIndicator color="#FFF" /> : <><Text style={s.primaryBtnText}>Створити акаунт</Text><ArrowRight color="#FFF" size={20} strokeWidth={3} /></>}
+            </AnimatedCard>
 
-            <Pressable style={s.secondaryBtn} onPress={() => router.back()}>
-              <Text style={[s.secondaryBtnText, { color: c.textMain }]}>
-                Вже маєш акаунт? <Text style={{ color: c.accent }}>Увійти</Text>
-              </Text>
-            </Pressable>
-          </View>
+            <AnimatedCard animationsEnabled={animationsEnabled} style={s.secondaryBtn} onPress={() => { playClickSound(); router.back(); }}>
+              <Text style={[s.secondaryBtnText, { color: c.textMain }]}>Вже маєш акаунт? <Text style={{ color: c.accent }}>Увійти</Text></Text>
+            </AnimatedCard>
+          </FadeInView>
+
         </ScrollView>
 
         <Modal visible={showSuccess} transparent animationType="fade">
@@ -211,16 +180,8 @@ export default function RegisterScreen() {
             <View style={[s.modalContent, { backgroundColor: c.cardBg, borderColor: c.border }]}>
               <Sparkles color={c.accent} size={48} style={{ marginBottom: 16 }} />
               <Text style={[Typography.titleLg, { color: c.textMain }]}>Готово! 🎉</Text>
-              <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>
-                Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.
-              </Text>
-              <Pressable 
-                style={[s.modalBtn, { backgroundColor: c.accent }]} 
-                onPress={async () => { 
-                  setShowSuccess(false); 
-                  router.replace('/');
-                }}
-              >
+              <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginVertical: 12 }]}>Акаунт успішно створено! 💌{'\n'}Будь ласка, перевір свою пошту та підтвердь реєстрацію, щоб увійти в додаток.</Text>
+              <Pressable style={[s.modalBtn, { backgroundColor: c.accent }]} onPress={async () => { playClickSound(); setShowSuccess(false); router.replace('/'); }}>
                 <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Зрозуміло</Text>
               </Pressable>
             </View>
@@ -233,27 +194,28 @@ export default function RegisterScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { 
-    flexGrow: 1, 
-    paddingHorizontal: Spacing.screenX, 
-    justifyContent: "center",
-    paddingVertical: 40 
-  },
-  header: { alignItems: "center", marginBottom: 40 },
-  headerIcon: { width: 100, height: 100, borderRadius: 20, marginBottom: 20 },
-  mainTitle: { ...Typography.titleXl, marginBottom: 4 },
-  subtitle: { ...Typography.body, textAlign: "center" },
-  card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: Spacing.headMb },
-  inputGroup: { gap: 12 },
-  inputWrapper: { flexDirection: "row", alignItems: "center", borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
-  input: { flex: 1, ...Typography.body },
-  requirementsBox: { marginTop: 20, paddingHorizontal: 4 },
-  errorText: { color: "#FF3B30", marginTop: 16, textAlign: "center", fontSize: 14, fontWeight: "500" },
-  footer: { gap: Spacing.gap },
-  primaryBtn: { flexDirection: "row", height: 60, borderRadius: Radii.full, alignItems: "center", justifyContent: "center", gap: 8 },
-  primaryBtnText: { ...Typography.titleMd, color: "#FFF", fontSize: 18 },
-  secondaryBtn: { height: 50, alignItems: "center", justifyContent: "center" },
-  secondaryBtnText: { ...Typography.body, fontSize: 15 },
+  themeToggle: { position: 'absolute', top: 50, right: 24, zIndex: 10, padding: 8 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, paddingVertical: AuthLayout.scrollPaddingVertical },
+  scrollContentCentered: { justifyContent: 'center' },
+  header: { alignItems: "center", marginBottom: AuthLayout.headerMarginBottom, marginTop: AuthLayout.headerMarginTop },
+  headerIcon: { width: AuthLayout.headerIconSize, height: AuthLayout.headerIconSize, borderRadius: AuthLayout.headerIconRadius, marginBottom: 20 },
+  mainTitle: { ...Typography.titleXl, marginBottom: 2, fontSize: 26 },
+  subtitle: { ...Typography.body, textAlign: "center", fontSize: 14 },
+  card: { borderRadius: Radii.lg, padding: 16, borderWidth: 1, marginBottom: 16 },
+  inputGroup: { gap: 10 },
+  inputWrapper: { flexDirection: "row", alignItems: "center", borderRadius: Radii.md, paddingHorizontal: 16, height: 50, gap: 10 },
+  input: { flex: 1, ...Typography.body, fontSize: 15 },
+  requirementsBox: { marginTop: 16, paddingHorizontal: 4 },
+  reqItemRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  checkboxSmall: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 16, paddingHorizontal: 4 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  errorText: { color: "#FF3B30", marginTop: 12, textAlign: "center", fontSize: 13, fontWeight: "500" },
+  footer: { gap: 12 },
+  primaryBtn: { flexDirection: "row", height: 54, borderRadius: Radii.full, alignItems: "center", justifyContent: "center", gap: 8 },
+  primaryBtnText: { ...Typography.titleMd, color: "#FFF", fontSize: 16 },
+  secondaryBtn: { height: 44, alignItems: "center", justifyContent: "center" },
+  secondaryBtnText: { ...Typography.body, fontSize: 14 },
   btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 30 },
   modalContent: { padding: 24, borderRadius: 20, alignItems: 'center', borderWidth: 1 },

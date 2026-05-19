@@ -7,23 +7,29 @@ import { Mail, ArrowLeft, Sparkles, Send } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context'; 
 
-import { Colors, Typography, Radii, Shadows, Spacing } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 import { playClickSound } from '@/utils/audio';
+import { useSavedTheme } from '@/hooks/useSavedTheme';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { parseApiError } from '@/utils/apiErrors';
+import { cardShadow } from '@/utils/shadowStyle';
+import FadeInView from '@/components/FadeInView';
+import AnimatedCard from '@/components/AnimatedCard';
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets(); 
+  const insets = useSafeAreaInsets();
+  const { theme, isDark } = useSavedTheme();
+  const { animationsEnabled } = useAppSettings();
 
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const c = Colors.light; 
-  const sh = Shadows.light;
+  const c = Colors[theme];
 
-  // Базова перевірка на валідність пошти (щоб кнопка стала активною)
   const isValidEmail = email.includes('@') && email.includes('.');
 
   const handleResetRequest = async () => {
@@ -42,7 +48,7 @@ export default function ForgotPasswordScreen() {
       if (response.ok) {
         setShowSuccess(true);
       } else {
-        setErrorMessage('Помилка сервера. Спробуйте пізніше.');
+        setErrorMessage(await parseApiError(response, 'Помилка сервера. Спробуйте пізніше.'));
       }
     } catch (error) {
       setErrorMessage('Не вдалося з’єднатися з сервером.');
@@ -70,7 +76,7 @@ export default function ForgotPasswordScreen() {
       >
         <ScrollView contentContainerStyle={s.scrollContent}>
           <View style={s.header}>
-            <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
+            <View style={[s.iconGlow, { backgroundColor: c.iconBg }, cardShadow(theme, 'glow')]}>
               <Mail color={c.iconColor} size={40} />
             </View>
             
@@ -80,7 +86,7 @@ export default function ForgotPasswordScreen() {
             </Text>
           </View>
 
-          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, sh.soft]}>
+          <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(theme, 'soft')]}>
             <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
               <Mail color={c.textMuted} size={20} />
               <TextInput
@@ -161,8 +167,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
     zIndex: 100 
   },
-  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, justifyContent: 'center', paddingVertical: 40 },
-  header: { alignItems: 'center', marginBottom: 40 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, justifyContent: 'center', paddingVertical: AuthLayout.scrollPaddingVertical },
+  header: { alignItems: 'center', marginBottom: AuthLayout.headerMarginBottom, marginTop: AuthLayout.headerMarginTop },
   iconGlow: { padding: 20, borderRadius: Radii.lg, marginBottom: 20 },
   mainTitle: { ...Typography.titleXl, marginBottom: 4 },
   subtitle: { ...Typography.body, textAlign: 'center', paddingHorizontal: 10 },

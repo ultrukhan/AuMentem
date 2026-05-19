@@ -1,16 +1,20 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { 
   View, Text, Pressable, StyleSheet, ActivityIndicator, 
-  ScrollView, Linking, Modal, Animated, Platform
+  ScrollView, Linking, Modal, Animated, Platform, Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Activity, Check, HeartHandshake, X, Sparkles, MailOpen } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 
-import { Colors, Typography, Radii, Shadows, Spacing, IconSizes } from '@/constants/theme';
+import { Colors, Typography, Radii, Spacing, IconSizes } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
 import { playSuccessSound, playClickSound, playAmbientSound, stopAmbientSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { cardShadow } from '@/utils/shadowStyle';
+import { parseApiError } from '@/utils/apiErrors';
+import AnimatedCard from '@/components/AnimatedCard';
 
 const DEFAULT_SUPPORT_MESSAGES = [
   "Ти все подолаєш! Навіть після найтемнішої ночі настає світанок ✨",
@@ -30,8 +34,9 @@ export default function TrackerScreen() {
   const router = useRouter();
   const { theme: themeParam } = useLocalSearchParams();
   const isDark = themeParam === 'dark';
-  const c = Colors[isDark ? 'dark' : 'light'];
-  const sh = Shadows[isDark ? 'dark' : 'light'];
+  const themeKey = isDark ? 'dark' : 'light';
+  const c = Colors[themeKey];
+  const { animationsEnabled } = useAppSettings();
 
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,23 +45,8 @@ export default function TrackerScreen() {
   const [activeModal, setActiveModal] = useState<'NONE' | 'POSITIVE' | 'CRITICAL'>('NONE');
   const [apathyModalVisible, setApathyModalVisible] = useState(false);
   const [supportMessage, setSupportMessage] = useState("");
-  const [animationsEnabled, setAnimationsEnabled] = useState(true);
-
   const fadeAnimTitle = useRef(new Animated.Value(0)).current;
   const fadeAnimCards = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const saved = await SecureStore.getItemAsync('userSettings');
-        if (saved) {
-          const settings = JSON.parse(saved);
-          setAnimationsEnabled(settings.animations !== false);
-        }
-      } catch (e) {}
-    };
-    loadSettings();
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -86,7 +76,11 @@ export default function TrackerScreen() {
 
   const handleBack = () => {
     playClickSound();
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(main)/home');
+    }
   };
 
   const handleSelectState = (id: string) => {
@@ -123,33 +117,57 @@ export default function TrackerScreen() {
     setIsSaving(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        Alert.alert('Помилка', 'Увійдіть у акаунт ще раз.');
+        router.replace('/');
+        return;
+      }
+
       const response = await fetch(`${BASE_URL}/Tracker/state`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: selectedState })
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ state: selectedState }),
       });
 
-      if (response.ok) {
+      const alreadyLoggedToday = response.status === 400;
+      const errorText = !response.ok ? await parseApiError(response, 'Не вдалося зберегти стан') : '';
+      const alreadyDoneToday =
+        alreadyLoggedToday &&
+        (/вже|конфлікт/i.test(errorText));
+
+      if (response.ok || alreadyDoneToday) {
         playSuccessSound();
         if (selectedState === 'APATHY') {
-          const res = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const data = await res.json();
-          
-          if (data && data.message) {
-            setSupportMessage(data.message);
-          } else {
-            const randomIndex = Math.floor(Math.random() * DEFAULT_SUPPORT_MESSAGES.length);
-            setSupportMessage(DEFAULT_SUPPORT_MESSAGES[randomIndex]);
+          let message = '';
+          try {
+              const res = await fetch(`${BASE_URL}/Time-capsule/latest-unread`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+              const data = await res.json();
+              message = data?.message ?? '';
+            }
+          } catch {
+            // 404 або мережа — показуємо локальне повідомлення
           }
-          
+          if (!message) {
+            const randomIndex = Math.floor(Math.random() * DEFAULT_SUPPORT_MESSAGES.length);
+            message = DEFAULT_SUPPORT_MESSAGES[randomIndex];
+          }
+          setSupportMessage(message);
           setApathyModalVisible(true);
         } else {
-          setActiveModal(selectedState as any);
+          setActiveModal(selectedState as 'POSITIVE' | 'CRITICAL');
         }
+      } else {
+        Alert.alert('Помилка', errorText);
       }
-    } catch (error) {
+    } catch {
+      Alert.alert('Помилка', 'Перевір підключення до інтернету.');
     } finally {
       setIsSaving(false);
     }
@@ -198,7 +216,7 @@ export default function TrackerScreen() {
     return (
       <Modal transparent animationType="slide" visible={true}>
         <View style={s.modalOverlay}>
-          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft]}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
            <Pressable 
   style={s.closeIcon} 
   onPress={() => { 
@@ -236,7 +254,7 @@ export default function TrackerScreen() {
       
       <Modal visible={apathyModalVisible} transparent animationType="fade">
         <View style={s.modalOverlay}>
-          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, Platform.OS === 'android' ? { elevation: 0 } : sh.soft]}>
+          <View style={[s.modalContainer, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
             <View style={s.modalIconBox}><MailOpen color="#9CA3AF" size={40} /></View>
             <Text style={[Typography.titleLg, { color: c.textMain, textAlign: 'center' }]}>Послання для тебе 🫂</Text>
             <Text style={[Typography.body, { color: c.textMain, fontStyle: 'italic', marginVertical: 20, textAlign: 'center', lineHeight: 24 }]}>
@@ -271,14 +289,14 @@ export default function TrackerScreen() {
                 style={[
                   s.moodCard, 
                   { backgroundColor: isSelected ? mood.color + '15' : c.cardBg, borderColor: isSelected ? mood.color : c.border, borderWidth: isSelected ? 2 : 1 }, 
-                  isSelected ? { elevation: 0, shadowOpacity: 0 } : sh.soft
+                  isSelected ? {} : cardShadow(themeKey, 'soft')
                 ]}
               >
                 <View style={s.cardInner}>
                   <Text style={s.emoji}>{mood.emoji}</Text>
                   <View style={{ flex: 1, marginLeft: 16 }}>
-                    <Text style={[Typography.titleMd, { color: isSelected ? mood.color : c.textMain }]}>{mood.label}</Text>
-                    <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}>{mood.subtext}</Text>
+                    <Text style={[Typography.titleMd, { color: isSelected ? mood.color : c.textMain }]} numberOfLines={1}>{mood.label}</Text>
+                    <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]} numberOfLines={2}>{mood.subtext}</Text>
                   </View>
                   <View style={[s.radioCircle, { borderColor: isSelected ? mood.color : c.border }, isSelected && { backgroundColor: mood.color }]}>
                     {isSelected && <Check color="#FFF" size={14} strokeWidth={3} />}
@@ -291,17 +309,18 @@ export default function TrackerScreen() {
       </ScrollView>
 
       <View style={[s.footer, { borderTopColor: c.border, backgroundColor: c.background }]}>
-        <Pressable 
+        <AnimatedCard
+          animationsEnabled={animationsEnabled}
           onPress={handleSaveState}
           disabled={!selectedState || isSaving}
           style={[
-            s.saveBtn, 
-            { backgroundColor: selectedState ? MOOD_OPTIONS.find(m => m.id === selectedState)?.color : c.accent }, 
-            (!selectedState || isSaving) ? { opacity: 0.5, elevation: 0, shadowOpacity: 0 } : { elevation: 4 }
+            s.saveBtn,
+            { backgroundColor: selectedState ? MOOD_OPTIONS.find(m => m.id === selectedState)?.color : c.accent },
+            (!selectedState || isSaving) && { opacity: 0.5 },
           ]}
         >
           {isSaving ? <ActivityIndicator color="#FFF" /> : <Text style={s.saveBtnText}>Продовжити</Text>}
-        </Pressable>
+        </AnimatedCard>
       </View>
     </SafeAreaView>
   );
