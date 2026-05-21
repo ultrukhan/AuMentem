@@ -24,7 +24,7 @@ async def get_daily_quests(
 ):
     """
     Генерує або повертає 5 щоденних квестів.
-    Пріоритет: ШІ-квести за інтересами, резерв — квести з бази по хобі юзера.
+    Пріоритет: 3 ШІ-квести за інтересами, резерв — 2 базові рутинні квести з бази (без хобі).
     """
     now = get_utc_now()
     start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -59,6 +59,7 @@ async def get_daily_quests(
 
         hobby_map = {h.name.lower().strip(): h for h in current_hobbies}
 
+        # Жорсткий ліміт: 3 квести від ШІ
         for q_data in generated_quests[:3]:
             title = q_data.get("title", "Новий цікавий квест")
             ai_hobby_name = q_data.get("hobby_name", "").lower().strip()
@@ -89,17 +90,14 @@ async def get_daily_quests(
     standard_quests = []
 
     if standard_limit > 0:
-        user_hobby_ids = [h.id for h in current_hobbies]
+        routine_query = db.query(DBMiniQuest).filter(~DBMiniQuest.hobbies.any())
 
-        if user_hobby_ids:
-            hobby_fallback = db.query(DBMiniQuest).filter(
-                DBMiniQuest.hobbies.any(DBHobby.id.in_(user_hobby_ids))
-            )
-            exclude_ids = [q.id for q in ai_quests]
-            if exclude_ids:
-                hobby_fallback = hobby_fallback.filter(~DBMiniQuest.id.in_(exclude_ids))
+        exclude_ids = [q.id for q in ai_quests]
+        if exclude_ids:
+            routine_query = routine_query.filter(~DBMiniQuest.id.in_(exclude_ids))
 
-            standard_quests = hobby_fallback.order_by(func.random()).limit(standard_limit).all()
+        standard_quests = routine_query.order_by(func.random()).limit(standard_limit).all()
+
 
         remaining_limit = standard_limit - len(standard_quests)
         if remaining_limit > 0:
