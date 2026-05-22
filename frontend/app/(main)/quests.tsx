@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, Pressable, ImageBackground, ScrollView, StyleSheet, ActivityIndicator, Modal, RefreshControl } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, ActivityIndicator, Modal, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { ArrowLeft, User, Settings, Activity, Footprints, Palette, CheckCircle2, Sparkles, Star, Check, Share, Ghost, Hash, Smile, Meh, Frown } from 'lucide-react-native';
+import { ArrowLeft, User, Settings, Activity, Footprints, Palette, CheckCircle2, Sparkles, Star, Check, Share, Ghost, Hash, Smile, Meh, Frown, Code, BookOpen, Bike, Camera, Coffee, Heart, Compass, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { BASE_URL } from '@/constants/api';
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, interpolate, Extrapolation, FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
+import AnimatedBackground from '@/components/AnimatedBackground';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import Toast from 'react-native-toast-message';
 import { playClickSound, playSuccessSound } from '@/utils/audio';
@@ -14,6 +15,32 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedCard from '@/components/AnimatedCard';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { parseApiError } from '@/utils/apiErrors';
+const getHobbyIcon = (name: string, color: string, size: number) => {
+  if (!name) return <Hash color={color} size={size} />;
+  const lower = name.toLowerCase();
+  if (lower.includes('йога') || lower.includes('медит') || lower.includes('yoga')) return <Star color={color} size={size} />;
+  if (lower.includes('програм') || lower.includes('код') || lower.includes('code') || lower.includes('program')) return <Code color={color} size={size} />;
+  if (lower.includes('читан') || lower.includes('книг') || lower.includes('read') || lower.includes('book')) return <BookOpen color={color} size={size} />;
+  if (lower.includes('вело') || lower.includes('bike') || lower.includes('cycl')) return <Bike color={color} size={size} />;
+  if (lower.includes('фото') || lower.includes('photo')) return <Camera color={color} size={size} />;
+  if (lower.includes('малюв') || lower.includes('мист') || lower.includes('art') || lower.includes('paint') || lower.includes('draw')) return <Palette color={color} size={size} />;
+  if (lower.includes('кулін') || lower.includes('готув') || lower.includes('cook') || lower.includes('bake')) return <Coffee color={color} size={size} />;
+  if (lower.includes('волонтер') || lower.includes('допомог') || lower.includes('volunteer')) return <Heart color={color} size={size} />;
+  if (lower.includes('спорт') || lower.includes('фітнес') || lower.includes('sport') || lower.includes('fitness')) return <Dumbbell color={color} size={size} />;
+  if (lower.includes('музик') || lower.includes('music')) return <Music color={color} size={size} />;
+  if (lower.includes('ігр') || lower.includes('game')) return <Gamepad2 color={color} size={size} />;
+  if (lower.includes('істор') || lower.includes('history')) return <Library color={color} size={size} />;
+  if (lower.includes('садівн') || lower.includes('рослин') || lower.includes('garden')) return <Leaf color={color} size={size} />;
+  if (lower.includes('кіно') || lower.includes('фільм') || lower.includes('cinema') || lower.includes('movie')) return <Film color={color} size={size} />;
+  if (lower.includes('психол') || lower.includes('psychology')) return <Brain color={color} size={size} />;
+  if (lower.includes('танц') || lower.includes('dance')) return <Music color={color} size={size} />;
+  if (lower.includes('тварин') || lower.includes('animal') || lower.includes('pet')) return <PawPrint color={color} size={size} />;
+  if (lower.includes('авто') || lower.includes('машин') || lower.includes('car')) return <Car color={color} size={size} />;
+  if (lower.includes('дизайн') || lower.includes('design')) return <PenTool color={color} size={size} />;
+  if (lower.includes('мов') || lower.includes('lang')) return <Globe color={color} size={size} />;
+  if (lower.includes('математ') || lower.includes('math')) return <Calculator color={color} size={size} />;
+  return <Hash color={color} size={size} />;
+};
 
 const SkeletonCard = ({ c, isDark }: any) => {
   const opacity = useSharedValue(0.4);
@@ -98,7 +125,13 @@ export default function QuestsScreen() {
   const [evalQuestId, setEvalQuestId] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const { animationsEnabled } = useAppSettings();
+
+  const toggleExpand = (id: string) => {
+    playClickSound();
+    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   
   const totalQuests = quests.length;
   const completedQuestsCount = quests.filter(q => q.status === 'COMPLETED').length;
@@ -108,19 +141,23 @@ export default function QuestsScreen() {
     [quests]
   );
 
-  const backgroundImage = isDark ? require('@/assets/images/background_dark.png') : require('@/assets/images/background.png');
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({ backgroundColor: withTiming(c.overlay, { duration: animationsEnabled ? 400 : 0 }) }), [c.overlay, animationsEnabled]);
-
   const loadQuests = async (showLoadingIndicator = true) => {
     if (showLoadingIndicator) setIsLoading(true);
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) return;
-      const response = await fetch(`${BASE_URL}/mini-quests/daily`, { headers: { 'Authorization': `Bearer ${token}` } });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const response = await fetch(`${BASE_URL}/mini-quests/daily`, { 
+        headers: { 'Authorization': `Bearer ${token}` },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       if (response.ok) {
         const data = await response.json();
         const priority: Record<string, number> = { 'IN_PROGRESS': 1, 'AVAILABLE': 2, 'COMPLETED': 3 };
-        setQuests(data.sort((a: any, b: any) => (priority[a.status] || 99) - (priority[b.status] || 99)));
+        const sorted = data.sort((a: any, b: any) => (priority[a.status] || 99) - (priority[b.status] || 99));
+        setQuests(sorted.slice(0, 5));
       }
     } catch (error) { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося завантажити квести' }); } finally {
       setIsLoading(false);
@@ -188,11 +225,10 @@ export default function QuestsScreen() {
     } catch (error) { Toast.show({ type: 'error', text1: 'Помилка мережі', text2: 'Не вдалося зберегти оцінку' }); } finally { setActionLoadingId(null); setEvalQuestId(null); }
   };
 
-  const getRandomIcon = (index: number) => [Activity, Sparkles, Footprints, Palette, Star][index % 5];
+
 
   return (
-    <ImageBackground source={backgroundImage} style={s.container} resizeMode="cover">
-      <Animated.View style={[StyleSheet.absoluteFill, overlayAnimatedStyle]} />
+    <AnimatedBackground isDark={isDark} themeKey={isDark ? 'dark' : 'light'}>
       <SafeAreaView style={s.safe} edges={['top']}>
         <Animated.View entering={FadeIn.duration(400)} style={{ flex: 1 }}>
           <View style={s.header}>
@@ -211,8 +247,8 @@ export default function QuestsScreen() {
               <ArrowLeft color={c.textMain} size={24} strokeWidth={2} />
             </AnimatedCard>
             <View style={s.headerRight}>
-              <AnimatedCard animationsEnabled={animationsEnabled} style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}><User color={c.textMain} size={24} strokeWidth={2} /></AnimatedCard>
-              <AnimatedCard animationsEnabled={animationsEnabled} onPress={() => { playClickSound(); router.push({ pathname: '/profile', params: { theme } }); }} style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}><Settings color={c.textMain} size={24} strokeWidth={2} /></AnimatedCard>
+              <AnimatedCard animationsEnabled={animationsEnabled} onPress={() => { playClickSound(); router.push({ pathname: '/profile', params: { theme } }); }} style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}><User color={c.textMain} size={24} strokeWidth={2} /></AnimatedCard>
+              <AnimatedCard animationsEnabled={animationsEnabled} onPress={() => { playClickSound(); router.push({ pathname: '/settings', params: { theme } }); }} style={[s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }]}><Settings color={c.textMain} size={24} strokeWidth={2} /></AnimatedCard>
             </View>
           </View>
 
@@ -252,7 +288,6 @@ export default function QuestsScreen() {
               </View>
             ) : (
               quests.map((quest, index) => {
-                const IconComponent = getRandomIcon(index);
                 let statusText = ''; let statusBg = ''; let statusColor = ''; let buttonText = '';
                 let onPressAction = () => {}; let isCompleted = false;
 
@@ -263,17 +298,37 @@ export default function QuestsScreen() {
                 }
 
                 const isItemLoading = actionLoadingId === quest.id;
-                const isButtonDisabled = isItemLoading || (quest.status === 'COMPLETED' && !!quest.evaluation);
+                const isButtonDisabled = actionLoadingId !== null || (quest.status === 'COMPLETED' && !!quest.evaluation);
 
                 return (
                   <View key={quest.id} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, isCompleted && { opacity: 0.85 }]}>
-                    <View style={[s.iconBoxInner, { backgroundColor: c.iconBg }]}><IconComponent color={c.iconColor} size={32} strokeWidth={2} /></View>
+                    <View style={[s.iconBoxInner, { backgroundColor: c.iconBg }]}>
+                      {quest.mini_quest.hobbies?.length > 0 ? (
+                        getHobbyIcon(quest.mini_quest.hobbies[0].name, c.iconColor, 32)
+                      ) : (
+                        <Compass color={c.iconColor} size={32} strokeWidth={2} />
+                      )}
+                    </View>
                     <View style={s.cardContent}>
-                      <Text style={[Typography.titleMd, { color: c.textMain, marginBottom: 4, flexShrink: 1 }]} numberOfLines={2}>{quest.mini_quest.title}</Text>
+                      <Pressable onPress={() => toggleExpand(quest.id)}>
+                        <Text style={[Typography.titleMd, { color: c.textMain, flexShrink: 1 }]} numberOfLines={expandedIds[quest.id] ? undefined : 2}>
+                          {quest.mini_quest.title}
+                        </Text>
+                        {!expandedIds[quest.id] && (
+                          <Text style={[Typography.nav, { color: c.accent, fontWeight: '700', marginTop: 2, marginBottom: 6 }]}>
+                            ••• детальніше
+                          </Text>
+                        )}
+                        {expandedIds[quest.id] && (
+                          <Text style={[Typography.nav, { color: c.textMuted, fontWeight: '600', marginTop: 2, marginBottom: 6 }]}>
+                            ▴ згорнути
+                          </Text>
+                        )}
+                      </Pressable>
                       {quest.mini_quest.hobbies?.length > 0 && (
                         <View style={s.hobbiesRow}>
                           {quest.mini_quest.hobbies.map((h: any) => (
-                            <View key={h.id} style={[s.hobbyBadge, { backgroundColor: c.iconBg }]}><Hash size={10} color={c.accent} /><Text style={[s.hobbyText, { color: c.textMuted }]} numberOfLines={1}>{h.name}</Text></View>
+                            <View key={h.id} style={[s.hobbyBadge, { backgroundColor: c.iconBg }]}>{getHobbyIcon(h.name, c.accent, 12)}<Text style={[s.hobbyText, { color: c.textMuted }]} numberOfLines={1}>{h.name}</Text></View>
                           ))}
                         </View>
                       )}
@@ -331,7 +386,7 @@ export default function QuestsScreen() {
         </Animated.View>
       </SafeAreaView>
       <Toast />
-    </ImageBackground>
+    </AnimatedBackground>
   );
 }
 
@@ -343,7 +398,7 @@ const s = StyleSheet.create({
   mainTitle: { paddingHorizontal: Spacing.screenX, marginBottom: 24 },
   scrollView: { flex: 1, paddingHorizontal: Spacing.screenX },
   card: { borderRadius: Radii.lg, padding: Spacing.cardP, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1 },
-  iconBoxInner: { padding: Spacing.iconP, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center', width: 64, height: 64, marginRight: 16 },
+  iconBoxInner: { padding: Spacing.iconP, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center', width: 64, height: 64, marginRight: 16, flexShrink: 0 },
   cardContent: { flex: 1, overflow: 'hidden' },
   hobbiesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
   hobbyBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, gap: 4 },

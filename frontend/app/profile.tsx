@@ -259,13 +259,21 @@ export default function ProfileScreen() {
 
               <View style={[s.inputWrapper, { backgroundColor: c.background, marginBottom: 12 }]}>
                 <Lock color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Поточний пароль"
-                  placeholderTextColor={c.textMuted}
-                  value={oldPassword}
-                  onChangeText={(t) => { setOldPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
-                />
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <TextInput
+                    style={[s.input, { color: !showPassword && oldPassword.length > 0 ? 'transparent' : c.textMain }]}
+                    placeholder="Поточний пароль"
+                    placeholderTextColor={c.textMuted}
+                    value={oldPassword}
+                    onChangeText={(t) => { setOldPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
+                    autoCapitalize="none"
+                  />
+                  {!showPassword && oldPassword.length > 0 && (
+                    <Text style={[s.input, { position: 'absolute', left: 0, pointerEvents: 'none', color: c.textMain }]} numberOfLines={1}>
+                      {'•'.repeat(oldPassword.length)}
+                    </Text>
+                  )}
+                </View>
                 <Pressable onPress={() => { playClickSound(); setShowPassword(!showPassword); }} style={{ padding: 4 }}>
                   {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
                 </Pressable>
@@ -273,13 +281,21 @@ export default function ProfileScreen() {
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Key color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Новий пароль"
-                  placeholderTextColor={c.textMuted}
-                  value={newPassword}
-                  onChangeText={(t) => { setNewPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
-                />
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <TextInput
+                    style={[s.input, { color: !showPassword && newPassword.length > 0 ? 'transparent' : c.textMain }]}
+                    placeholder="Новий пароль"
+                    placeholderTextColor={c.textMuted}
+                    value={newPassword}
+                    onChangeText={(t) => { setNewPassword(t); if (pwdMessage.text) setPwdMessage({text: '', type: ''}); }}
+                    autoCapitalize="none"
+                  />
+                  {!showPassword && newPassword.length > 0 && (
+                    <Text style={[s.input, { position: 'absolute', left: 0, pointerEvents: 'none', color: c.textMain }]} numberOfLines={1}>
+                      {'•'.repeat(newPassword.length)}
+                    </Text>
+                  )}
+                </View>
               </View>
 
               {newPassword.length > 0 && !isNewPasswordValid && (

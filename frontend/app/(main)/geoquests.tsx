@@ -5,14 +5,16 @@ import {
   Dimensions, Platform, Alert, Modal, Linking
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import Svg, { Circle, Path, G } from 'react-native-svg';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import polyline from '@mapbox/polyline';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft, Navigation, X,
   MoveLeft, MoveRight, MoveUp,
-  LocateFixed, MapPin, Camera, Share, Ghost, Check, Image as ImageIcon
+  LocateFixed, MapPin, Camera, Share, Ghost, Check, Image as ImageIcon,
+  Compass
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -27,12 +29,61 @@ import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound } from '@/utils/audio';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const INITIAL_PAN_Y = SCREEN_HEIGHT - 160;
 const DEFAULT_REGION = {
-  latitude: 49.8397,
-  longitude: 24.0297,
-  latitudeDelta: 0.08,
-  longitudeDelta: 0.08,
+  latitude: 48.3794,
+  longitude: 31.1656,
+  latitudeDelta: 12.0,
+  longitudeDelta: 12.0,
+};
+
+const MAP_STYLE_DARK = [
+  { "elementType": "geometry", "stylers": [{ "color": "#020617" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#020617" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#93C5FD" }] },
+  { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [{ "color": "#EFF6FF" }] },
+  { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#0f172a" }] },
+  { "featureType": "poi.park", "elementType": "labels.text.fill", "stylers": [{ "color": "#475569" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#1e293b" }] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [{ "color": "#334155" }] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#94a3b8" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#1e3a8a" }] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#1d4ed8" }] },
+  { "featureType": "road.highway", "elementType": "labels.text.fill", "stylers": [{ "color": "#cbd5e1" }] },
+  { "featureType": "transit", "elementType": "geometry", "stylers": [{ "color": "#1e293b" }] },
+  { "featureType": "transit.station", "elementType": "labels.text.fill", "stylers": [{ "color": "#cbd5e1" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0f172a" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#475569" }] },
+  { "featureType": "water", "elementType": "labels.text.stroke", "stylers": [{ "color": "#0f172a" }] }
+];
+
+const MAP_STYLE_LIGHT = [
+  { "elementType": "geometry", "stylers": [{ "color": "#FFFDF7" }] },
+  { "elementType": "labels.text.stroke", "stylers": [{ "color": "#FFFDF7" }] },
+  { "elementType": "labels.text.fill", "stylers": [{ "color": "#7C2D12" }] },
+  { "featureType": "administrative.locality", "elementType": "labels.text.fill", "stylers": [{ "color": "#EA580C" }] },
+  { "featureType": "poi", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "poi.park", "elementType": "geometry", "stylers": [{ "color": "#FEF08A" }] },
+  { "featureType": "road", "elementType": "geometry", "stylers": [{ "color": "#FED7AA" }] },
+  { "featureType": "road", "elementType": "geometry.stroke", "stylers": [{ "color": "#FDBA74" }] },
+  { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{ "color": "#7C2D12" }] },
+  { "featureType": "road.highway", "elementType": "geometry", "stylers": [{ "color": "#FFEDD5" }] },
+  { "featureType": "road.highway", "elementType": "geometry.stroke", "stylers": [{ "color": "#FED7AA" }] },
+  { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#BAE6FD" }] },
+  { "featureType": "water", "elementType": "labels.text.fill", "stylers": [{ "color": "#0369A1" }] }
+];
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3;
+  const p1 = lat1 * Math.PI/180;
+  const p2 = lat2 * Math.PI/180;
+  const dp = (lat2-lat1) * Math.PI/180;
+  const dl = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dp/2) * Math.sin(dp/2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(dl/2) * Math.sin(dl/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
 };
 
 export default function GeoQuestsScreen() {
@@ -45,13 +96,17 @@ export default function GeoQuestsScreen() {
   const { animationsEnabled } = useAppSettings();
 
   const mapRef = useRef<MapView>(null);
-  const panY = useRef(new Animated.Value(INITIAL_PAN_Y)).current;
+  const sheetVisibleHeight = 220 + Math.max(insets.bottom, 20);
+  const initialPanYRef = useRef(SCREEN_HEIGHT - sheetVisibleHeight);
+  initialPanYRef.current = SCREEN_HEIGHT - sheetVisibleHeight;
+  const panY = useRef(new Animated.Value(initialPanYRef.current)).current;
 
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [locationReady, setLocationReady] = useState(false);
   const [pendingRouteRestore, setPendingRouteRestore] = useState(false);
   const [nearestQuests, setNearestQuests] = useState<any[]>([]);
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
   const [selectedQuest, setSelectedQuest] = useState<any>(null);
   const [activeUserQuestId, setActiveUserQuestId] = useState<string | null>(null);
 
@@ -77,6 +132,43 @@ export default function GeoQuestsScreen() {
     isNavigatingRef.current = isNavigating;
   }, [isNavigating]);
 
+  const [completedTodayIds, setCompletedTodayIds] = useState<string[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchHistory = async () => {
+        try {
+          const token = await SecureStore.getItemAsync('userToken');
+          if (!token) return;
+          const res = await fetch(`${BASE_URL}/geo-quests/my-history`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const history = await res.json();
+            const todayLocal = new Date().toDateString();
+            const completedToday = history
+              .filter((item: any) => item.completed_at && new Date(item.completed_at).toDateString() === todayLocal)
+              .map((item: any) => item.geo_quest?.id || item.geo_quest_id);
+            setCompletedTodayIds(completedToday);
+          }
+        } catch (e) {
+          console.log('Failed to fetch history', e);
+        }
+      };
+      fetchHistory();
+    }, [])
+  );
+
+  useEffect(() => {
+    if (nearestQuests.length > 0) {
+      setTracksViewChanges(true);
+      const timer = setTimeout(() => {
+        setTracksViewChanges(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [nearestQuests, selectedQuest?.id]);
+
   const animateToCoords = useCallback((coords: { latitude: number; longitude: number }) => {
     mapRef.current?.animateToRegion({
       latitude: coords.latitude,
@@ -98,6 +190,14 @@ export default function GeoQuestsScreen() {
         const loc = await Location.getCurrentPositionAsync({});
         setUserLocation(loc.coords);
         await fetchNearestQuests(loc.coords.latitude, loc.coords.longitude);
+
+        // Smoothly zoom in on the user's location dot once coordinates are resolved
+        mapRef.current?.animateToRegion({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008,
+        }, 1000);
 
         const saved = await SecureStore.getItemAsync('activeQuest');
         if (saved) {
@@ -138,6 +238,14 @@ export default function GeoQuestsScreen() {
         longitudeDelta: 0.005,
       }, 600);
     }
+  };
+
+  const resetCompass = () => {
+    playClickSound();
+    mapRef.current?.animateCamera({
+      heading: 0,
+      pitch: 0,
+    });
   };
 
   const buildRoute = async (quest: any, coordsOverride?: Location.LocationObjectCoords) => {
@@ -258,10 +366,7 @@ export default function GeoQuestsScreen() {
   };
 
   const handleConfirmFinish = () => {
-    setFinishModalVisible(false);
-    setTimeout(() => {
-      processQuestCompletion();
-    }, 400);
+    processQuestCompletion();
   };
 
   const processQuestCompletion = async () => {
@@ -269,7 +374,26 @@ export default function GeoQuestsScreen() {
     setIsCompleting(true);
 
     try {
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
+      let currentLat = userLocation?.latitude;
+      let currentLng = userLocation?.longitude;
+      
+      if (!currentLat || !currentLng) {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        currentLat = loc.coords.latitude;
+        currentLng = loc.coords.longitude;
+      }
+
+      const targetLat = selectedQuest?.place?.coordinates?.lat;
+      const targetLng = selectedQuest?.place?.coordinates?.lng;
+      if (targetLat && targetLng && currentLat && currentLng) {
+        const dist = calculateDistance(currentLat, currentLng, targetLat, targetLng);
+        if (dist > 50) {
+          Alert.alert('Не вийшло', `Ти занадто далеко від цілі! Відстань: ${Math.round(dist)}м. Підійди ближче.`);
+          setIsCompleting(false);
+          return;
+        }
+      }
+
       const token = await SecureStore.getItemAsync('userToken');
       let finalPhotoUrl = null;
 
@@ -300,8 +424,8 @@ export default function GeoQuestsScreen() {
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_geo_quest_id: activeUserQuestId,
-            lat: loc.coords.latitude,
-            lng: loc.coords.longitude,
+            lat: currentLat,
+            lng: currentLng,
           }),
         });
 
@@ -334,8 +458,8 @@ export default function GeoQuestsScreen() {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude,
+          lat: currentLat,
+          lng: currentLng,
           photo_url: finalPhotoUrl,
         }),
       });
@@ -348,6 +472,10 @@ export default function GeoQuestsScreen() {
           animateToCoords({ latitude: lat, longitude: lng });
         }
         clearFullRoute();
+
+        if (selectedQuest) {
+          setCompletedTodayIds((prev) => [...prev, selectedQuest.id]);
+        }
 
         if (animationsEnabled) {
           setShowConfetti(true);
@@ -369,6 +497,7 @@ export default function GeoQuestsScreen() {
     } catch (e) {
       Alert.alert('Помилка', 'Не вдалося завантажити фото або підтвердити координати');
     } finally {
+      setFinishModalVisible(false);
       setIsCompleting(false);
     }
   };
@@ -398,6 +527,21 @@ export default function GeoQuestsScreen() {
     }
   };
 
+  const cancelActiveQuest = async () => {
+    if (activeUserQuestId) {
+      try {
+        const token = await SecureStore.getItemAsync('userToken');
+        await fetch(`${BASE_URL}/geo-quests/my-quests/${activeUserQuestId}/cancel`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.error('Failed to cancel quest on backend', e);
+      }
+    }
+    clearFullRoute();
+  };
+
   const clearFullRoute = () => {
     SecureStore.deleteItemAsync('activeQuest');
     setIsNavigating(false);
@@ -406,7 +550,7 @@ export default function GeoQuestsScreen() {
     setSteps([]);
     setRouteData(null);
     setActiveUserQuestId(null);
-    Animated.spring(panY, { toValue: INITIAL_PAN_Y, useNativeDriver: false }).start();
+    Animated.spring(panY, { toValue: initialPanYRef.current, useNativeDriver: false }).start();
   };
 
   const panResponder = useRef(
@@ -414,18 +558,18 @@ export default function GeoQuestsScreen() {
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (_, gestureState) => {
         const newY = gestureState.moveY;
-        if (!isNavigatingRef.current && newY < INITIAL_PAN_Y) return;
+        if (!isNavigatingRef.current && newY < initialPanYRef.current) return;
         if (newY > SCREEN_HEIGHT * 0.1 && newY < SCREEN_HEIGHT * 0.95) panY.setValue(newY);
       },
       onPanResponderRelease: (_, gestureState) => {
         if (!isNavigatingRef.current) {
-          Animated.spring(panY, { toValue: INITIAL_PAN_Y, useNativeDriver: false }).start();
+          Animated.spring(panY, { toValue: initialPanYRef.current, useNativeDriver: false }).start();
           return;
         }
         if (gestureState.moveY < SCREEN_HEIGHT * 0.45) {
           Animated.spring(panY, { toValue: SCREEN_HEIGHT * 0.15, useNativeDriver: false }).start();
         } else {
-          Animated.spring(panY, { toValue: INITIAL_PAN_Y, useNativeDriver: false }).start();
+          Animated.spring(panY, { toValue: initialPanYRef.current, useNativeDriver: false }).start();
         }
       },
     })
@@ -447,33 +591,45 @@ export default function GeoQuestsScreen() {
         initialRegion={DEFAULT_REGION}
         showsUserLocation={!locationDenied}
         showsMyLocationButton={false}
+        showsCompass={false}
+        customMapStyle={isDark ? MAP_STYLE_DARK : MAP_STYLE_LIGHT}
       >
         {nearestQuests.map((item) => {
           const quest = item.geo_quest;
+          const isCompleted = completedTodayIds.includes(quest.id);
           const lat = quest?.place?.coordinates?.lat;
           const lng = quest?.place?.coordinates?.lng;
           if (typeof lat !== 'number' || typeof lng !== 'number') return null;
           const isSelected = selectedQuest?.id === quest.id;
           return (
             <Marker
-              key={quest.id}
+              key={`${quest.id}-${isSelected}`}
               coordinate={{ latitude: lat, longitude: lng }}
               anchor={{ x: 0.5, y: 0.5 }}
               centerOffset={{ x: 0, y: 0 }}
-              tracksViewChanges={false}
-              onPress={() => !isNavigating && setSelectedQuest(quest)}
+              tracksViewChanges={tracksViewChanges}
+              onPress={() => {
+                if (isCompleted) {
+                  Alert.alert('Виконано', 'Ти вже виконав цей квест сьогодні! Спробуй інший.');
+                } else if (!isNavigating) {
+                  setSelectedQuest(quest);
+                }
+              }}
             >
-              <View style={s.markerWrapper} collapsable={false}>
-                <View style={[
-                  s.markerCircle,
-                  {
-                    backgroundColor: isSelected ? c.accent : c.background,
-                    borderColor: isSelected ? '#FFF' : c.border,
-                    borderWidth: isSelected ? 3 : 2,
-                  },
-                ]}>
-                  <MapPin color={isSelected ? '#FFF' : c.textMain} size={20} />
-                </View>
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: isSelected ? c.accent : (isCompleted ? c.border : c.background),
+                borderColor: isSelected ? '#FFF' : c.border,
+                borderWidth: isSelected ? 3 : 1.5,
+                justifyContent: 'center',
+                alignItems: 'center',
+                shadowColor: '#000', shadowOpacity: 0.3, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4,
+                elevation: 4,
+                opacity: 1
+              }}>
+                <MapPin color={isSelected ? '#FFF' : (isCompleted ? c.textMuted : c.textMain)} size={18} />
               </View>
             </Marker>
           );
@@ -507,12 +663,19 @@ export default function GeoQuestsScreen() {
         )}
       </SafeAreaView>
 
-      <Animated.View style={[s.bottomSheet, { top: panY, backgroundColor: c.background, borderColor: c.border, paddingBottom: Math.max(insets.bottom, 24) }]}>
+      <Animated.View style={[s.bottomSheet, { top: panY, bottom: -50, backgroundColor: c.background, borderColor: c.border, paddingBottom: Math.max(insets.bottom, 24) + 50 }]}>
         <Pressable
           onPress={centerOnUser}
           style={[s.locateBtn, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, cardShadow(themeKey, 'soft')]}
         >
           <LocateFixed color={c.accent} size={24} />
+        </Pressable>
+
+        <Pressable
+          onPress={resetCompass}
+          style={[s.compassBtn, { backgroundColor: c.background, borderColor: c.border, borderWidth: 1 }, cardShadow(themeKey, 'soft')]}
+        >
+          <Compass color={c.accent} size={24} />
         </Pressable>
 
         <View {...panResponder.panHandlers} style={s.dragArea}>
@@ -583,7 +746,7 @@ export default function GeoQuestsScreen() {
                     </>
                   )}
                 </Pressable>
-                <Pressable onPress={clearFullRoute} style={[s.cancelIconBtn, { backgroundColor: isDark ? 'rgba(239,68,68,0.2)' : '#FEE2E2' }]}>
+                <Pressable onPress={cancelActiveQuest} style={[s.cancelIconBtn, { backgroundColor: isDark ? 'rgba(239,68,68,0.2)' : '#FEE2E2' }]}>
                   <X color="#EF4444" size={24} />
                 </Pressable>
               </View>
@@ -696,7 +859,7 @@ export default function GeoQuestsScreen() {
 
       {showConfetti && (
         <ConfettiCannon
-          count={120}
+          count={60}
           origin={{ x: -10, y: 0 }}
           autoStart
           fadeOut
@@ -716,22 +879,23 @@ const s = StyleSheet.create({
   hudInfo: { flex: 1, marginLeft: 12 },
   hudClose: { padding: 8 },
   markerWrapper: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
   },
   markerCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'visible',
   },
   bottomSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: Radii.xl, borderTopRightRadius: Radii.xl, borderWidth: 1, borderBottomWidth: 0 },
   locateBtn: { position: 'absolute', right: Spacing.screenX, top: -70, padding: 12, borderRadius: Radii.full, zIndex: 10 },
+  compassBtn: { position: 'absolute', right: Spacing.screenX + 56, top: -70, padding: 12, borderRadius: Radii.full, zIndex: 10 },
   dragArea: { width: '100%', alignItems: 'center', paddingVertical: 14 },
   dragLine: { width: 40, height: 4, borderRadius: 2 },
   sheetContent: { paddingHorizontal: Spacing.screenX, flex: 1 },
@@ -742,7 +906,7 @@ const s = StyleSheet.create({
   completeBtn: { flex: 1, padding: 16, borderRadius: Radii.full, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   cancelIconBtn: { width: 56, height: 56, borderRadius: Radii.full, justifyContent: 'center', alignItems: 'center' },
   stepRow: { flexDirection: 'row', marginBottom: 20 },
-  stepIconBox: { padding: 10, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center' },
+  stepIconBox: { padding: 10, borderRadius: Radii.md, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   shareModal: { borderTopLeftRadius: Radii.xl, borderTopRightRadius: Radii.xl, padding: 24 },
   shareIconBox: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 20 },

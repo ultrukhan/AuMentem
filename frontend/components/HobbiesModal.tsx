@@ -5,17 +5,18 @@ import {
 } from 'react-native';
 import { 
   Sparkles, Check, Code, BookOpen, Bike, 
-  Camera, Palette, Coffee, Heart, Star, X
+  Camera, Palette, Coffee, Heart, Star, X, Hash, Activity, Smile, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator 
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
+import ConfettiCannon from 'react-native-confetti-cannon';
 import { BASE_URL } from '@/constants/api';
 import { Colors, Typography, Radii } from '@/constants/theme';
 import { textLayout } from '@/utils/textLayout';
 import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
-import { playClickSound } from '@/utils/audio';
+import { playClickSound, playSuccessSound } from '@/utils/audio';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface Hobby {
   id: number;
@@ -30,16 +31,30 @@ interface Props {
 }
 
 const getHobbyIcon = (name: string, color: string, size: number) => {
+  if (!name) return <Hash color={color} size={size} />;
   const lower = name.toLowerCase();
-  if (lower.includes('йога') || lower.includes('медит')) return <Star color={color} size={size} />;
-  if (lower.includes('програм')) return <Code color={color} size={size} />;
-  if (lower.includes('читан')) return <BookOpen color={color} size={size} />;
-  if (lower.includes('вело')) return <Bike color={color} size={size} />;
-  if (lower.includes('фото')) return <Camera color={color} size={size} />;
-  if (lower.includes('малюв')) return <Palette color={color} size={size} />;
-  if (lower.includes('кулін')) return <Coffee color={color} size={size} />;
-  if (lower.includes('волонтер')) return <Heart color={color} size={size} />;
-  return <Star color={color} size={size} />; 
+  if (lower.includes('йога') || lower.includes('медит') || lower.includes('yoga')) return <Star color={color} size={size} />;
+  if (lower.includes('програм') || lower.includes('код') || lower.includes('code') || lower.includes('program')) return <Code color={color} size={size} />;
+  if (lower.includes('читан') || lower.includes('книг') || lower.includes('read') || lower.includes('book')) return <BookOpen color={color} size={size} />;
+  if (lower.includes('вело') || lower.includes('bike') || lower.includes('cycl')) return <Bike color={color} size={size} />;
+  if (lower.includes('фото') || lower.includes('photo')) return <Camera color={color} size={size} />;
+  if (lower.includes('малюв') || lower.includes('мист') || lower.includes('art') || lower.includes('paint') || lower.includes('draw')) return <Palette color={color} size={size} />;
+  if (lower.includes('кулін') || lower.includes('готув') || lower.includes('cook') || lower.includes('bake')) return <Coffee color={color} size={size} />;
+  if (lower.includes('волонтер') || lower.includes('допомог') || lower.includes('volunteer')) return <Heart color={color} size={size} />;
+  if (lower.includes('спорт') || lower.includes('фітнес') || lower.includes('sport') || lower.includes('fitness')) return <Dumbbell color={color} size={size} />;
+  if (lower.includes('музик') || lower.includes('music')) return <Music color={color} size={size} />;
+  if (lower.includes('ігр') || lower.includes('game')) return <Gamepad2 color={color} size={size} />;
+  if (lower.includes('істор') || lower.includes('history')) return <Library color={color} size={size} />;
+  if (lower.includes('садівн') || lower.includes('рослин') || lower.includes('garden')) return <Leaf color={color} size={size} />;
+  if (lower.includes('кіно') || lower.includes('фільм') || lower.includes('cinema') || lower.includes('movie')) return <Film color={color} size={size} />;
+  if (lower.includes('психол') || lower.includes('psychology')) return <Brain color={color} size={size} />;
+  if (lower.includes('танц') || lower.includes('dance')) return <Music color={color} size={size} />;
+  if (lower.includes('тварин') || lower.includes('animal') || lower.includes('pet')) return <PawPrint color={color} size={size} />;
+  if (lower.includes('авто') || lower.includes('машин') || lower.includes('car')) return <Car color={color} size={size} />;
+  if (lower.includes('дизайн') || lower.includes('design')) return <PenTool color={color} size={size} />;
+  if (lower.includes('мов') || lower.includes('lang')) return <Globe color={color} size={size} />;
+  if (lower.includes('математ') || lower.includes('math')) return <Calculator color={color} size={size} />;
+  return <Hash color={color} size={size} />;
 };
 
 export default function HobbiesModal({ visible, onSuccess, onClose, isDark = false }: Props) {
@@ -51,6 +66,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -58,6 +74,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
       loadData();
       setError('');
       setIsSuccess(false); 
+      setShowConfetti(false);
     }
   }, [visible]);
 
@@ -119,10 +136,13 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         await SecureStore.setItemAsync('has_hobbies', 'true');
         await SecureStore.setItemAsync('user_saved_hobbies', JSON.stringify(selectedIds));
         
+        playSuccessSound();
         setIsSuccess(true);
+        setShowConfetti(true);
         setTimeout(() => {
+          setShowConfetti(false);
           onSuccess();
-        }, 1000);
+        }, 1800);
 
       } else {
         setError(await parseApiError(response, 'Не вдалося зберегти зміни на сервері'));
@@ -240,6 +260,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
             </Pressable>
           </View>
         </View>
+        {showConfetti && <ConfettiCannon count={50} origin={{ x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT }} autoStart={true} fadeOut={true} fallSpeed={2500} explosionSpeed={500} />}
       </View>
     </Modal>
   );
@@ -258,9 +279,10 @@ const s = StyleSheet.create({
   hobbyChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingLeft: 14,
+    paddingRight: 32,
     borderRadius: Radii.full,
     borderWidth: 1,
     width: '47%',
@@ -270,12 +292,12 @@ const s = StyleSheet.create({
   chipInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    justifyContent: 'flex-start',
+    gap: 8,
     flex: 1,
     maxWidth: '100%',
   },
-  chipLabel: { fontWeight: '500', textAlign: 'center', fontSize: 13, flex: 1, ...textLayout },
+  chipLabel: { fontFamily: 'Nunito_600SemiBold', textAlign: 'left', fontSize: 13, flex: 1, ...textLayout },
   checkCircle: {
     position: 'absolute',
     right: 10,

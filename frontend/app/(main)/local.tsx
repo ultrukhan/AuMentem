@@ -3,7 +3,6 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ImageBackground, 
   Pressable, 
   Platform 
 } from 'react-native';
@@ -18,6 +17,7 @@ import {
 
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
+import AnimatedBackground from '@/components/AnimatedBackground';
 import BottomNav from '@/components/BottomNav';
 import { cardShadow } from '@/utils/shadowStyle';
 import { useAppSettings } from '@/hooks/useAppSettings';
@@ -36,17 +36,12 @@ export default function LocalEventsScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/home');
+      router.replace({ pathname: '/(main)/home', params: { theme: themeKey } });
     }
   };
 
   return (
-    <ImageBackground 
-      source={require('@/assets/images/background.png')} 
-      style={s.container}
-      resizeMode="cover"
-    >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
+    <AnimatedBackground isDark={isDark} themeKey={isDark ? 'dark' : 'light'}>
 
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         
@@ -109,7 +104,7 @@ export default function LocalEventsScreen() {
         <BottomNav isDark={isDark} theme={isDark ? 'dark' : 'light'} />
         
       </SafeAreaView>
-    </ImageBackground>
+    </AnimatedBackground>
   );
 }
 

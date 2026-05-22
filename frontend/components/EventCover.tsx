@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Image, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CalendarDays, Sparkles } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
@@ -21,7 +22,7 @@ export default function EventCover({ imageUrl, theme, style, large = false, cate
   if (hasImage) {
     return (
       <View style={[styles.wrap, style]}>
-        <Image source={{ uri: imageUrl! }} style={styles.image} resizeMode="cover" />
+        <Image source={{ uri: imageUrl! }} style={styles.image} contentFit="cover" transition={200} />
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)']} style={styles.overlay} />
       </View>
     );

@@ -4,12 +4,12 @@ import {
   View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, 
   Platform, SafeAreaView, ActivityIndicator, Modal, ScrollView, Image, Keyboard
 } from "react-native";
-import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon } from "lucide-react-native";
+import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon, Volume2, VolumeX } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Colors, Typography, Radii, Spacing, AuthLayout } from "@/constants/theme";
 import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 import * as SecureStore from "expo-secure-store";
-import { playClickSound } from '@/utils/audio';
+import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
 import { useSavedTheme } from '@/hooks/useSavedTheme';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { parseApiError } from '@/utils/apiErrors';
@@ -40,12 +40,52 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const savedSettings = await SecureStore.getItemAsync('userSettings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          setIsMuted(parsed.music === false && parsed.sfx === false);
+        } catch {}
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const toggleMute = async () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    
+    try {
+      const saved = await SecureStore.getItemAsync('userSettings');
+      let current = saved ? JSON.parse(saved) : {};
+      current.music = !newMuted;
+      current.sfx = !newMuted;
+      current.musicVolume = newMuted ? 0 : 0.5;
+      current.sfxVolume = newMuted ? 0 : 0.5;
+      await SecureStore.setItemAsync('userSettings', JSON.stringify(current));
+    } catch {}
+    
+    if (newMuted) {
+      stopAmbientSound();
+    } else {
+      setTimeout(() => playClickSound(), 50);
+      playAmbientSound(0, isDark);
+    }
+  };
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -53,7 +93,7 @@ export default function RegisterScreen() {
   }, []);
 
   const c = Colors[theme];
-  const appIcon = require('@/assets/images/icon.png');
+  const appIcon = require('@/assets/images/icon.jpg');
 
   const reqLength = password.length >= 8;
   const reqUpper = /[A-Z]/.test(password);
@@ -97,12 +137,17 @@ export default function RegisterScreen() {
 
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
+      <Pressable style={s.soundToggle} onPress={toggleMute}>
+        {isMuted ? <VolumeX color={c.textMain} size={24} /> : <Volume2 color={c.textMain} size={24} />}
+      </Pressable>
+
       <Pressable style={s.themeToggle} onPress={toggleTheme}>
         {isDark ? <Sun color={c.textMain} size={24} /> : <Moon color={c.textMain} size={24} />}
       </Pressable>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
+          ref={scrollViewRef}
           scrollEnabled={keyboardVisible}
           contentContainerStyle={[s.scrollContent, !keyboardVisible && s.scrollContentCentered]}
           keyboardShouldPersistTaps="handled"
@@ -130,7 +175,21 @@ export default function RegisterScreen() {
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Lock color={c.textMuted} size={20} />
-                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Пароль" placeholderTextColor={c.textMuted} value={password} onChangeText={setPassword} />
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <TextInput 
+                    style={[s.input, { color: !showPassword && password.length > 0 ? 'transparent' : c.textMain }]} 
+                    placeholder="Пароль" 
+                    placeholderTextColor={c.textMuted} 
+                    value={password} 
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                  />
+                  {!showPassword && password.length > 0 && (
+                    <Text style={[s.input, { position: 'absolute', left: 0, pointerEvents: 'none', color: c.textMain }]} numberOfLines={1}>
+                      {'•'.repeat(password.length)}
+                    </Text>
+                  )}
+                </View>
                 <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
                   {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
                 </Pressable>
@@ -195,6 +254,7 @@ export default function RegisterScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
   themeToggle: { position: 'absolute', top: 50, right: 24, zIndex: 10, padding: 8 },
+  soundToggle: { position: 'absolute', top: 50, right: 72, zIndex: 10, padding: 8 },
   scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, paddingVertical: AuthLayout.scrollPaddingVertical },
   scrollContentCentered: { justifyContent: 'center' },
   header: { alignItems: "center", marginBottom: AuthLayout.headerMarginBottom, marginTop: AuthLayout.headerMarginTop },

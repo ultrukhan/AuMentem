@@ -2,9 +2,9 @@ import { BASE_URL } from '@/constants/api';
 
 import React, { useState, useEffect } from 'react';
 
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator, ScrollView, Image, Keyboard, Appearance } from 'react-native';
 
-import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon } from 'lucide-react-native';
+import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from 'lucide-react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -12,7 +12,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
 
-import { playClickSound } from '@/utils/audio';
+import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
 
 import { useAppSettings } from '@/hooks/useAppSettings';
 
@@ -37,64 +37,85 @@ export default function AuthScreen() {
 
   const [themeReady, setThemeReady] = useState(false);
 
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(Appearance.getColorScheme() === 'dark');
 
   const [nickname, setNickname] = useState('');
 
   const [password, setPassword] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
-
   const [isLoading, setIsLoading] = useState(false);
-
   const [errorMessage, setErrorMessage] = useState('');
-
+  const [isMuted, setIsMuted] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
   const [splashStage, setSplashStage] = useState<'brand' | 'app' | 'done'>('brand');
 
-
-
   const theme = isDark ? 'dark' : 'light';
-
   const c = Colors[theme];
 
   const teamLogo = require('@/assets/images/team_icon.png');
-  const appIcon = require('@/assets/images/icon.png');
-
-
+  const appIcon = require('@/assets/images/icon.jpg');
 
   const toggleTheme = async () => {
-
     playClickSound();
-
     const newTheme = !isDark;
-
     setIsDark(newTheme);
-
     await SecureStore.setItemAsync('userTheme', newTheme ? 'dark' : 'light');
-
   };
 
-
+  const toggleMute = async () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    
+    try {
+      const saved = await SecureStore.getItemAsync('userSettings');
+      let current = saved ? JSON.parse(saved) : {};
+      current.music = !newMuted;
+      current.sfx = !newMuted;
+      current.musicVolume = newMuted ? 0 : 0.5;
+      current.sfxVolume = newMuted ? 0 : 0.5;
+      await SecureStore.setItemAsync('userSettings', JSON.stringify(current));
+    } catch {}
+    
+    if (newMuted) {
+      stopAmbientSound();
+    } else {
+      setTimeout(() => playClickSound(), 50);
+      playAmbientSound(0, isDark);
+    }
+  };
 
   useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
+  useEffect(() => {
     let cancelled = false;
 
-
-
     const bootstrap = async () => {
-
       const savedTheme = await SecureStore.getItemAsync('userTheme');
-
+      const savedSettings = await SecureStore.getItemAsync('userSettings');
       if (!cancelled) {
-
         setIsDark(savedTheme === 'dark');
-
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setIsMuted(parsed.music === false && parsed.sfx === false);
+          } catch {}
+        }
         setThemeReady(true);
-
       }
-
-
 
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
@@ -102,65 +123,40 @@ export default function AuthScreen() {
 
       setSplashStage('app');
 
-
-
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       if (cancelled) return;
 
-
-
       try {
-
         const token = await SecureStore.getItemAsync('userToken');
-
         if (token) {
-
           const response = await fetch(`${BASE_URL}/auth/me`, {
-
             headers: { Authorization: `Bearer ${token}` },
-
           });
-
           if (response.ok) {
             const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-
             if (isFirstLogin === 'true') {
               router.replace('/into');
             } else {
               router.replace('/(main)/home');
             }
-
             return;
           }
-
           await SecureStore.deleteItemAsync('userToken');
           await SecureStore.deleteItemAsync('currentUserId');
-
         }
-
       } catch {
-
         // ignore
-
       }
 
-
-
       if (!cancelled) setSplashStage('done');
-
     };
-
-
 
     bootstrap();
 
     return () => {
-
       cancelled = true;
-
     };
-
   }, [router]);
 
 
@@ -279,6 +275,10 @@ export default function AuthScreen() {
 
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
 
+      <Pressable style={s.soundToggle} onPress={toggleMute}>
+        {isMuted ? <VolumeX color={c.textMain} size={24} /> : <Volume2 color={c.textMain} size={24} />}
+      </Pressable>
+
       <Pressable style={s.themeToggle} onPress={toggleTheme}>
 
         {isDark ? <Sun color={c.textMain} size={24} /> : <Moon color={c.textMain} size={24} />}
@@ -287,7 +287,14 @@ export default function AuthScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-        <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+        <ScrollView 
+          ref={scrollViewRef}
+          scrollEnabled={keyboardVisible}
+          contentContainerStyle={[s.scrollContent, !keyboardVisible && { flexGrow: 1, justifyContent: 'center' }]} 
+          keyboardShouldPersistTaps="handled" 
+          showsVerticalScrollIndicator={false} 
+          bounces={keyboardVisible}
+        >
 
           <FadeInView animationsEnabled={animationsEnabled} style={s.header}>
 
@@ -312,17 +319,21 @@ export default function AuthScreen() {
               </View>
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-
                 <Lock color={c.textMuted} size={20} />
-
-                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Пароль" placeholderTextColor={c.textMuted} value={password} onChangeText={setPassword} />
-
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  <TextInput 
+                    style={[s.input, { color: c.textMain }]} 
+                    placeholder="Пароль" 
+                    placeholderTextColor={c.textMuted} 
+                    value={password} 
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                    secureTextEntry={!showPassword}
+                  />
+                </View>
                 <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-
                   {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
-
                 </Pressable>
-
               </View>
 
             </View>
@@ -370,6 +381,8 @@ const s = StyleSheet.create({
   container: { flex: 1 },
 
   themeToggle: { position: 'absolute', top: 50, right: 24, zIndex: 10, padding: 8 },
+
+  soundToggle: { position: 'absolute', top: 50, right: 72, zIndex: 10, padding: 8 },
 
   splashLogoFrame: { width: 120, height: 120, borderRadius: 28, overflow: 'hidden' },
   splashLogo: { width: '100%', height: '100%' },

@@ -8,6 +8,21 @@ import * as SecureStore from 'expo-secure-store';
 import { 
   ArrowLeft, BarChart3, Calendar, MapPin, Trophy, Target, Sparkles 
 } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
+
+const CatPath = "M290.59 192c-20.18 0-106.82 1.98-162.59 85.95V192c0-52.94-43.06-96-96-96-17.67 0-32 14.33-32 32s14.33 32 32 32c17.64 0 32 14.36 32 32v256c0 35.3 28.7 64 64 64h176c8.84 0 16-7.16 16-16v-16c0-17.67-14.33-32-32-32h-32l128-96v144c0 8.84 7.16 16 16 16h32c8.84 0 16-7.16 16-16V289.86c-10.29 2.67-20.89 4.54-32 4.54-61.81 0-113.52-44.05-125.41-102.4zM448 96h-64l-64-64v134.4c0 53.02 42.98 96 96 96s96-42.98 96-96V32l-64 64zm-72 80c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16zm80 0c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16z";
+const DogPath = "M298.06,224,448,277.55V496a16,16,0,0,1-16,16H368a16,16,0,0,1-16-16V384H192V496a16,16,0,0,1-16,16H112a16,16,0,0,1-16-16V282.09C58.84,268.84,32,233.66,32,192a32,32,0,0,1,64,0,32.06,32.06,0,0,0,32,32ZM544,112v32a64,64,0,0,1-64,64H448v35.58L320,197.87V48c0-14.25,17.22-21.39,27.31-11.31L374.59,64h53.63c10.91,0,23.75,7.92,28.62,17.69L464,96h64A16,16,0,0,1,544,112Zm-112,0a16,16,0,1,0-16,16A16,16,0,0,0,432,112Z";
+const BirdPath = "M544 32h-16.36C513.04 12.68 490.09 0 464 0c-44.18 0-80 35.82-80 80v20.98L12.09 393.57A30.216 30.216 0 0 0 0 417.74c0 22.46 23.64 37.07 43.73 27.03L165.27 384h96.49l44.41 120.1c2.27 6.23 9.15 9.44 15.38 7.17l22.55-8.21c6.23-2.27 9.44-9.15 7.17-15.38L312.94 384H352c1.91 0 3.76-.23 5.66-.29l44.51 120.38c2.27 6.23 9.15 9.44 15.38 7.17l22.55-8.21c6.23-2.27 9.44-9.15 7.17-15.38l-41.24-111.53C485.74 352.8 544 279.26 544 192v-80l96-16c0-35.35-42.98-64-96-64zm-80 72c-13.25 0-24-10.75-24-24 0-13.26 10.75-24 24-24s24 10.74 24 24c0 13.25-10.75 24-24 24z";
+
+const PetIcon = ({ type, color, size }: { type: number, color: string, size: number }) => {
+  const paths = [CatPath, DogPath, BirdPath];
+  const viewBoxes = ["0 0 512 512", "0 0 576 512", "0 0 640 512"];
+  return (
+    <Svg width={size} height={size} viewBox={viewBoxes[type]}>
+      <Path d={paths[type]} fill={color} />
+    </Svg>
+  );
+};
 
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { BASE_URL } from '@/constants/api';
@@ -48,7 +63,7 @@ export default function StatsScreen() {
   const [stats, setStats] = useState<WeeklyStat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [timeRange, setTimeRange] = useState<TimeRange>('WEEK');
+  const [petType, setPetType] = useState<number>(0);
 
   const fetchStats = async (silent = false) => {
     if (!silent) setIsLoading(true);
@@ -78,48 +93,12 @@ export default function StatsScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchStats();
+      SecureStore.getItemAsync('selectedPetType').then(val => {
+        if (val !== null) setPetType(Number(val));
+      });
     }, [])
   );
 
-  const chartData = useMemo(() => {
-    if (stats.length === 0) return [];
-
-    if (timeRange === 'WEEK') {
-      return stats.slice(0, 5).reverse().map(s => {
-        const d = new Date(s.week_start);
-        return {
-          id: s.id,
-          label: `${d.getDate()}.${d.getMonth() + 1}`,
-          value: s.total_score
-        };
-      });
-    }
-
-    if (timeRange === 'MONTH') {
-      const monthlyData: Record<string, number> = {};
-      stats.forEach(s => {
-        const d = new Date(s.week_start);
-        const monthKey = d.toLocaleString('uk-UA', { month: 'short' }); 
-        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + s.total_score;
-      });
-      return Object.entries(monthlyData).slice(0, 5).reverse().map(([label, value], i) => ({
-        id: `month-${i}`, label, value
-      }));
-    }
-
-    if (timeRange === 'YEAR') {
-      const yearlyData: Record<string, number> = {};
-      stats.forEach(s => {
-        const yearKey = new Date(s.week_start).getFullYear().toString();
-        yearlyData[yearKey] = (yearlyData[yearKey] || 0) + s.total_score;
-      });
-      return Object.entries(yearlyData).reverse().map(([label, value], i) => ({
-        id: `year-${i}`, label, value
-      }));
-    }
-
-    return [];
-  }, [stats, timeRange]);
 
   const renderEmptyState = () => (
     <View style={s.emptyStateContainer}>
@@ -135,57 +114,49 @@ export default function StatsScreen() {
     </View>
   );
 
-  const renderChart = () => {
-    if (chartData.length === 0) return null;
-
-    const maxScore = Math.max(...chartData.map(s => s.value), 10); 
-
-    return (
-      <View style={[s.chartCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
-        
-        <View style={[s.tabsContainer, { backgroundColor: c.background }]}>
-          {(['WEEK', 'MONTH', 'YEAR'] as TimeRange[]).map((tab) => {
-            const isActive = timeRange === tab;
-            const labels = { WEEK: 'Тижні', MONTH: 'Місяці', YEAR: 'Роки' };
-            return (
-              <AnimatedCard
-                key={tab}
-                animationsEnabled={animationsEnabled}
-                onPress={() => { playClickSound(); setTimeRange(tab); }}
-                style={[s.tabBtn, isActive && { backgroundColor: c.cardBg, ...cardShadow(themeKey, 'soft') }]}
-              >
-                <Text style={[s.tabText, { color: isActive ? c.textMain : c.textMuted, fontWeight: isActive ? '700' : '500' }]} numberOfLines={1}>
-                  {labels[tab]}
-                </Text>
-              </AnimatedCard>
-            );
-          })}
-        </View>
-
-        <View style={s.chartContainer}>
-          {chartData.map((item, index) => {
-            const barHeight = (item.value / maxScore) * 100; 
-            const isLatest = index === chartData.length - 1; 
-
-            return (
-              <View key={item.id} style={s.barWrapper}>
-                <Text style={[s.barValue, { color: isLatest ? c.accent : c.textMuted }]}>{item.value}</Text>
-                <View style={s.barBackground}>
-                  <View 
-                    style={[
-                      s.barFill, 
-                      { height: `${barHeight}%`, backgroundColor: isLatest ? c.accent : c.border }
-                    ]} 
-                  />
-                </View>
-                <Text style={[s.barLabel, { color: c.textMuted }]} numberOfLines={1}>{item.label}</Text>
-              </View>
-            );
-          })}
-        </View>
+  const renderPetBanner = () => (
+    <View style={[s.scoreBanner, { backgroundColor: c.cardBg, borderColor: c.accent, borderWidth: 1.5, marginBottom: 24 }, cardShadow(themeKey, 'soft')]}>
+      <View style={{ height: 110, justifyContent: 'flex-end', marginBottom: 16 }}>
+        <MotiView
+          key={petType}
+          from={{ translateY: 0, scaleY: 1, scaleX: 1 }}
+          animate={{ translateY: -35, scaleY: 1.1, scaleX: 0.95 }}
+          transition={{
+            type: 'timing',
+            duration: 450,
+            loop: true,
+            repeatReverse: true,
+          }}
+          style={{ alignItems: 'center' }}
+        >
+          <Pressable onPress={() => {
+            playClickSound();
+            setPetType((prev) => {
+              const next = (prev + 1) % 3;
+              SecureStore.setItemAsync('selectedPetType', String(next));
+              return next;
+            });
+          }}>
+            <PetIcon type={petType} color={c.accent} size={80} />
+          </Pressable>
+        </MotiView>
+        <MotiView
+          key={`shadow-${petType}`}
+          from={{ scaleX: 1, opacity: 0.3 }}
+          animate={{ scaleX: 0.5, opacity: 0.1 }}
+          transition={{ type: 'timing', duration: 450, loop: true, repeatReverse: true }}
+          style={{ width: 60, height: 10, borderRadius: 50, backgroundColor: c.textMain, position: 'absolute', bottom: -5, alignSelf: 'center' }}
+        />
       </View>
-    );
-  };
+      <Text style={[Typography.titleXl, { color: c.textMain, fontSize: 24, textAlign: 'center' }]}>
+        Твій улюбленець радіє! 🎉
+      </Text>
+      <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8, paddingHorizontal: 16, lineHeight: 22 }]}>
+        Він пишається тобою за виконання квестів. Продовжуй в тому ж дусі!
+      </Text>
+    </View>
+  );
+
 
   const latestStat = stats.length > 0 ? stats[0] : null;
 
@@ -208,21 +179,22 @@ export default function StatsScreen() {
         </View>
       ) : stats.length === 0 ? (
         <ScrollView
-          contentContainerStyle={s.emptyScroll}
+          contentContainerStyle={[s.emptyScroll, { paddingTop: 24 }]}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
         >
+          {renderPetBanner()}
           {renderEmptyState()}
         </ScrollView>
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.scrollContent}
+          contentContainerStyle={[s.scrollContent, { paddingTop: 24 }]}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
         >
           
-          {renderChart()}
+          {renderPetBanner()}
 
-          <Text style={[Typography.titleLg, { color: c.textMain, marginTop: 24, marginBottom: 16 }]}>
+          <Text style={[Typography.titleLg, { color: c.textMain, marginBottom: 16 }]}>
             Підсумки останнього тижня
           </Text>
 
@@ -277,7 +249,7 @@ const s = StyleSheet.create({
   screenTitle: { ...Typography.titleXl, fontSize: 26 },
   scrollContent: { paddingHorizontal: Spacing.screenX, paddingBottom: 40 },
   
-  emptyScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 40 },
+  emptyScroll: { flexGrow: 1, justifyContent: 'center', paddingBottom: 40, paddingHorizontal: Spacing.screenX },
   emptyStateContainer: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 },
   iconCircle: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center' },
 
@@ -285,6 +257,9 @@ const s = StyleSheet.create({
   tabsContainer: { flexDirection: 'row', borderRadius: Radii.lg, padding: 4, marginBottom: 16 },
   tabBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: Radii.md },
   tabText: { fontSize: 14 },
+  
+  scoreBanner: { padding: 24, borderRadius: Radii.xl, alignItems: 'center', marginTop: 10 },
+  scoreIconWrap: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   
   chartContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 160, paddingTop: 10 },
   barWrapper: { alignItems: 'center', flex: 1 },

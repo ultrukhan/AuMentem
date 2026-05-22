@@ -3,21 +3,21 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  ImageBackground, 
   Pressable, 
   FlatList,
   ActivityIndicator,
-  Image,
   Dimensions,
   Modal,
   RefreshControl
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Ghost, MapPin, X } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import AnimatedBackground from '@/components/AnimatedBackground';
 
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import { playClickSound } from '@/utils/audio';
@@ -125,7 +125,8 @@ export default function GalleryScreen() {
         <Image 
           source={{ uri: item.photo_url }} 
           style={s.image} 
-          resizeMode="cover"
+          contentFit="cover"
+          transition={200}
         />
         <LinearGradient 
           colors={['transparent', 'rgba(0,0,0,0.85)']} 
@@ -147,12 +148,7 @@ export default function GalleryScreen() {
   };
 
   return (
-    <ImageBackground 
-      source={isDark ? require('@/assets/images/background_dark.png') : require('@/assets/images/background.png')} 
-      style={s.container}
-      resizeMode="cover"
-    >
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.overlay }]} />
+    <AnimatedBackground isDark={isDark} themeKey={isDark ? 'dark' : 'light'}>
 
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <Animated.View entering={animationsEnabled ? FadeIn.duration(400) : undefined} exiting={animationsEnabled ? FadeOut.duration(300) : undefined} style={{ flex: 1 }}>
@@ -224,7 +220,7 @@ export default function GalleryScreen() {
             </Pressable>
             {lightboxPhoto && (
               <>
-                <Image source={{ uri: lightboxPhoto.photo_url }} style={s.lightboxImage} resizeMode="contain" />
+                <Image source={{ uri: lightboxPhoto.photo_url }} style={s.lightboxImage} contentFit="contain" transition={200} />
                 <View style={s.lightboxCaption}>
                   <Text style={[Typography.titleMd, { color: '#FFF' }]}>{lightboxPhoto.quest_title}</Text>
                   <Text style={[Typography.nav, { color: '#D1D5DB', marginTop: 4 }]}>
@@ -236,7 +232,7 @@ export default function GalleryScreen() {
           </View>
         </Modal>
       </SafeAreaView>
-    </ImageBackground>
+    </AnimatedBackground>
   );
 }
 

@@ -7,7 +7,6 @@ import {
   FlatList, 
   ActivityIndicator,
   RefreshControl,
-  Image,
   Animated,
   Alert,
   Modal,
@@ -16,6 +15,7 @@ import {
   Platform,
   ScrollView
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, Sparkles, MapPin, Ghost, Trash2, Flag, X, CheckCircle2, Circle } from 'lucide-react-native';
@@ -138,8 +138,8 @@ const ReactionButton = ({
 
   const handlePress = () => {
     Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 0.9, duration: 30, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1.3, friction: 3, tension: 60, useNativeDriver: true }),
+      Animated.timing(scaleAnim, { toValue: 0.95, duration: 30, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1.15, friction: 3, tension: 60, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, friction: 4, useNativeDriver: true })
     ]).start();
 
@@ -217,7 +217,6 @@ export default function FeedScreen() {
   const [myUserId, setMyUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [myReactions, setMyReactions] = useState<Record<string, string | null>>({});
 
   const [reportingPostId, setReportingPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<string | null>(null);
@@ -270,26 +269,25 @@ export default function FeedScreen() {
 
   const handleReact = async (postId: string, reactionType: string) => {
     playClickSound();
-    const currentMyReaction = myReactions[postId];
-    const isRemoving = currentMyReaction === reactionType;
-    const newReaction = isRemoving ? null : reactionType;
-
-    setMyReactions(prev => ({ ...prev, [postId]: newReaction }));
+    
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    const isRemoving = post.reactions?.some(r => (r.user_id === myUserId || r.user_id === 'me') && r.reaction_type === reactionType);
 
     setPosts(currentPosts => 
-      currentPosts.map(post => {
-        if (post.id === postId) {
-          let updatedReactions = [...(post.reactions || [])];
-          if (currentMyReaction) {
-            const indexToRemove = updatedReactions.findIndex(r => r.reaction_type === currentMyReaction);
+      currentPosts.map(p => {
+        if (p.id === postId) {
+          let updatedReactions = [...(p.reactions || [])];
+          if (isRemoving) {
+            const indexToRemove = updatedReactions.findIndex(r => (r.user_id === myUserId || r.user_id === 'me') && r.reaction_type === reactionType);
             if (indexToRemove > -1) updatedReactions.splice(indexToRemove, 1);
+          } else {
+            updatedReactions.push({ reaction_type: reactionType as any, user_id: myUserId || 'me' });
           }
-          if (!isRemoving) {
-            updatedReactions.push({ reaction_type: reactionType as any, user_id: 'me' });
-          }
-          return { ...post, reactions: updatedReactions };
+          return { ...p, reactions: updatedReactions };
         }
-        return post;
+        return p;
       })
     );
 
@@ -451,14 +449,14 @@ export default function FeedScreen() {
         </View>
 
         {photoUrl && (
-          <Image source={{ uri: photoUrl }} style={s.postImage} resizeMode="cover" />
+          <Image source={{ uri: photoUrl }} style={s.postImage} contentFit="cover" transition={200} />
         )}
 
         <View style={[s.cardFooter, { borderTopColor: c.border }]}>
           <View style={s.reactionsRow}>
             {REACTION_OPTIONS.map((reaction) => {
               const count = item.reactions?.filter(r => r.reaction_type === reaction.type).length || 0;
-              const isActive = myReactions[item.id] === reaction.type;
+              const isActive = item.reactions?.some(r => (r.user_id === myUserId || r.user_id === 'me') && r.reaction_type === reaction.type) || false;
               
               return (
                 <ReactionButton 
