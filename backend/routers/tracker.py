@@ -44,7 +44,7 @@ async def save_state(state: StateLogCreate,
 
     existing_log = db.query(DBStateLog).filter(
         DBStateLog.user_id == user.id,
-        DBStateLog.created_at >= start_of_today
+        DBStateLog.recorded_at  >= start_of_today
     ).first()
 
     if existing_log:
