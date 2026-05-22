@@ -57,9 +57,20 @@ async def get_daily_quests(
     if hobby_names:
         generated_quests = await generate_quests_by_hobbies(hobby_names)
 
+        # Перевірка чи сторонній запит не створив вже квести( спроба фіксанути баг)
+        already_created_quests = db.query(DBUserMiniQuest).options(
+            joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
+        ).filter(
+            DBUserMiniQuest.user_id == user.id,
+            DBUserMiniQuest.created_at >= start_of_today
+        ).all()
+
+        if already_created_quests:
+            return already_created_quests
+
+
         hobby_map = {h.name.lower().strip(): h for h in current_hobbies}
 
-        # Жорсткий ліміт: 3 квести від ШІ
         for q_data in generated_quests[:3]:
             title = q_data.get("title", "Новий цікавий квест")
             ai_hobby_name = q_data.get("hobby_name", "").lower().strip()
