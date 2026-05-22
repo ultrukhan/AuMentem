@@ -10,6 +10,8 @@ from typing import List
 import uuid
 import random
 from ai_services.quest_generator import generate_quests_by_hobbies
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/mini-quests",
@@ -27,7 +29,10 @@ async def get_daily_quests(
     Пріоритет: 3 ШІ-квести за інтересами, резерв — 2 базові рутинні квести з бази (без хобі).
     """
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
 
     db.query(DBUserMiniQuest).filter(
         DBUserMiniQuest.user_id == user.id,

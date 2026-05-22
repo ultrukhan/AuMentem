@@ -15,6 +15,8 @@ import time
 import cloudinary
 import cloudinary.utils
 from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/geo-quests",
@@ -93,7 +95,10 @@ async def start_geo_quest(
         raise HTTPException(status_code=404, detail="Гео-квест не знайдено")
 
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
 
     active_quest = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,
