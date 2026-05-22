@@ -161,6 +161,16 @@ async def complete_quest(
     if not user_quest:
         raise HTTPException(status_code=404, detail="Активний квест не знайдено")
 
+    user_point = func.ST_GeographyFromText(f'SRID=4326;POINT({payload.lng} {payload.lat})')
+    target_coordinates = user_quest.geo_quest.place.coordinates
+    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
+
+    if distance > 50.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підійдіть ближче."
+        )
+
     current_time = get_utc_now()
     user_quest.photo_proof_url = payload.photo_url
     user_quest.status = QuestStatus.COMPLETED
