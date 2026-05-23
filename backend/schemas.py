@@ -50,8 +50,8 @@ class AppUserResponse(BaseModel):
     is_onboarding_completed : bool
     hobbies: List[HobbyResponse] = []
 
-    model_config = {"from_attributes": True}
-    class_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
+
 
 class AppUserPublic(BaseModel):
     id: UUID
