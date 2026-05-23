@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, Platform, Alert, Pressable, Modal, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send } from 'lucide-react-native';
+import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send, Bell } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
@@ -15,6 +16,7 @@ import { BASE_URL } from '@/constants/api';
 import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 import { Toast } from '@/utils/toast';
 import HomeBackground from '@/components/HomeBackground';
+import AnimatedCard from '@/components/AnimatedCard';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -100,9 +102,11 @@ export default function SettingsScreen() {
     anonymousMode: false,
     ambientOrbsEnabled: true,
     petEnabled: true,
+    notificationsEnabled: true
   });
 
   const [isSupportModalVisible, setSupportModalVisible] = useState(false);
+  const [isPreviewModalVisible, setPreviewModalVisible] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
 
   useEffect(() => {
@@ -188,9 +192,18 @@ export default function SettingsScreen() {
           
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ФОН ДОМАШНЬОГО ЕКРАНУ</Text>
           <View style={s.section}>
-            <View style={{ height: 200, borderRadius: Radii.lg, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginBottom: 12 }}>
+            <AnimatedCard 
+              animationsEnabled={settings.animations}
+              onPress={() => { playClickSound(); setPreviewModalVisible(true); }}
+              style={[
+                { height: 200, borderRadius: Radii.lg, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginBottom: 12 },
+              ]}
+            >
                <HomeBackground isDark={isDark} previewAmbientOrbsEnabled={settings.ambientOrbsEnabled ?? true} previewPetEnabled={settings.petEnabled ?? true} />
-            </View>
+               <View style={{ position: 'absolute', bottom: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
+                 <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>На весь екран ↗</Text>
+               </View>
+            </AnimatedCard>
             <SettingsToggle 
               icon={Sparkles} title="Анімовані частки (Кульки)" isDark={isDark}
               value={settings.ambientOrbsEnabled ?? true} 
@@ -241,6 +254,20 @@ export default function SettingsScreen() {
             </Text>
           </View>
 
+          <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>СИСТЕМНІ</Text>
+          <View style={s.section}>
+            <SettingsToggle 
+              icon={Bell} title="Сповіщення" isDark={isDark}
+              value={settings.notificationsEnabled ?? true} 
+              onValueChange={(val: boolean) => {
+                updateSetting('notificationsEnabled', val);
+                if (!val) {
+                  Notifications.cancelAllScheduledNotificationsAsync();
+                }
+              }}
+            />
+          </View>
+
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ІНФОРМАЦІЯ</Text>
           <View style={s.section}>
             <SettingsLink icon={MessageCircleQuestion} title="Написати в підтримку" isDark={isDark} animationsEnabled={settings.animations} onPress={() => setSupportModalVisible(true)} />
@@ -269,7 +296,6 @@ export default function SettingsScreen() {
             <Text style={[Typography.body, { color: c.textMuted, marginBottom: 16 }]}>
               Знайшли баг чи маєте ідею? Напишіть нам, і ми відповімо вам на email!
             </Text>
-            
             <TextInput
               style={[s.textInput, { backgroundColor: c.background, color: c.textMain, borderColor: c.border }]}
               placeholder="Твоє повідомлення..."
@@ -290,10 +316,34 @@ export default function SettingsScreen() {
               <Send color="#FFF" size={20} />
               <Text style={[Typography.button, { color: '#FFF', marginLeft: 8 }]}>Надіслати</Text>
             </Pressable>
-            
           </View>
         </View>
       </Modal>
+
+      <Modal visible={isPreviewModalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: c.background }}>
+          <HomeBackground isDark={isDark} previewAmbientOrbsEnabled={settings.ambientOrbsEnabled ?? true} previewPetEnabled={settings.petEnabled ?? true} />
+          
+          <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: Spacing.screenX, flexDirection: 'row', justifyContent: 'flex-end' }}>
+            <Pressable 
+              onPress={() => setPreviewModalVisible(false)}
+              style={({ pressed }) => [
+                { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+                pressed && { opacity: 0.7 }
+              ]}
+            >
+              <X color="#FFF" size={24} />
+            </Pressable>
+          </SafeAreaView>
+          
+          <View style={{ position: 'absolute', bottom: 50, left: 0, right: 0, alignItems: 'center' }}>
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 }}>
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '500' }}>Це фон головного екрану</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
