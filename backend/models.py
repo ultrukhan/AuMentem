@@ -171,7 +171,6 @@ class DBWeeklyStat(Base):
     active_days = Column(Integer, default=0)
     top_hobby = Column(String, nullable=True)
     unique_locations = Column(Integer, default=0)
-    total_score = Column(Integer, default=0)
 
 class DBLocalEvents(Base):
     __tablename__ = 'local_events'

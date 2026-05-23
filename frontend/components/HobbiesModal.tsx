@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, View, Text, Pressable, StyleSheet, 
+import {
+  Modal, View, Text, Pressable, StyleSheet,
   ActivityIndicator, ScrollView, Dimensions, Platform
 } from 'react-native';
-import { 
-  Sparkles, Check, Code, BookOpen, Bike, 
-  Camera, Palette, Coffee, Heart, Star, X, Hash, Activity, Smile, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator 
+import {
+  Sparkles, Check, Code, BookOpen, Bike,
+  Camera, Palette, Coffee, Heart, Star, X, Hash, Activity, Smile, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -25,9 +25,10 @@ interface Hobby {
 
 interface Props {
   visible: boolean;
-  onSuccess: () => void;
+  onSuccess: (updatedHobbies: any[]) => void; // 💥 Тепер приймає аргумент
   onClose?: () => void;
   isDark?: boolean;
+  userId?: string | null;
 }
 
 const getHobbyIcon = (name: string, color: string, size: number) => {
@@ -73,29 +74,40 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     if (visible) {
       loadData();
       setError('');
-      setIsSuccess(false); 
+      setIsSuccess(false);
       setShowConfetti(false);
     }
   }, [visible]);
-
-  const loadData = async () => {
+const loadData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${BASE_URL}/auth/hobbies`);
+      const token = await SecureStore.getItemAsync('userToken');
       
-      if (response.ok) {
-        const allHobbies = await response.json();
+      // 1. Паралельно беремо список ВСІХ хобі і поточний стан профілю
+      const [allHobbiesRes, userRes] = await Promise.all([
+        fetch(`${BASE_URL}/auth/hobbies`),
+        fetch(`${BASE_URL}/auth/me`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        })
+      ]);
+      
+      if (allHobbiesRes.ok && userRes.ok) {
+        const allHobbies = await allHobbiesRes.json();
+        const userData = await userRes.json();
+        
         setHobbies(allHobbies);
 
-        const savedHobbiesStr = await SecureStore.getItemAsync('user_saved_hobbies');
-        if (savedHobbiesStr) {
-          setSelectedIds(JSON.parse(savedHobbiesStr));
+        // 💥 ПРАВИЛЬНИЙ PRE-FILL: 
+        // Бекенд віддає список об'єктів хобі (userData.hobbies). 
+        // Ми просто витягуємо їхні ID, щоб підсвітити галочки.
+        if (userData.hobbies && Array.isArray(userData.hobbies)) {
+          const ids = userData.hobbies.map((h: Hobby) => h.id);
+          setSelectedIds(ids);
         } else {
           setSelectedIds([]);
         }
-
       } else {
-        setError('Не вдалося завантажити інтереси з сервера');
+        setError('Не вдалося завантажити інтереси');
       }
     } catch (err) {
       setError('Помилка з\'єднання з сервером');
@@ -105,16 +117,16 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
   };
 
   const toggleHobby = (id: number) => {
-    setSelectedIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(hobbyId => hobbyId !== id) 
+    setSelectedIds(prev =>
+      prev.includes(id)
+        ? prev.filter(hobbyId => hobbyId !== id)
         : [...prev, id]
     );
   };
 
   const handleSave = async () => {
     if (selectedIds.length === 0) {
-      setError('Обери хоча б одне інтерес! ✨');
+      setError('Обери хоча б одний інтерес! ✨');
       return;
     }
     setIsSaving(true);
@@ -129,22 +141,20 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ hobby_ids: selectedIds }), 
+        body: JSON.stringify({ hobby_ids: selectedIds }),
       });
 
       if (response.ok) {
-        await SecureStore.setItemAsync('has_hobbies', 'true');
-        await SecureStore.setItemAsync('user_saved_hobbies', JSON.stringify(selectedIds));
-        
-        playSuccessSound();
-        setIsSuccess(true);
-        setShowConfetti(true);
-        setTimeout(() => {
-          setShowConfetti(false);
-          onSuccess();
-        }, 1800);
+  const updatedUser = await response.json(); // Отримуємо оновленого юзера
 
-      } else {
+  playSuccessSound();
+  setIsSuccess(true);
+  setShowConfetti(true);
+  setTimeout(() => {
+    setShowConfetti(false);
+    onSuccess(updatedUser.hobbies || []); // 💥 ПЕРЕДАЄМО НОВІ ХОБІ В ПРОФІЛЬ
+  }, 1800);
+} else {
         setError(await parseApiError(response, 'Не вдалося зберегти зміни на сервері'));
       }
     } catch (err) {
@@ -154,6 +164,35 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     }
   };
 
+const handleSkip = async () => {
+    playClickSound();
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      
+      const response = await fetch(`${BASE_URL}/app_user/upd_hobbies`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ hobby_ids: [] }), 
+      });
+
+      if (response.ok) {
+        // 💥 ПЕРЕДАЄМО ПОРОЖНІЙ МАСИВ, ЩОБ ПОКАЗАТИ, ЩО ХОБІ СКИНУТІ
+        onSuccess([]); 
+      } else {
+        setError(await parseApiError(response, 'Не вдалося пропустити'));
+      }
+    } catch (err) {
+      setError('Помилка мережі');
+    } finally {
+      setIsSaving(false);
+    }
+  };
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={[s.overlay, { zIndex: 1000 }]}>
@@ -162,8 +201,8 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }, cardShadow(theme, 'hard')]}>
           
           {onClose && (
-            <Pressable 
-              style={({ pressed }) => [s.closeBtn, pressed && { opacity: 0.6 }]} 
+            <Pressable
+              style={({ pressed }) => [s.closeBtn, pressed && { opacity: 0.6 }]}
               onPress={onClose}
               disabled={isSaving || isSuccess}
             >
@@ -203,7 +242,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
                     <Pressable
                       key={hobby.id}
                       onPress={() => toggleHobby(hobby.id)}
-                      disabled={isSaving || isSuccess} 
+                      disabled={isSaving || isSuccess}
                       style={({ pressed }) => [
                         s.hobbyChip,
                         { backgroundColor: bgColor, borderColor: borderColor, transform: [{ scale: pressed ? 0.96 : 1 }] },
@@ -237,7 +276,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
               Обрано інтересів: {selectedIds.length}
             </Text>
             
-            <Pressable 
+            <Pressable
               onPress={handleSave}
               disabled={isSaving || isSuccess || selectedIds.length === 0}
               style={({ pressed }) => [
@@ -258,6 +297,21 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
                 <Text style={s.saveBtnText}>Підтвердити вибір</Text>
               )}
             </Pressable>
+
+            {!isSuccess && (
+              <Pressable 
+                onPress={handleSkip}
+                disabled={isSaving}
+                style={({ pressed }) => [
+                  { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
+                  pressed && { opacity: 0.6 }
+                ]}
+              >
+                <Text style={[Typography.body, { color: c.textMuted, fontSize: 16, fontWeight: '600' }]}>
+                  Пропустити
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
         {showConfetti && <ConfettiCannon count={50} origin={{ x: SCREEN_WIDTH / 2, y: SCREEN_HEIGHT }} autoStart={true} fadeOut={true} fallSpeed={2500} explosionSpeed={500} />}
@@ -312,3 +366,4 @@ const s = StyleSheet.create({
   successContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   btnPressed: { transform: [{ scale: 0.98 }] },
 });
+

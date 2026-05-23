@@ -15,6 +15,8 @@ import time
 import cloudinary
 import cloudinary.utils
 from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/geo-quests",
@@ -93,7 +95,10 @@ async def start_geo_quest(
         raise HTTPException(status_code=404, detail="Гео-квест не знайдено")
 
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
 
     active_quest = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,
@@ -160,6 +165,16 @@ async def complete_quest(
 
     if not user_quest:
         raise HTTPException(status_code=404, detail="Активний квест не знайдено")
+
+    user_point = func.ST_GeographyFromText(f'SRID=4326;POINT({payload.lng} {payload.lat})')
+    target_coordinates = user_quest.geo_quest.place.coordinates
+    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
+
+    if distance > 50.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підійдіть ближче."
+        )
 
     current_time = get_utc_now()
     user_quest.photo_proof_url = payload.photo_url

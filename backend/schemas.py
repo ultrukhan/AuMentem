@@ -115,10 +115,13 @@ class UserGeoQuestResponse(BaseModel):
 class NearestGeoQuestResponse(BaseModel):
     geo_quest: GeoQuest
     distance_meters: float
+    is_completed_today: bool = False
 
     model_config = {"from_attributes": True}
 
 class QuestCompleteRequest(BaseModel):
+    lat: float
+    lng: float
     photo_url: Optional[str] = None
 
 class MiniQuest(BaseModel):
@@ -273,7 +276,6 @@ class WeeklyStatResponse(BaseModel):
     active_days: int
     top_hobby: Optional[str]
     unique_locations: int
-    total_score: int
 
     model_config = {"from_attributes": True}
 

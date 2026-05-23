@@ -1,3 +1,5 @@
+
+
 import { BASE_URL } from "@/constants/api";
 import React, { useState, useEffect } from "react";
 import {
@@ -173,27 +175,46 @@ export default function RegisterScreen() {
                 <TextInput style={[s.input, { color: c.textMain }]} placeholder="Твій email" placeholderTextColor={c.textMuted} autoCapitalize="none" value={email} onChangeText={setEmail} />
               </View>
 
+              {/* ЗУМ-БЕЗПЕЧНИЙ ПАРОЛЬ */}
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Lock color={c.textMuted} size={20} />
-                <View style={{ flex: 1, justifyContent: 'center' }}>
-                  <TextInput 
-                    style={[s.input, { color: !showPassword && password.length > 0 ? 'transparent' : c.textMain }]} 
-                    placeholder="Пароль" 
-                    placeholderTextColor={c.textMuted} 
-                    value={password} 
+                
+                <View style={{ flex: 1, position: 'relative', justifyContent: 'center', height: '100%' }}>
+                  {!showPassword && password.length > 0 && (
+                    <View style={[StyleSheet.absoluteFill, { justifyContent: 'center' }]} pointerEvents="none">
+                      <Text 
+                        style={{ ...Typography.body, color: c.textMain, fontSize: 16, letterSpacing: 2, marginTop: Platform.OS === 'ios' ? 4 : 0 }} 
+                        numberOfLines={1}
+                      >
+                        {"•".repeat(password.length)}
+                      </Text>
+                    </View>
+                  )}
+
+                  <TextInput
+                    style={[
+                      s.input,
+                      { color: c.textMain },
+                      !showPassword && password.length > 0 && { color: 'rgba(255,255,255,0)' }
+                    ]}
+                    placeholder="Пароль"
+                    placeholderTextColor={c.textMuted}
+                    value={password}
                     onChangeText={setPassword}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    caretHidden={!showPassword}
+                    selectionColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
+                    cursorColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
                   />
-                  {!showPassword && password.length > 0 && (
-                    <Text style={[s.input, { position: 'absolute', left: 0, pointerEvents: 'none', color: c.textMain }]} numberOfLines={1}>
-                      {'•'.repeat(password.length)}
-                    </Text>
-                  )}
                 </View>
-                <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                
+                <Pressable onPress={() => { playClickSound(); setShowPassword(!showPassword); }} style={{ padding: 4 }}>
                   {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
                 </Pressable>
               </View>
+
             </View>
 
             <View style={s.requirementsBox}>
