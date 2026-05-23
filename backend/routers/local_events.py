@@ -50,19 +50,33 @@ async def get_upcoming_events(
 
     return events
 
+
 @router.get("/my/favorites", response_model=List[LocalEventResponse])
-async def get_my_events(user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """Екран 'Мої події' - видає всі збережені заходи поточного юзера"""
-    events = (
+async def get_my_events(
+        show_past: bool = Query(False,
+                                description="Якщо True - поверне історію минулих подій, якщо False - тільки майбутні"),
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)):
+    """
+    Екран 'Мої події'.
+    За замовчуванням видає тільки ті збережені заходи, які ще не почалися.
+    """
+    now = get_utc_now()
+
+    query = (
         db.query(DBLocalEvents)
         .join(DBFavEvent, DBLocalEvents.id == DBFavEvent.event_id)
         .filter(DBFavEvent.user_id == user.id)
-        .order_by(DBFavEvent.created_at.desc())
-        .all()
     )
-    return events
 
+    if show_past:
+        query = query.filter(DBLocalEvents.start_time < now)
+        events = query.order_by(DBLocalEvents.start_time.desc()).all()
+    else:
+        query = query.filter(DBLocalEvents.start_time >= now)
+        events = query.order_by(DBLocalEvents.start_time.asc()).all()
+
+    return events
 
 
 @router.post("/{event_id}/favorite", response_model=FavEventActionResponse)
