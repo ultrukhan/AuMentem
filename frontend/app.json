@@ -27,7 +27,7 @@
       "package": "com.aumentem.altera",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyBoGxA67xvqsrHVpPrm3dhrsza0j_o66Ro"
+          "apiKey": ""
         }
       },
       "permissions": [

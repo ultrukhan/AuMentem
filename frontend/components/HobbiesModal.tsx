@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Modal, View, Text, Pressable, StyleSheet, 
+import {
+  Modal, View, Text, Pressable, StyleSheet,
   ActivityIndicator, ScrollView, Dimensions, Platform
 } from 'react-native';
-import { 
-  Sparkles, Check, Code, BookOpen, Bike, 
-  Camera, Palette, Coffee, Heart, Star, X, Hash, Activity, Smile, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator 
+import {
+  Sparkles, Check, Code, BookOpen, Bike,
+  Camera, Palette, Coffee, Heart, Star, X, Hash, Activity, Smile, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator
 } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -73,7 +73,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     if (visible) {
       loadData();
       setError('');
-      setIsSuccess(false); 
+      setIsSuccess(false);
       setShowConfetti(false);
     }
   }, [visible]);
@@ -104,10 +104,11 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     }
   };
 
+
   const toggleHobby = (id: number) => {
-    setSelectedIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(hobbyId => hobbyId !== id) 
+    setSelectedIds(prev =>
+      prev.includes(id)
+        ? prev.filter(hobbyId => hobbyId !== id)
         : [...prev, id]
     );
   };
@@ -129,7 +130,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ hobby_ids: selectedIds }), 
+        body: JSON.stringify({ hobby_ids: selectedIds }),
       });
 
       if (response.ok) {
@@ -154,6 +155,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
     }
   };
 
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={[s.overlay, { zIndex: 1000 }]}>
@@ -162,8 +164,8 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
         <View style={[s.modalContent, { backgroundColor: c.background, borderColor: c.border }, cardShadow(theme, 'hard')]}>
           
           {onClose && (
-            <Pressable 
-              style={({ pressed }) => [s.closeBtn, pressed && { opacity: 0.6 }]} 
+            <Pressable
+              style={({ pressed }) => [s.closeBtn, pressed && { opacity: 0.6 }]}
               onPress={onClose}
               disabled={isSaving || isSuccess}
             >
@@ -203,7 +205,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
                     <Pressable
                       key={hobby.id}
                       onPress={() => toggleHobby(hobby.id)}
-                      disabled={isSaving || isSuccess} 
+                      disabled={isSaving || isSuccess}
                       style={({ pressed }) => [
                         s.hobbyChip,
                         { backgroundColor: bgColor, borderColor: borderColor, transform: [{ scale: pressed ? 0.96 : 1 }] },
@@ -237,7 +239,7 @@ export default function HobbiesModal({ visible, onSuccess, onClose, isDark = fal
               Обрано інтересів: {selectedIds.length}
             </Text>
             
-            <Pressable 
+            <Pressable
               onPress={handleSave}
               disabled={isSaving || isSuccess || selectedIds.length === 0}
               style={({ pressed }) => [
@@ -312,3 +314,4 @@ const s = StyleSheet.create({
   successContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   btnPressed: { transform: [{ scale: 0.98 }] },
 });
+
