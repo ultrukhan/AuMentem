@@ -190,7 +190,7 @@ async def complete_quest(
 async def get_nearest_geo_quests(
         lat: float,
         lng: float,
-        limit: int = 5,
+        limit: int = 10,
         db: Session = Depends(get_db),
         user: DBAppUser = Depends(get_current_user)
 ):
