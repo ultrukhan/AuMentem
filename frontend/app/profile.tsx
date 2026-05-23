@@ -42,6 +42,9 @@ import {
 } from "@/constants/theme";
 import { BASE_URL } from "@/constants/api";
 import { playClickSound } from "@/utils/audio";
+import { useAppSettings } from "@/hooks/useAppSettings";
+import FadeInView from "@/components/FadeInView";
+import AnimatedCard from "@/components/AnimatedCard";
 
 import HobbiesModal from "@/components/HobbiesModal";
 
@@ -53,6 +56,7 @@ export default function ProfileScreen() {
   const theme = isDark ? "dark" : "light";
   const c = Colors[theme];
   const sh = Shadows[theme];
+  const { animationsEnabled } = useAppSettings();
 
   const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
@@ -317,7 +321,8 @@ export default function ProfileScreen() {
             style={{ marginTop: 50 }}
           />
         ) : (
-          <ScrollView
+          <FadeInView animationsEnabled={animationsEnabled} style={{ flex: 1 }}>
+        <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={s.scrollContent}
           >
@@ -677,8 +682,9 @@ export default function ProfileScreen() {
               ]}
             >
          
-              <Pressable
-                onPress={() => {
+              <AnimatedCard
+              animationsEnabled={animationsEnabled}
+              onPress={() => {
                   playClickSound();
                   setShowHobbiesModal(true);
                 }}
@@ -709,12 +715,13 @@ export default function ProfileScreen() {
                 >
                   Змінити
                 </Text>
-              </Pressable>
+              </AnimatedCard>
 
               <View style={[s.miniDivider, { backgroundColor: c.border }]} />
 
-              <Pressable
-                onPress={handleShareApp}
+              <AnimatedCard
+              animationsEnabled={animationsEnabled}
+              onPress={handleShareApp}
                 style={({ pressed }) => [s.actionRow, pressed && s.pressed]}
               >
                 <View
@@ -734,12 +741,13 @@ export default function ProfileScreen() {
                     Поділитися додатком
                   </Text>
                 </View>
-              </Pressable>
+              </AnimatedCard>
 
               <View style={[s.miniDivider, { backgroundColor: c.border }]} />
 
-              <Pressable
-                onPress={handleLogout}
+              <AnimatedCard
+              animationsEnabled={animationsEnabled}
+              onPress={handleLogout}
                 style={({ pressed }) => [s.actionRow, pressed && s.pressed]}
               >
                 <View
@@ -759,9 +767,10 @@ export default function ProfileScreen() {
                     Вийти з акаунта
                   </Text>
                 </View>
-              </Pressable>
+              </AnimatedCard>
             </View>
           </ScrollView>
+          </FadeInView>
         )}
 
         <HobbiesModal
