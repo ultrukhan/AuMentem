@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException,status
@@ -33,10 +33,15 @@ async def update_nick(update_data:AppUserUpdate, user: DBAppUser = Depends(get_c
 
     return user
 
-@router.put("/upd_hobbies",response_model = AppUserResponse)
-async def set_hobbies(hobbies: UserHobbiesUpdate, user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)):
+
+@router.put("/upd_hobbies", response_model=AppUserResponse)
+async def set_hobbies(
+        hobbies: UserHobbiesUpdate,
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
     """
-            Оновлює список хоббі для поточного авторизованого користувача
+    Оновлює список хоббі для поточного авторизованого користувача та завершує онбординг.
     """
     if not hobbies.hobby_ids:
         user.hobbies = []
@@ -44,15 +49,16 @@ async def set_hobbies(hobbies: UserHobbiesUpdate, user: DBAppUser = Depends(get_
         selected_hobbies = db.query(DBHobby).filter(DBHobby.id.in_(hobbies.hobby_ids)).all()
 
         if len(selected_hobbies) != len(hobbies.hobby_ids):
-            raise HTTPException(status_code =400, detail = "Одне або кілька вибраних хоббі не існують")
+            raise HTTPException(status_code=400, detail="Одне або кілька вибраних хоббі не існують")
 
         user.hobbies = selected_hobbies
+
+    user.is_onboarding_completed = True
 
     db.commit()
     db.refresh(user)
 
     return user
-
 
 @router.post("/change-password")
 async def change_password(payload: PasswordChangeRequest,user: DBAppUser = Depends(get_current_user),db: Session = Depends(get_db)):
@@ -76,3 +82,13 @@ async def change_password(payload: PasswordChangeRequest,user: DBAppUser = Depen
 
     return {"detail": "Пароль успішно змінено!"}
 
+
+@router.get("/onboarding-status")
+async def check_onboarding(
+    user: DBAppUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Перевіряє, чи потрібно користувачу проходити або допроходити онбординг.
+    """
+    return {"needs_hobby_selection": not user.is_onboarding_completed}
