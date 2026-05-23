@@ -48,8 +48,10 @@ class AppUserResponse(BaseModel):
     created_at: datetime
     last_login_at: Optional[datetime] = None
     is_onboarding_completed : bool
+    hobbies: List[HobbyResponse] = []
 
     model_config = {"from_attributes": True}
+    class_config = {"from_attributes": True}
 
 class AppUserPublic(BaseModel):
     id: UUID
