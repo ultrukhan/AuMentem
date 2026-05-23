@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -52,6 +54,7 @@ export default function ProfileScreen() {
   const c = Colors[theme];
   const sh = Shadows[theme];
 
+  const [userId, setUserId] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [completedQuests, setCompletedQuests] = useState(0);
   const [isSavingNick, setIsSavingNick] = useState(false);
@@ -71,56 +74,73 @@ export default function ProfileScreen() {
   const hasLower = /[a-z]/.test(newPassword);
   const hasNumber = /\d/.test(newPassword);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-]/.test(newPassword);
-
+  const [userHobbies, setUserHobbies] = useState<any[]>([]);
   const isNewPasswordValid =
     hasMinLength && hasUpper && hasLower && hasNumber && hasSpecial;
+  const fetchProfileData = async () => {
+    try {
+      const token = await SecureStore.getItemAsync("userToken");
+      if (!token) return;
 
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const token = await SecureStore.getItemAsync("userToken");
-        if (!token) return;
+      const storedUserId = await SecureStore.getItemAsync("currentUserId");
+      setUserId(storedUserId);
 
-        const [profileRes, statsRes] = await Promise.all([
-          fetch(`${BASE_URL}/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${BASE_URL}/stats/my-weekly-stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+      // 💥 ДОДАЙ fetch сюди, щоб забрати актуальні хобі з сервера
+      const [profileRes, statsRes, hobbiesRes] = await Promise.all([
+        fetch(`${BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${BASE_URL}/stats/my-weekly-stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }), // Або інший ендпоінт, де лежать хобі юзера
+      ]);
 
-        if (profileRes.ok) {
-          const data = await profileRes.json();
-          setNickname(data.nickname);
-        }
-
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          let totalQuests = 0;
-          statsData.forEach((stat: any) => {
-            totalQuests +=
-              (stat.mini_quests_completed || 0) +
-              (stat.geo_quests_completed || 0);
-          });
-          setCompletedQuests(totalQuests);
-        }
-      } catch (error) {
-        console.error("Помилка завантаження:", error);
-      } finally {
-        setIsLoading(false);
+      if (profileRes.ok) {
+        const data = await profileRes.json();
+        setNickname(data.nickname);
+        // Зберігаємо хобі, які прийшли від бекенда
+        setUserHobbies(data.hobbies || []);
       }
-    };
+
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        let totalQuests = 0;
+        statsData.forEach((stat: any) => {
+          totalQuests +=
+            (stat.mini_quests_completed || 0) +
+            (stat.geo_quests_completed || 0);
+        });
+        setCompletedQuests(totalQuests);
+      }
+    } catch (error) {
+      console.error("Помилка завантаження:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  useEffect(() => {
     fetchProfileData();
   }, []);
-
   const handleLogout = async () => {
     playClickSound();
     try {
-      await SecureStore.deleteItemAsync('userToken');
-      await SecureStore.deleteItemAsync('currentUserId');
-      await SecureStore.deleteItemAsync('has_hobbies');
-     
+      // Видаляємо лише дані про поточну сесію
+      await SecureStore.deleteItemAsync("userToken");
+      await SecureStore.deleteItemAsync("currentUserId");
+
+      // ⚠️ ВАЖЛИВО: Ми НЕ видаляємо 'user_saved_hobbies', 'has_hobbies',
+      // бо вони тепер унікальні для кожного userId.
+      // Вони будуть просто перезаписані або завантажені при наступному вході.
+
+      await SecureStore.deleteItemAsync("isFirstLogin");
+      await SecureStore.deleteItemAsync("lastCookieDate");
+      await SecureStore.deleteItemAsync("lastCookieText");
+      await SecureStore.deleteItemAsync("lastNotificationDate");
+      await SecureStore.deleteItemAsync("selectedPetType");
+
       router.replace("/");
     } catch (error) {
       console.error("Помилка при виході:", error);
@@ -244,6 +264,24 @@ export default function ProfileScreen() {
       </Text>
     </View>
   );
+  const handleHobbiesUpdate = (updatedHobbies: any[]) => {
+    setUserHobbies(updatedHobbies);
+  };
+  const handleHobbiesSuccess = async () => {
+    setShowHobbiesModal(false);
+
+    // Повторно викликаємо отримання даних, щоб отримати свіжі хобі
+    const token = await SecureStore.getItemAsync("userToken");
+    if (token) {
+      const profileRes = await fetch(`${BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (profileRes.ok) {
+        const data = await profileRes.json();
+        setUserHobbies(data.hobbies || []); // Оновлюємо стан, що відображається
+      }
+    }
+  };
 
   return (
     <SafeAreaView
@@ -390,6 +428,7 @@ export default function ProfileScreen() {
                 Безпека
               </Text>
 
+              {/* ПОТОЧНИЙ ПАРОЛЬ */}
               <View
                 style={[
                   s.inputWrapper,
@@ -397,16 +436,46 @@ export default function ProfileScreen() {
                 ]}
               >
                 <Lock color={c.textMuted} size={20} />
-                <View style={{ flex: 1, justifyContent: "center" }}>
+
+                <View
+                  style={{
+                    flex: 1,
+                    position: "relative",
+                    justifyContent: "center",
+                    height: "100%",
+                  }}
+                >
+                  {!showPassword && oldPassword.length > 0 && (
+                    <View
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { justifyContent: "center" },
+                      ]}
+                      pointerEvents="none"
+                    >
+                      <Text
+                        style={{
+                          ...Typography.body,
+                          color: c.textMain,
+                          fontSize: 16,
+                          letterSpacing: 2,
+                          marginTop: Platform.OS === "ios" ? 4 : 0,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {"•".repeat(oldPassword.length)}
+                      </Text>
+                    </View>
+                  )}
+
                   <TextInput
                     style={[
                       s.input,
-                      {
-                        color:
-                          !showPassword && oldPassword.length > 0
-                            ? "transparent"
-                            : c.textMain,
-                      },
+                      { color: c.textMain },
+                      !showPassword &&
+                        oldPassword.length > 0 && {
+                          color: "rgba(255,255,255,0)",
+                        },
                     ]}
                     placeholder="Поточний пароль"
                     placeholderTextColor={c.textMuted}
@@ -417,24 +486,22 @@ export default function ProfileScreen() {
                         setPwdMessage({ text: "", type: "" });
                     }}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    caretHidden={!showPassword}
+                    selectionColor={
+                      !showPassword && oldPassword.length > 0
+                        ? "rgba(255,255,255,0)"
+                        : c.accent
+                    }
+                    cursorColor={
+                      !showPassword && oldPassword.length > 0
+                        ? "rgba(255,255,255,0)"
+                        : c.accent
+                    }
                   />
-                  {!showPassword && oldPassword.length > 0 && (
-                    <Text
-                      style={[
-                        s.input,
-                        {
-                          position: "absolute",
-                          left: 0,
-                          pointerEvents: "none",
-                          color: c.textMain,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {"•".repeat(oldPassword.length)}
-                    </Text>
-                  )}
                 </View>
+
                 <Pressable
                   onPress={() => {
                     playClickSound();
@@ -450,18 +517,49 @@ export default function ProfileScreen() {
                 </Pressable>
               </View>
 
+              {/* НОВИЙ ПАРОЛЬ */}
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
                 <Key color={c.textMuted} size={20} />
-                <View style={{ flex: 1, justifyContent: "center" }}>
+
+                <View
+                  style={{
+                    flex: 1,
+                    position: "relative",
+                    justifyContent: "center",
+                    height: "100%",
+                  }}
+                >
+                  {!showPassword && newPassword.length > 0 && (
+                    <View
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { justifyContent: "center" },
+                      ]}
+                      pointerEvents="none"
+                    >
+                      <Text
+                        style={{
+                          ...Typography.body,
+                          color: c.textMain,
+                          fontSize: 16,
+                          letterSpacing: 2,
+                          marginTop: Platform.OS === "ios" ? 4 : 0,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {"•".repeat(newPassword.length)}
+                      </Text>
+                    </View>
+                  )}
+
                   <TextInput
                     style={[
                       s.input,
-                      {
-                        color:
-                          !showPassword && newPassword.length > 0
-                            ? "transparent"
-                            : c.textMain,
-                      },
+                      { color: c.textMain },
+                      !showPassword &&
+                        newPassword.length > 0 && {
+                          color: "rgba(255,255,255,0)",
+                        },
                     ]}
                     placeholder="Новий пароль"
                     placeholderTextColor={c.textMuted}
@@ -472,24 +570,35 @@ export default function ProfileScreen() {
                         setPwdMessage({ text: "", type: "" });
                     }}
                     autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    caretHidden={!showPassword}
+                    selectionColor={
+                      !showPassword && newPassword.length > 0
+                        ? "rgba(255,255,255,0)"
+                        : c.accent
+                    }
+                    cursorColor={
+                      !showPassword && newPassword.length > 0
+                        ? "rgba(255,255,255,0)"
+                        : c.accent
+                    }
                   />
-                  {!showPassword && newPassword.length > 0 && (
-                    <Text
-                      style={[
-                        s.input,
-                        {
-                          position: "absolute",
-                          left: 0,
-                          pointerEvents: "none",
-                          color: c.textMain,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {"•".repeat(newPassword.length)}
-                    </Text>
-                  )}
                 </View>
+
+                <Pressable
+                  onPress={() => {
+                    playClickSound();
+                    setShowPassword(!showPassword);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  {showPassword ? (
+                    <EyeOff color={c.textMuted} size={20} />
+                  ) : (
+                    <Eye color={c.textMuted} size={20} />
+                  )}
+                </Pressable>
               </View>
 
               {newPassword.length > 0 && !isNewPasswordValid && (
@@ -574,6 +683,7 @@ export default function ProfileScreen() {
                 sh.soft,
               ]}
             >
+         
               <Pressable
                 onPress={() => {
                   playClickSound();
@@ -589,14 +699,17 @@ export default function ProfileScreen() {
                   }}
                 >
                   <Sparkles color={c.textMuted} size={20} />
-                  <Text
-                    style={[
-                      Typography.body,
-                      { color: c.textMain, fontWeight: "500" },
-                    ]}
-                  >
-                    Твої інтереси
-                  </Text>
+                  <View>
+                    <Text
+                      style={[
+                        Typography.body,
+                        { color: c.textMain, fontWeight: "500" },
+                      ]}
+                    >
+                      Твої інтереси
+                    </Text>
+                   
+                  </View>
                 </View>
                 <Text
                   style={{ color: c.accent, fontWeight: "600", fontSize: 14 }}
@@ -661,9 +774,13 @@ export default function ProfileScreen() {
         <HobbiesModal
           visible={showHobbiesModal}
           isDark={isDark}
-          onSuccess={() => setShowHobbiesModal(false)}
+          userId={userId}
+         
+          onSuccess={() => {
+            setShowHobbiesModal(false);
+            fetchProfileData(); 
+          }}
           onClose={() => setShowHobbiesModal(false)}
-          
         />
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -384,15 +384,24 @@ export default function HomeScreen() {
 
   // }, [maybeShowTracker]);
 
-  const finishHobbiesFlow = useCallback(async () => {
+  // const finishHobbiesFlow = useCallback(async () => {
+  //   setShowHobbies(false);
+
+  //   await SecureStore.setItemAsync("has_hobbies", "true");
+
+  //   const token = await SecureStore.getItemAsync("userToken");
+  //   if (token) await maybeShowTracker(token);
+  // }, [maybeShowTracker]);
+const finishHobbiesFlow = useCallback(async () => {
+    // Просто ховаємо модалку
     setShowHobbies(false);
-
-    await SecureStore.setItemAsync("has_hobbies", "true");
-
-    const token = await SecureStore.getItemAsync("userToken");
-    if (token) await maybeShowTracker(token);
+    
+    // І перевіряємо, чи треба показати трекер настрою
+    const token = await SecureStore.getItemAsync('userToken');
+    if (token) {
+      await maybeShowTracker(token);
+    }
   }, [maybeShowTracker]);
-
   const toggleTheme = async () => {
     playClickSound();
 
@@ -403,16 +412,72 @@ export default function HomeScreen() {
     await SecureStore.setItemAsync("userTheme", newTheme ? "dark" : "light");
   };
 
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const loadData = async () => {
+  //       try {
+  //         const token = await SecureStore.getItemAsync("userToken");
+
+  //         if (!token) {
+  //           router.replace("/");
+
+  //           return;
+  //         }
+
+  //         const response = await fetch(`${BASE_URL}/auth/me`, {
+  //           headers: { Authorization: `Bearer ${token}` },
+  //         });
+
+  //         if (response.ok) {
+  //           const data = await response.json();
+
+  //           setUserProfile(data);
+
+  //           // const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+  //           // const savedHasHobbies = await SecureStore.getItemAsync('has_hobbies');
+  //           // const hasHobbies = (data.hobbies && data.hobbies.length > 0) || savedHasHobbies === 'true';
+
+  //           // if (isFirstLogin === 'true' || !hasHobbies) {
+  //           //   setShowHobbies(true);
+  //           //   if (isFirstLogin === 'true') await SecureStore.deleteItemAsync('isFirstLogin');
+  //           // } else {
+  //           //   await maybeShowTracker(token);
+  //           // }
+  //          const userId = String(data.id);
+  //           await SecureStore.setItemAsync('currentUserId', userId);
+
+  //           // 💥 БЕКЕНД ВИРІШУЄ ВСЕ! 
+  //           // Чекаємо, поки Назар додасть це поле. Якщо true - показуємо хобі.
+  //           if (data.needs_hobby_selection === true) {
+  //             setShowHobbies(true);
+  //           } else {
+  //             // Якщо хобі вже є, просто перевіряємо чи треба трекер
+  //             await maybeShowTracker(token);
+  //           }
+  //         } else {
+  //           await SecureStore.deleteItemAsync("userToken");
+  //           await SecureStore.deleteItemAsync("currentUserId");
+  //           await SecureStore.deleteItemAsync("has_hobbies");
+  //           await SecureStore.deleteItemAsync("user_saved_hobbies");
+  //           router.replace("/");
+  //         }
+  //       } catch {
+  //       } finally {
+  //         setIsLoading(false);
+  //       }
+  //     };
+
+  //     loadData();
+  //   }, [maybeShowTracker, router]),
+  // );
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
         try {
-          const token = await SecureStore.getItemAsync("userToken");
-
-          if (!token) {
-            router.replace("/");
-
-            return;
+          const token = await SecureStore.getItemAsync('userToken');
+          if (!token) { 
+            router.replace('/'); 
+            return; 
           }
 
           const response = await fetch(`${BASE_URL}/auth/me`, {
@@ -421,47 +486,48 @@ export default function HomeScreen() {
 
           if (response.ok) {
             const data = await response.json();
-
             setUserProfile(data);
 
-            // const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-            // const savedHasHobbies = await SecureStore.getItemAsync('has_hobbies');
-            // const hasHobbies = (data.hobbies && data.hobbies.length > 0) || savedHasHobbies === 'true';
+            // Зберігаємо ID для інших екранів (наприклад, для тваринки)
+            const userId = String(data.id);
+            await SecureStore.setItemAsync('currentUserId', userId);
 
-            // if (isFirstLogin === 'true' || !hasHobbies) {
-            //   setShowHobbies(true);
-            //   if (isFirstLogin === 'true') await SecureStore.deleteItemAsync('isFirstLogin');
-            // } else {
-            //   await maybeShowTracker(token);
-            // }
-            const isFirstLogin = await SecureStore.getItemAsync("isFirstLogin");
+            // 💥 Стукаємо на новий ендпоінт Назара для перевірки статусу онбордингу
+            const statusRes = await fetch(`${BASE_URL}/app_user/onboarding-status`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
 
-            // ПОКАЗУЄМО ХОБІ ТІЛЬКИ ЯКЩО ЦЕ ПЕРШИЙ ВХІД
-            if (isFirstLogin === "true") {
-              setShowHobbies(true);
-              // Одразу видаляємо прапорець, щоб модалка більше ніколи не з'являлася
-              await SecureStore.deleteItemAsync("isFirstLogin");
+            if (statusRes.ok) {
+              const statusData = await statusRes.json();
+              
+              // Якщо бекенд каже, що треба вибрати хобі — показуємо модалку
+              if (statusData.needs_hobby_selection === true) {
+                setShowHobbies(true);
+              } else {
+                // Якщо хобі вже вибрані (або пропущені) — йдемо далі
+                await maybeShowTracker(token);
+              }
             } else {
-              // Якщо це звичайний логін — просто показуємо трекер настрою
-              await maybeShowTracker(token);
+               // Якщо сталася помилка сервера, просто пускаємо користувача до додатка
+               await maybeShowTracker(token);
             }
+
           } else {
-            await SecureStore.deleteItemAsync("userToken");
-            await SecureStore.deleteItemAsync("currentUserId");
-            await SecureStore.deleteItemAsync("has_hobbies");
-            await SecureStore.deleteItemAsync("user_saved_hobbies");
-            router.replace("/");
+            // Якщо токен протух
+            await SecureStore.deleteItemAsync('userToken');
+            await SecureStore.deleteItemAsync('currentUserId');
+            router.replace('/');
           }
         } catch {
+          // Ігноруємо помилки мережі, щоб додаток не крашився
         } finally {
           setIsLoading(false);
         }
       };
 
       loadData();
-    }, [maybeShowTracker, router]),
+    }, [maybeShowTracker, router])
   );
-  
 
   const getCardStyle = (isWide = false) => [
     isWide ? s.fullCard : s.halfCard,

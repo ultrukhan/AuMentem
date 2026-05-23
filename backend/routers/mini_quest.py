@@ -10,6 +10,8 @@ from typing import List
 import uuid
 import random
 from ai_services.quest_generator import generate_quests_by_hobbies
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/mini-quests",
@@ -27,7 +29,10 @@ async def get_daily_quests(
     Пріоритет: 3 ШІ-квести за інтересами, резерв — 2 базові рутинні квести з бази (без хобі).
     """
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
 
     db.query(DBUserMiniQuest).filter(
         DBUserMiniQuest.user_id == user.id,
@@ -57,9 +62,20 @@ async def get_daily_quests(
     if hobby_names:
         generated_quests = await generate_quests_by_hobbies(hobby_names)
 
+        # Перевірка чи сторонній запит не створив вже квести( спроба фіксанути баг)
+        already_created_quests = db.query(DBUserMiniQuest).options(
+            joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
+        ).filter(
+            DBUserMiniQuest.user_id == user.id,
+            DBUserMiniQuest.created_at >= start_of_today
+        ).all()
+
+        if already_created_quests:
+            return already_created_quests
+
+
         hobby_map = {h.name.lower().strip(): h for h in current_hobbies}
 
-        # Жорсткий ліміт: 3 квести від ШІ
         for q_data in generated_quests[:3]:
             title = q_data.get("title", "Новий цікавий квест")
             ai_hobby_name = q_data.get("hobby_name", "").lower().strip()
