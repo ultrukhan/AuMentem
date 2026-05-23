@@ -31,6 +31,7 @@ import { useAppSettings } from '@/hooks/useAppSettings';
 import { useSinglePress } from '@/hooks/useSinglePress';
 import { cardShadow } from '@/utils/shadowStyle';
 import AnimatedCard from '@/components/AnimatedCard';
+import FadeInView from '@/components/FadeInView';
 import { Skeleton } from 'moti/skeleton';
 import { MotiView } from 'moti';
 
@@ -120,12 +121,12 @@ export default function StatsScreen() {
         <MotiView
           key={petType}
           from={{ translateY: 0, scaleY: 1, scaleX: 1 }}
-          animate={{ translateY: -35, scaleY: 1.1, scaleX: 0.95 }}
+          animate={animationsEnabled ? { translateY: -35, scaleY: 1.1, scaleX: 0.95 } : { translateY: 0, scaleY: 1, scaleX: 1 }}
           transition={{
             type: 'timing',
-            duration: 450,
-            loop: true,
-            repeatReverse: true,
+            duration: animationsEnabled ? 450 : 0,
+            loop: animationsEnabled,
+            repeatReverse: animationsEnabled,
           }}
           style={{ alignItems: 'center' }}
         >
@@ -163,81 +164,81 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]} edges={['top']}>
       <View style={s.header}>
-        <Pressable 
-          onPress={() => runOnce(() => { playClickSound(); router.back(); })}
-          style={({ pressed }) => [s.roundBackBtn, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft'), pressed && { opacity: 0.7 }]}
-        >
-          <ArrowLeft color={c.textMain} size={24} strokeWidth={2.5} />
-        </Pressable>
-        <Text style={[s.screenTitle, { color: c.textMain }]}>Моя статистика 📊</Text>
+        <AnimatedCard animationsEnabled={animationsEnabled} onPress={() => { playClickSound(); router.back(); }} style={[s.roundBackBtn, { backgroundColor: c.cardBg }]}>
+          <ArrowLeft color={c.textMain} size={24} />
+        </AnimatedCard>
+        <Text style={[Typography.titleLg, { color: c.textMain }]}>Твоя статистика</Text>
+        <View style={{ width: 48 }} />
       </View>
 
-      {isLoading ? (
-        <View style={{ padding: Spacing.screenX, gap: 16, marginTop: 24 }}>
-          <Skeleton colorMode={isDark ? 'dark' : 'light'} width="100%" height={220} radius={24} />
-          <Skeleton colorMode={isDark ? 'dark' : 'light'} width="100%" height={120} radius={24} />
-        </View>
-      ) : stats.length === 0 ? (
-        <ScrollView
-          contentContainerStyle={[s.emptyScroll, { paddingTop: 24 }]}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
-        >
-          {renderPetBanner()}
-          {renderEmptyState()}
-        </ScrollView>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[s.scrollContent, { paddingTop: 24 }]}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
-        >
-          
-          {renderPetBanner()}
-
-          <Text style={[Typography.titleLg, { color: c.textMain, marginBottom: 16 }]}>
-            Підсумки останнього тижня
-          </Text>
-
-          <View style={s.gridContainer}>
-            {[
-              { icon: Target, color: '#F59E0B', bg: '#F59E0B15', value: latestStat?.mini_quests_completed, label: 'Міні-квестів' },
-              { icon: MapPin, color: '#3B82F6', bg: '#3B82F615', value: latestStat?.geo_quests_completed, label: 'Гео-квестів' },
-              { icon: Calendar, color: '#10B981', bg: '#10B98115', value: latestStat?.active_days, label: 'Активних днів' },
-              { icon: Sparkles, color: '#8B5CF6', bg: '#8B5CF615', value: latestStat?.unique_locations, label: 'Нових локацій' },
-            ].map((metric, index) => {
-              const card = (
-                <View style={[s.metricCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
-                  <View style={[s.iconBox, { backgroundColor: metric.bg }]}><metric.icon color={metric.color} size={24} /></View>
-                  <Text style={[s.metricValue, { color: c.textMain }]}>{metric.value ?? 0}</Text>
-                  <Text style={[s.metricLabel, { color: c.textMuted }]} numberOfLines={2}>{metric.label}</Text>
-                </View>
-              );
-              if (!animationsEnabled) return <View key={metric.label}>{card}</View>;
-              return (
-                <MotiView
-                  key={metric.label}
-                  from={{ opacity: 0, translateY: 10 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'timing', duration: 350, delay: index * 60 }}
-                >
-                  {card}
-                </MotiView>
-              );
-            })}
+      <FadeInView animationsEnabled={animationsEnabled} style={{ flex: 1 }}>
+        {isLoading ? (
+          <View style={{ padding: Spacing.screenX, gap: 16, marginTop: 24 }}>
+            <Skeleton colorMode={isDark ? 'dark' : 'light'} width="100%" height={220} radius={24} />
+            <Skeleton colorMode={isDark ? 'dark' : 'light'} width="100%" height={120} radius={24} />
           </View>
+        ) : stats.length === 0 ? (
+          <ScrollView
+            contentContainerStyle={[s.emptyScroll, { paddingTop: 24 }]}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
+          >
+            {renderPetBanner()}
+            {renderEmptyState()}
+          </ScrollView>
+        ) : (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[s.scrollContent, { paddingTop: 24 }]}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={c.accent} />}
+          >
+            
+            {renderPetBanner()}
 
-          {latestStat?.top_hobby && (
-            <View style={[s.hobbyCard, { backgroundColor: c.accent }, cardShadow(themeKey, 'soft')]}>
-              <Trophy color="#FFF" size={32} />
-              <View style={s.hobbyTextCol}>
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' }}>Хобі тижня</Text>
-                <Text style={{ color: '#FFF', fontSize: 22, fontWeight: 'bold' }}>{latestStat.top_hobby}</Text>
-              </View>
+            <Text style={[Typography.titleLg, { color: c.textMain, marginBottom: 16 }]}>
+              Підсумки останнього тижня
+            </Text>
+
+            <View style={s.gridContainer}>
+              {[
+                { icon: Target, color: '#F59E0B', bg: '#F59E0B15', value: latestStat?.mini_quests_completed, label: 'Міні-квестів' },
+                { icon: MapPin, color: '#3B82F6', bg: '#3B82F615', value: latestStat?.geo_quests_completed, label: 'Гео-квестів' },
+                { icon: Calendar, color: '#10B981', bg: '#10B98115', value: latestStat?.active_days, label: 'Активних днів' },
+                { icon: Sparkles, color: '#8B5CF6', bg: '#8B5CF615', value: latestStat?.unique_locations, label: 'Нових локацій' },
+              ].map((metric, index) => {
+                const card = (
+                  <View style={[s.metricCard, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, 'soft')]}>
+                    <View style={[s.iconBox, { backgroundColor: metric.bg }]}><metric.icon color={metric.color} size={24} /></View>
+                    <Text style={[s.metricValue, { color: c.textMain }]}>{metric.value ?? 0}</Text>
+                    <Text style={[s.metricLabel, { color: c.textMuted }]} numberOfLines={2}>{metric.label}</Text>
+                  </View>
+                );
+                if (!animationsEnabled) return <View key={metric.label}>{card}</View>;
+                return (
+                  <MotiView
+                    key={metric.label}
+                    from={{ opacity: 0, translateY: 10 }}
+                    animate={{ opacity: 1, translateY: 0 }}
+                    transition={{ type: 'timing', duration: 350, delay: index * 60 }}
+                  >
+                    {card}
+                  </MotiView>
+                );
+              })}
             </View>
-          )}
 
-        </ScrollView>
-      )}
+            {latestStat?.top_hobby && (
+              <View style={[s.hobbyCard, { backgroundColor: c.accent }, cardShadow(themeKey, 'soft')]}>
+                <Trophy color="#FFF" size={32} />
+                <View style={s.hobbyTextCol}>
+                  <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600' }}>Хобі тижня</Text>
+                  <Text style={{ color: '#FFF', fontSize: 22, fontWeight: 'bold' }}>{latestStat.top_hobby}</Text>
+                </View>
+              </View>
+            )}
+
+          </ScrollView>
+        )}
+      </FadeInView>
     </SafeAreaView>
   );
 }

@@ -8,7 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ToastContainer() {
-  const [toast, setToast] = useState<ToastConfig & { id: number } | null>(null);
+  const [toast, setToast] = useState<ToastConfig & { id: number, animate: boolean } | null>(null);
   const [isDark, setIsDark] = useState(Appearance.getColorScheme() === 'dark');
   const insets = useSafeAreaInsets();
 
@@ -19,9 +19,18 @@ export default function ToastContainer() {
     };
     fetchTheme();
 
-    const subscription = DeviceEventEmitter.addListener('SHOW_TOAST', (config: ToastConfig) => {
+    const subscription = DeviceEventEmitter.addListener('SHOW_TOAST', async (config: ToastConfig) => {
       const id = Date.now();
-      setToast({ ...config, id });
+      let animate = true;
+      try {
+        const saved = await SecureStore.getItemAsync('userSettings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.animations === false) animate = false;
+        }
+      } catch {}
+      
+      setToast({ ...config, id, animate });
 
       setTimeout(() => {
         setToast((current) => (current?.id === id ? null : current));
@@ -41,10 +50,10 @@ export default function ToastContainer() {
         {toast && (
           <MotiView
             key={toast.id}
-            from={{ opacity: 0, translateY: -40 }}
+            from={toast.animate ? { opacity: 0, translateY: -40 } : { opacity: 1, translateY: 0 }}
             animate={{ opacity: 1, translateY: 0 }}
-            exit={{ opacity: 0, translateY: -40 }}
-            transition={{ type: 'timing', duration: 350 }}
+            exit={toast.animate ? { opacity: 0, translateY: -40 } : { opacity: 0, translateY: 0 }}
+            transition={{ type: 'timing', duration: toast.animate ? 350 : 0 }}
             style={[
               s.toast,
               { backgroundColor: c.cardBg, borderColor: c.border, top: Math.max(insets.top + 10, 50) }
