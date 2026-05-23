@@ -25,7 +25,7 @@ interface Hobby {
 
 interface Props {
   visible: boolean;
-  onSuccess: (updatedHobbies: any[]) => void; // 💥 Тепер приймає аргумент
+  onSuccess: (updatedHobbies: any[]) => void;
   onClose?: () => void;
   isDark?: boolean;
   userId?: string | null;
@@ -83,7 +83,7 @@ const loadData = async () => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       
-      // 1. Паралельно беремо список ВСІХ хобі і поточний стан профілю
+
       const [allHobbiesRes, userRes] = await Promise.all([
         fetch(`${BASE_URL}/auth/hobbies`),
         fetch(`${BASE_URL}/auth/me`, { 
@@ -97,9 +97,6 @@ const loadData = async () => {
         
         setHobbies(allHobbies);
 
-        // 💥 ПРАВИЛЬНИЙ PRE-FILL: 
-        // Бекенд віддає список об'єктів хобі (userData.hobbies). 
-        // Ми просто витягуємо їхні ID, щоб підсвітити галочки.
         if (userData.hobbies && Array.isArray(userData.hobbies)) {
           const ids = userData.hobbies.map((h: Hobby) => h.id);
           setSelectedIds(ids);
@@ -107,10 +104,10 @@ const loadData = async () => {
           setSelectedIds([]);
         }
       } else {
-        setError('Не вдалося завантажити інтереси');
+        setError('Error loading interests');
       }
     } catch (err) {
-      setError('Помилка з\'єднання з сервером');
+      setError('Server connection error');
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +123,7 @@ const loadData = async () => {
 
   const handleSave = async () => {
     if (selectedIds.length === 0) {
-      setError('Обери хоча б одний інтерес! ✨');
+      setError('Select at least one interest!');
       return;
     }
     setIsSaving(true);
@@ -145,20 +142,20 @@ const loadData = async () => {
       });
 
       if (response.ok) {
-  const updatedUser = await response.json(); // Отримуємо оновленого юзера
+  const updatedUser = await response.json();
 
   playSuccessSound();
   setIsSuccess(true);
   setShowConfetti(true);
   setTimeout(() => {
     setShowConfetti(false);
-    onSuccess(updatedUser.hobbies || []); // 💥 ПЕРЕДАЄМО НОВІ ХОБІ В ПРОФІЛЬ
+    onSuccess(updatedUser.hobbies || []);
   }, 1800);
 } else {
-        setError(await parseApiError(response, 'Не вдалося зберегти зміни на сервері'));
+        setError(await parseApiError(response, 'Failed to save changes'));
       }
     } catch (err) {
-      setError('Помилка мережі при збереженні');
+      setError('Network error during save');
     } finally {
       setIsSaving(false);
     }
@@ -182,13 +179,12 @@ const handleSkip = async () => {
       });
 
       if (response.ok) {
-        // 💥 ПЕРЕДАЄМО ПОРОЖНІЙ МАСИВ, ЩОБ ПОКАЗАТИ, ЩО ХОБІ СКИНУТІ
         onSuccess([]); 
       } else {
-        setError(await parseApiError(response, 'Не вдалося пропустити'));
+        setError(await parseApiError(response, 'Failed to skip'));
       }
     } catch (err) {
-      setError('Помилка мережі');
+      setError('Network error');
     } finally {
       setIsSaving(false);
     }

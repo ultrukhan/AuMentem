@@ -16,6 +16,7 @@ import { useAppSettings } from '@/hooks/useAppSettings';
 import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
 import AnimatedCard from '@/components/AnimatedCard'; 
+import { Toast } from '@/utils/toast';
 
 export default function TimeCapsuleScreen() {
   const router = useRouter();
@@ -108,10 +109,10 @@ export default function TimeCapsuleScreen() {
       if (response.ok) {
         isSuccess = true;
       } else {
-        Alert.alert("Помилка", await parseApiError(response, "Не вдалося зберегти лист."));
+        Toast.show({ title: "Помилка", message: await parseApiError(response, "Не вдалося зберегти лист.") });
       }
     } catch (error) {
-      Alert.alert("Помилка", "Перевір підключення до інтернету.");
+      Toast.show({ title: "Помилка", message: "Перевір підключення до інтернету." });
     } finally {
       if (!isSuccess) setIsSaving(false);
     }

@@ -13,6 +13,8 @@ import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound, stopAmbientSound, setAmbientVolume, playAmbientSound } from '@/utils/audio';
 import { BASE_URL } from '@/constants/api';
 import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
+import { Toast } from '@/utils/toast';
+import HomeBackground from '@/components/HomeBackground';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -23,6 +25,9 @@ const SettingsLink = ({ icon: Icon, title, onPress, isDark, animationsEnabled }:
 
   return (
     <AnimatedPressable
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={title}
       onPressIn={() => {
         if (animationsEnabled) scale.value = withSpring(0.97);
       }}
@@ -93,6 +98,8 @@ export default function SettingsScreen() {
     sfxVolume: 0.5,
     animations: true,
     anonymousMode: false,
+    ambientOrbsEnabled: true,
+    petEnabled: true,
   });
 
   const [isSupportModalVisible, setSupportModalVisible] = useState(false);
@@ -132,7 +139,7 @@ export default function SettingsScreen() {
   };
 
   const handleSupportSubmit = async () => {
-    if (!supportMessage.trim()) return Alert.alert("Увага", "Напишіть повідомлення.");
+    if (!supportMessage.trim()) return Toast.show({ title: "Увага", message: "Напишіть повідомлення." });
     playClickSound();
     
     try {
@@ -149,14 +156,14 @@ export default function SettingsScreen() {
       });
       
       if (res.ok) {
-        Alert.alert("Дякуємо!", "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!");
+        Toast.show({ title: "Дякуємо!", message: "Твоє повідомлення надіслано в підтримку. Ми відповімо тобі на пошту!" });
         setSupportModalVisible(false);
         setSupportMessage('');
       } else {
-        Alert.alert("Помилка", await parseApiError(res, "Не вдалося надіслати повідомлення."));
+        Toast.show({ title: "Помилка", message: await parseApiError(res, "Не вдалося надіслати повідомлення.") });
       }
     } catch (e) {
-      Alert.alert("Помилка мережі", "Перевірте підключення до інтернету.");
+      Toast.show({ title: "Помилка мережі", message: "Перевірте підключення до інтернету." });
     }
   };
 
@@ -165,6 +172,9 @@ export default function SettingsScreen() {
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.header}>
           <Pressable 
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Повернутися назад"
             onPress={() => { playClickSound(); router.back(); }}
             style={({ pressed }) => [s.iconBtn, { backgroundColor: c.cardBg, borderColor: c.border }, pressed && { opacity: 0.7 }]}
           >
@@ -176,6 +186,23 @@ export default function SettingsScreen() {
 
         <ScrollView style={s.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
           
+          <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ФОН ДОМАШНЬОГО ЕКРАНУ</Text>
+          <View style={s.section}>
+            <View style={{ height: 200, borderRadius: Radii.lg, overflow: 'hidden', borderWidth: 1, borderColor: c.border, marginBottom: 12 }}>
+               <HomeBackground isDark={isDark} previewAmbientOrbsEnabled={settings.ambientOrbsEnabled ?? true} previewPetEnabled={settings.petEnabled ?? true} />
+            </View>
+            <SettingsToggle 
+              icon={Sparkles} title="Анімовані частки (Кульки)" isDark={isDark}
+              value={settings.ambientOrbsEnabled ?? true} 
+              onValueChange={(val: boolean) => updateSetting('ambientOrbsEnabled', val)}
+            />
+            <SettingsToggle 
+              icon={Ghost} title="Улюбленець" isDark={isDark}
+              value={settings.petEnabled ?? true} 
+              onValueChange={(val: boolean) => updateSetting('petEnabled', val)}
+            />
+          </View>
+
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ВРАЖЕННЯ ВІД ДОДАТКУ</Text>
           <View style={s.section}>
             <SettingsToggle 
@@ -254,6 +281,9 @@ export default function SettingsScreen() {
             />
 
             <Pressable 
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Надіслати повідомлення у підтримку"
               onPress={handleSupportSubmit}
               style={({ pressed }) => [s.submitBtn, { backgroundColor: c.accent }, pressed && { opacity: 0.8 }]}
             >

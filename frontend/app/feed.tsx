@@ -29,6 +29,7 @@ import { cardShadow } from '@/utils/shadowStyle';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { MotiView } from 'moti';
 import { Skeleton } from 'moti/skeleton';
+import { Toast } from '@/utils/toast';
 
 interface Reaction {
   reaction_type: 'SUPPORT' | 'HUG' | 'PROUD' | 'HEART';
@@ -310,7 +311,7 @@ export default function FeedScreen() {
   const handleDeletePost = (postId: string) => {
     playClickSound();
     Alert.alert(
-      "Видалити пост?",
+      "Видалити пост?", 
       "Ви дійсно хочете видалити цей пост? Цю дію неможливо буде скасувати.",
       [
         { text: "Скасувати", style: "cancel" },
@@ -328,10 +329,10 @@ export default function FeedScreen() {
               if (response.ok) {
                 setPosts(prev => prev.filter(p => p.id !== postId));
               } else {
-                Alert.alert("Помилка", "Не вдалося видалити пост.");
+                Toast.show({ title: "Помилка", message: "Не вдалося видалити пост." });
               }
             } catch (error) {
-              Alert.alert("Помилка", "Перевірте з'єднання з інтернетом.");
+              Toast.show({ title: "Помилка", message: "Перевірте з'єднання з інтернетом." });
             }
           }
         }
@@ -361,13 +362,13 @@ export default function FeedScreen() {
       });
 
       if (response.ok) {
-        Alert.alert("Дякуємо!", "Скаргу успішно надіслано. Наші модератори перевірять цей пост.");
+        Toast.show({ title: "Дякуємо!", message: "Скаргу успішно надіслано. Наші модератори перевірять цей пост." });
         closeReportModal();
       } else {
-        Alert.alert("Увага", await parseApiError(response, "Не вдалося надіслати скаргу."));
+        Toast.show({ title: "Увага", message: await parseApiError(response, "Не вдалося надіслати скаргу.") });
       }
     } catch (error) {
-      Alert.alert("Помилка", "Перевірте з'єднання з інтернетом.");
+      Toast.show({ title: "Помилка", message: "Перевірте з'єднання з інтернетом." });
     } finally {
       setIsSubmittingReport(false);
     }

@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Platform, AppState } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
+import ToastContainer from '@/components/ToastContainer';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -54,5 +55,10 @@ export default function RootLayout() {
 
   if (!loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <ToastContainer />
+    </>
+  );
 }

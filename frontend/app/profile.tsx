@@ -85,7 +85,6 @@ export default function ProfileScreen() {
       const storedUserId = await SecureStore.getItemAsync("currentUserId");
       setUserId(storedUserId);
 
-      // 💥 ДОДАЙ fetch сюди, щоб забрати актуальні хобі з сервера
       const [profileRes, statsRes, hobbiesRes] = await Promise.all([
         fetch(`${BASE_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -95,13 +94,12 @@ export default function ProfileScreen() {
         }),
         fetch(`${BASE_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
-        }), // Або інший ендпоінт, де лежать хобі юзера
+        }),
       ]);
 
       if (profileRes.ok) {
         const data = await profileRes.json();
         setNickname(data.nickname);
-        // Зберігаємо хобі, які прийшли від бекенда
         setUserHobbies(data.hobbies || []);
       }
 
@@ -127,13 +125,8 @@ export default function ProfileScreen() {
   const handleLogout = async () => {
     playClickSound();
     try {
-      // Видаляємо лише дані про поточну сесію
       await SecureStore.deleteItemAsync("userToken");
       await SecureStore.deleteItemAsync("currentUserId");
-
-      // ⚠️ ВАЖЛИВО: Ми НЕ видаляємо 'user_saved_hobbies', 'has_hobbies',
-      // бо вони тепер унікальні для кожного userId.
-      // Вони будуть просто перезаписані або завантажені при наступному вході.
 
       await SecureStore.deleteItemAsync("isFirstLogin");
       await SecureStore.deleteItemAsync("lastCookieDate");
@@ -270,7 +263,7 @@ export default function ProfileScreen() {
   const handleHobbiesSuccess = async () => {
     setShowHobbiesModal(false);
 
-    // Повторно викликаємо отримання даних, щоб отримати свіжі хобі
+
     const token = await SecureStore.getItemAsync("userToken");
     if (token) {
       const profileRes = await fetch(`${BASE_URL}/auth/me`, {
@@ -278,7 +271,7 @@ export default function ProfileScreen() {
       });
       if (profileRes.ok) {
         const data = await profileRes.json();
-        setUserHobbies(data.hobbies || []); // Оновлюємо стан, що відображається
+        setUserHobbies(data.hobbies || []);
       }
     }
   };

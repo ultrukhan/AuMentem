@@ -34,7 +34,11 @@ import {
   ChevronLeft,
   ArrowLeft,
   Sparkles,
+  Bell,
+  Check,
 } from "lucide-react-native";
+
+import { scheduleEventReminder } from "@/utils/notifications";
 
 import { Colors, Typography, Radii, Spacing } from "@/constants/theme";
 import { BASE_URL } from "@/constants/api";
@@ -47,6 +51,7 @@ import { MotiView } from "moti";
 import EventCover from "@/components/EventCover";
 import EventCardSkeleton from "@/components/EventCardSkeleton";
 import BottomNav from "@/components/BottomNav";
+import { Toast } from '@/utils/toast';
 
 interface LocalEvent {
   id: string;
@@ -108,7 +113,8 @@ export default function LocalEventsScreen() {
   const c = Colors[themeKey];
   const { animationsEnabled } = useAppSettings();
   const runOnce = useSinglePress();
-  const [showPast, setShowPast] = useState(false); // 💥 Стан для перемикача
+  const [showPast, setShowPast] = useState(false);
+  const [remindEvent, setRemindEvent] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"EXPLORE" | "SAVED">("EXPLORE");
 
@@ -235,13 +241,11 @@ export default function LocalEventsScreen() {
           );
         }
       } else {
-        Alert.alert(
-          "Помилка",
-          await parseApiError(response, "Не вдалося оновити статус події"),
-        );
+        Toast.show({ title: "Помилка", message: await parseApiError(response, "Не вдалося оновити статус події"),
+         });
       }
     } catch (error) {
-      Alert.alert("Помилка", "Не вдалося оновити статус події");
+      Toast.show({ title: "Помилка", message: "Не вдалося оновити статус події" });
     } finally {
       setIsTogglingFav(false);
     }
@@ -250,6 +254,7 @@ export default function LocalEventsScreen() {
   const openEventDetails = async (event: LocalEvent) => {
     setSelectedEvent(event);
     setAttendeesCount(null);
+    setRemindEvent(false);
     try {
       const token = await SecureStore.getItemAsync("userToken");
       const response = await fetch(
@@ -663,6 +668,7 @@ export default function LocalEventsScreen() {
             initialNumToRender={5}
             maxToRenderPerBatch={5}
             windowSize={7}
+            removeClippedSubviews={true}
             contentContainerStyle={[
               s.listContent,
               (isLoading || filteredEvents.length === 0) && s.listContentGrow,
@@ -705,8 +711,10 @@ export default function LocalEventsScreen() {
             data={isLoading ? [] : savedEvents}
             keyExtractor={(item) => item.id}
             renderItem={renderEventCard}
-            initialNumToRender={5}
-            maxToRenderPerBatch={5}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={7}
+            removeClippedSubviews={true}
             contentContainerStyle={[
               s.listContent,
               (isLoading || savedEvents.length === 0) && s.listContentGrow,
@@ -720,48 +728,13 @@ export default function LocalEventsScreen() {
                 tintColor={c.accent}
               />
             }
-            // ListEmptyComponent={
-            //   isLoading ? (
-            //     <EventCardSkeleton isDark={isDark} count={2} />
-            //   ) : (
-            //     <View style={s.emptyStateBox}>
-            //       <Bookmark
-            //         color={c.textMuted}
-            //         size={56}
-            //         style={{ marginBottom: 16 }}
-            //         strokeWidth={1.5}
-            //         opacity={0.5}
-            //       />
-            //       <Text style={[s.emptyTitle, { color: c.textMain }]}>
-            //         Збереженого немає
-            //       </Text>
-            //       <Text style={[s.emptyText, { color: c.textMuted }]}>
-            //         Ви ще не додали жодної події до своїх планів. Знайдіть щось
-            //         цікаве в афіші!
-            //       </Text>
-            //       <Pressable
-            //         style={({ pressed }) => [
-            //           s.findEventsBtn,
-            //           { backgroundColor: c.accent },
-            //           pressed && { opacity: 0.8 },
-            //           s.beautifulShadow,
-            //         ]}
-            //         onPress={() => {
-            //           playClickSound();
-            //           setActiveTab("EXPLORE");
-            //         }}
-            //       >
-            //         <Text style={s.findEventsBtnText}>Шукати події 🔎</Text>
-            //       </Pressable>
-            //     </View>
-            //   )
-            // }
+
             ListEmptyComponent={
               isLoading ? (
                 <EventCardSkeleton isDark={isDark} count={2} />
               ) : (
                 <View style={s.emptyStateBox}>
-                  {/* 💥 Змінюємо іконку/текст залежно від того, чи це історія, чи майбутні */}
+                  {/* Змінюємо іконку/текст залежно від того, чи це історія, чи майбутні */}
                   {showPast ? (
                     <>
                       <Clock
@@ -956,6 +929,22 @@ export default function LocalEventsScreen() {
                     <Text style={[s.modalDescText, { color: c.textMuted }]}>
                       {selectedEvent.description}
                     </Text>
+
+                    {selectedEvent.external_link && (
+                      <Pressable 
+                        onPress={() => { playClickSound(); setRemindEvent(!remindEvent); }}
+                        style={[s.checkboxRow, { marginTop: 24, padding: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
+                      >
+                        <View style={[s.checkbox, { borderColor: c.textMuted }, remindEvent && { backgroundColor: c.accent, borderColor: c.accent }]}>
+                          {remindEvent && <Check color="#FFF" size={14} strokeWidth={3} />}
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                          <Text style={[Typography.body, { color: c.textMain }]}>Нагадати про захід</Text>
+                          <Text style={[Typography.nav, { color: c.textMuted }]}>Ми надішлемо сповіщення за годину</Text>
+                        </View>
+                        <Bell color={remindEvent ? c.accent : c.textMuted} size={24} />
+                      </Pressable>
+                    )}
                   </View>
                 </ScrollView>
 
@@ -1003,10 +992,19 @@ export default function LocalEventsScreen() {
                         },
                       s.lightShadow,
                     ]}
-                    onPress={() =>
-                      selectedEvent.external_link &&
-                      openExternalLink(selectedEvent.external_link)
-                    }
+                    onPress={async () => {
+                      if (selectedEvent.external_link) {
+                        if (remindEvent) {
+                          const scheduled = await scheduleEventReminder(selectedEvent.name, selectedEvent.start_time);
+                          if (scheduled) {
+                            Toast.success("Готово!", "Нагадування успішно встановлено!");
+                          } else {
+                            Toast.error("Помилка", "Немає дозволу на сповіщення");
+                          }
+                        }
+                        openExternalLink(selectedEvent.external_link);
+                      }
+                    }}
                     disabled={!selectedEvent.external_link}
                   >
                     <Text style={s.registerBtnText}>
@@ -1122,6 +1120,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptyTitle: { ...Typography.titleLg, marginBottom: 12 },
+  emptySubtitle: {
+    ...Typography.body,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 20
+  },
   emptyText: {
     ...Typography.body,
     textAlign: "center",
@@ -1298,11 +1302,24 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: Radii.full,
-    borderWidth: 1, // Додаємо рамку
+    borderWidth: 1,
   },
   miniFilterText: {
     fontSize: 13,
     fontWeight: "700",
     paddingHorizontal: 4,
   },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radii.md,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center'
+  }
 });

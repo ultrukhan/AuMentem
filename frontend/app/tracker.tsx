@@ -15,6 +15,7 @@ import { useAppSettings } from '@/hooks/useAppSettings';
 import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
 import AnimatedCard from '@/components/AnimatedCard';
+import { Toast } from '@/utils/toast';
 
 const DEFAULT_SUPPORT_MESSAGES = [
   "Ти все подолаєш! Навіть після найтемнішої ночі настає світанок ✨",
@@ -118,7 +119,7 @@ export default function TrackerScreen() {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        Alert.alert('Помилка', 'Увійдіть у акаунт ще раз.');
+        Toast.show({ title: 'Помилка', message: 'Увійдіть у акаунт ще раз.' });
         router.replace('/');
         return;
       }
@@ -152,7 +153,7 @@ export default function TrackerScreen() {
               message = data?.message ?? '';
             }
           } catch {
-            // 404 або мережа — показуємо локальне повідомлення
+
           }
           if (!message) {
             const randomIndex = Math.floor(Math.random() * DEFAULT_SUPPORT_MESSAGES.length);
@@ -164,10 +165,10 @@ export default function TrackerScreen() {
           setActiveModal(selectedState as 'POSITIVE' | 'CRITICAL');
         }
       } else {
-        Alert.alert('Помилка', errorText);
+        Toast.show({ title: 'Помилка', message: errorText });
       }
     } catch {
-      Alert.alert('Помилка', 'Перевір підключення до інтернету.');
+      Toast.show({ title: 'Помилка', message: 'Перевір підключення до інтернету.' });
     } finally {
       setIsSaving(false);
     }

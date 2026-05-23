@@ -27,6 +27,7 @@ import { useAppSettings } from '@/hooks/useAppSettings';
 import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound } from '@/utils/audio';
+import { Toast } from '@/utils/toast';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DEFAULT_REGION = {
@@ -251,13 +252,13 @@ export default function GeoQuestsScreen() {
   const buildRoute = async (quest: any, coordsOverride?: Location.LocationObjectCoords) => {
     const origin = coordsOverride ?? userLocation;
     if (!origin) {
-      Alert.alert('Геолокація', 'Увімкніть доступ до геопозиції, щоб прокласти маршрут.');
+      Toast.show({ title: 'Геолокація', message: 'Увімкніть доступ до геопозиції, щоб прокласти маршрут.' });
       return;
     }
     const destLat = quest.place.coordinates?.lat;
     const destLng = quest.place.coordinates?.lng;
     if (!destLat || !destLng) {
-      Alert.alert('Помилка', 'Немає координат цілі.');
+      Toast.show({ title: 'Помилка', message: 'Немає координат цілі.' });
       return;
     }
 
@@ -294,7 +295,7 @@ export default function GeoQuestsScreen() {
       setShowHud(true);
       Animated.spring(panY, { toValue: SCREEN_HEIGHT * 0.55, useNativeDriver: false }).start();
     } else {
-      Alert.alert('Помилка маршруту', 'Не вдалося прокласти пішохідний шлях.');
+      Toast.show({ title: 'Помилка маршруту', message: 'Не вдалося прокласти пішохідний шлях.' });
     }
   };
 
@@ -309,7 +310,7 @@ export default function GeoQuestsScreen() {
     if (!selectedQuest) return;
     if (!userLocation) {
       Alert.alert(
-        'Геолокація',
+        'Геолокація', 
         'Для прокладання маршруту потрібен доступ до вашої позиції.',
         locationDenied
           ? [
@@ -317,7 +318,7 @@ export default function GeoQuestsScreen() {
               { text: 'Налаштування', onPress: () => Linking.openSettings() },
             ]
           : [{ text: 'OK' }]
-      );
+       );
       return;
     }
     setIsLoading(true);
@@ -341,7 +342,7 @@ export default function GeoQuestsScreen() {
       });
 
       if (!startRes.ok) {
-        Alert.alert('Увага', await parseApiError(startRes, 'Не вдалося почати квест'));
+        Toast.show({ title: 'Увага', message: await parseApiError(startRes, 'Не вдалося почати квест') });
         setIsLoading(false);
         return;
       }
@@ -355,7 +356,7 @@ export default function GeoQuestsScreen() {
 
       await buildRoute(selectedQuest);
     } catch (e) {
-      Alert.alert('Помилка', 'Мережевий збій при прокладанні маршруту');
+      Toast.show({ title: 'Помилка', message: 'Мережевий збій при прокладанні маршруту' });
     } finally {
       setIsLoading(false);
     }
@@ -388,7 +389,7 @@ export default function GeoQuestsScreen() {
       if (targetLat && targetLng && currentLat && currentLng) {
         const dist = calculateDistance(currentLat, currentLng, targetLat, targetLng);
         if (dist > 50) {
-          Alert.alert('Не вийшло', `Ти занадто далеко від цілі! Відстань: ${Math.round(dist)}м. Підійди ближче.`);
+          Toast.show({ title: 'Не вийшло', message: `Ти занадто далеко від цілі! Відстань: ${Math.round(dist)}м. Підійди ближче.` });
           setIsCompleting(false);
           return;
         }
@@ -400,7 +401,7 @@ export default function GeoQuestsScreen() {
       if (saveToAlbum) {
         const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
         if (!permissionResult.granted) {
-          Alert.alert('Помилка', 'Додаток потребує дозволу для роботи з камерою.');
+          Toast.show({ title: 'Помилка', message: 'Додаток потребує дозволу для роботи з камерою.' });
           setIsCompleting(false);
           return;
         }
@@ -431,7 +432,7 @@ export default function GeoQuestsScreen() {
 
         if (!sigRes.ok) {
           const errorText = await sigRes.text();
-          Alert.alert('Помилка Сервера', `Бекенд відмовив у підписі: ${errorText}`);
+          Toast.show({ title: 'Помилка Сервера', message: `Бекенд відмовив у підписі: ${errorText}` });
           setIsCompleting(false);
           return;
         }
@@ -492,10 +493,10 @@ export default function GeoQuestsScreen() {
         setIsAnonymous(defaultAnonymous);
         setTimeout(() => setShareModalVisible(true), animationsEnabled ? 1500 : 0);
       } else {
-        Alert.alert('Не вийшло', await parseApiError(res, 'Підійдіть ближче до цілі!'));
+        Toast.show({ title: 'Не вийшло', message: await parseApiError(res, 'Підійдіть ближче до цілі!') });
       }
     } catch (e) {
-      Alert.alert('Помилка', 'Не вдалося завантажити фото або підтвердити координати');
+      Toast.show({ title: 'Помилка', message: 'Не вдалося завантажити фото або підтвердити координати' });
     } finally {
       setFinishModalVisible(false);
       setIsCompleting(false);
@@ -516,12 +517,12 @@ export default function GeoQuestsScreen() {
       if (response.ok) {
         setShareModalVisible(false);
         setCompletedQuestId(null);
-        Alert.alert('Супер! 🎉', 'Твій успіх вже у стрічці підтримки.');
+        Toast.show({ title: 'Супер! 🎉', message: 'Твій успіх вже у стрічці підтримки.' });
       } else {
-        Alert.alert('Помилка', await parseApiError(response, 'Не вдалося опублікувати пост'));
+        Toast.show({ title: 'Помилка', message: await parseApiError(response, 'Не вдалося опублікувати пост') });
       }
     } catch {
-      Alert.alert('Помилка мережі', 'Перевір підключення до інтернету');
+      Toast.show({ title: 'Помилка мережі', message: 'Перевір підключення до інтернету' });
     } finally {
       setIsSharing(false);
     }
@@ -610,7 +611,7 @@ export default function GeoQuestsScreen() {
               tracksViewChanges={tracksViewChanges}
               onPress={() => {
                 if (isCompleted) {
-                  Alert.alert('Виконано', 'Ти вже виконав цей квест сьогодні! Спробуй інший.');
+                  Toast.show({ title: 'Виконано', message: 'Ти вже виконав цей квест сьогодні! Спробуй інший.' });
                 } else if (!isNavigating) {
                   setSelectedQuest(quest);
                 }

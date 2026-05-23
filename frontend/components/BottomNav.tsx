@@ -51,6 +51,9 @@ export default function BottomNav({ isDark = false, theme: themeProp }: BottomNa
           return (
             <Pressable
               key={tab.name}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`Перейти на вкладку ${tab.name}`}
               onPress={() => {
                 if (active) return;
                 runOnce(() => {

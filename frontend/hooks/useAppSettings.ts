@@ -6,12 +6,16 @@ export type AppSettings = {
   animations: boolean;
   sfx: boolean;
   music: boolean;
+  ambientOrbsEnabled: boolean;
+  petEnabled: boolean;
 };
 
 const DEFAULTS: AppSettings = {
   animations: true,
   sfx: true,
   music: true,
+  ambientOrbsEnabled: true,
+  petEnabled: true,
 };
 
 export function useAppSettings() {
@@ -26,6 +30,8 @@ export function useAppSettings() {
         animations: parsed.animations !== false,
         sfx: parsed.sfx !== false,
         music: parsed.music !== false,
+        ambientOrbsEnabled: parsed.ambientOrbsEnabled !== false,
+        petEnabled: parsed.petEnabled !== false,
       });
     } catch {
       // keep defaults
@@ -42,6 +48,8 @@ export function useAppSettings() {
     animationsEnabled: settings.animations,
     sfxEnabled: settings.sfx,
     musicEnabled: settings.music,
+    ambientOrbsEnabled: settings.ambientOrbsEnabled,
+    petEnabled: settings.petEnabled,
     reload,
   };
 }
