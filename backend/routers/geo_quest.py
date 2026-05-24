@@ -4,7 +4,7 @@ from sqlalchemy import func
 from geoalchemy2.elements import WKTElement
 from database import get_db
 from models import DBAppUser, DBPlace, DBGeoQuest, DBUserGeoQuest, get_utc_now
-from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest
+from schemas import UserGeoQuestResponse, NearestGeoQuestResponse, QuestCompleteRequest, AlbumItemResponse, PaginatedAlbumResponse
 from auth_utils import get_current_user
 from enums import QuestStatus
 import uuid
@@ -15,6 +15,8 @@ import time
 import cloudinary
 import cloudinary.utils
 from config import CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/geo-quests",
@@ -55,7 +57,7 @@ async def get_upload_signature(
     target_coordinates = user_quest.geo_quest.place.coordinates
     distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
 
-    if distance > 20.0:
+    if distance > 50.0:
         raise HTTPException(
             status_code=400,
             detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підпис не згенеровано."
@@ -93,7 +95,10 @@ async def start_geo_quest(
         raise HTTPException(status_code=404, detail="Гео-квест не знайдено")
 
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
 
     active_quest = db.query(DBUserGeoQuest).filter(
         DBUserGeoQuest.geo_quest_id == geo_quest_id,
@@ -161,6 +166,16 @@ async def complete_quest(
     if not user_quest:
         raise HTTPException(status_code=404, detail="Активний квест не знайдено")
 
+    user_point = func.ST_GeographyFromText(f'SRID=4326;POINT({payload.lng} {payload.lat})')
+    target_coordinates = user_quest.geo_quest.place.coordinates
+    distance = db.query(func.ST_Distance(target_coordinates, user_point)).scalar()
+
+    if distance > 50.0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ви занадто далеко від локації! Відстань: {distance:.1f} м. Підійдіть ближче."
+        )
+
     current_time = get_utc_now()
     user_quest.photo_proof_url = payload.photo_url
     user_quest.status = QuestStatus.COMPLETED
@@ -175,7 +190,7 @@ async def complete_quest(
 async def get_nearest_geo_quests(
         lat: float,
         lng: float,
-        limit: int = 5,
+        limit: int = 10,
         db: Session = Depends(get_db),
         user: DBAppUser = Depends(get_current_user)
 ):
@@ -197,7 +212,106 @@ async def get_nearest_geo_quests(
     for quest, distance in results:
         response.append({
             "geo_quest": quest,
-            "distance_meters": round(distance, 2) # Тепер це будуть реальні метри!
+            "distance_meters": round(distance, 2)
         })
 
     return response
+
+@router.delete("/my-quests/{user_geo_quest_id}/cancel")
+async def cancel_quest(
+        user_geo_quest_id: uuid.UUID,
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Скасовує квест (видаляє запис), якщо він ще в процесі.
+    """
+    user_quest = db.query(DBUserGeoQuest).filter(
+        DBUserGeoQuest.id == user_geo_quest_id,
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).first()
+
+    if not user_quest:
+        raise HTTPException(status_code=404, detail="Активний квест не знайдено (можливо, він вже завершений або скасований)")
+
+    db.delete(user_quest)
+    db.commit()
+
+    return {"message": "Квест успішно скасовано"}
+
+@router.get("/my-active", response_model=List[UserGeoQuestResponse])
+async def get_active_quests(
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Повертає список усіх квестів, які користувач зараз проходить (IN_PROGRESS).
+    """
+    active_quests = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.status == QuestStatus.IN_PROGRESS
+    ).all()
+
+    return active_quests
+
+@router.get("/my-history", response_model=List[UserGeoQuestResponse])
+async def get_user_quest_history(
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    """
+    Повертає історію всіх гео-квестів користувача (і ті, що в процесі, і завершені).
+    Тут є дати початку (started_at) і завершення (completed_at).
+    """
+    history = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id
+    ).order_by(DBUserGeoQuest.started_at.desc()).all()
+
+    return history
+
+@router.get("/album", response_model=PaginatedAlbumResponse)
+async def get_user_album(
+    limit: int = 20,
+    offset: int = 0,
+    user: DBAppUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Повна інформація про локацію та квест
+    """
+    query = db.query(DBUserGeoQuest).options(
+        joinedload(DBUserGeoQuest.geo_quest).joinedload(DBGeoQuest.place)
+    ).filter(
+        DBUserGeoQuest.user_id == user.id,
+        DBUserGeoQuest.photo_proof_url.isnot(None),
+        DBUserGeoQuest.status == QuestStatus.COMPLETED
+    )
+
+    total_count = query.count()
+
+    user_quests = query.order_by(DBUserGeoQuest.completed_at.desc())\
+                       .limit(limit)\
+                       .offset(offset)\
+                       .all()
+
+    album_items = [
+        AlbumItemResponse(
+            id=q.id,
+            photo_url=q.photo_proof_url,
+            quest_title=q.geo_quest.title,
+            location_name=q.geo_quest.place.name,
+            completed_at=q.completed_at
+        ) for q in user_quests
+    ]
+
+    return PaginatedAlbumResponse(
+        total_count=total_count,
+        items=album_items,
+        limit=limit,
+        offset=offset
+    )

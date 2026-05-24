@@ -1,12 +1,14 @@
 from database import Base
 from datetime import datetime,timezone
 import uuid
-from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum
+from sqlalchemy import Column,Table, Integer, String,Boolean,DateTime, Uuid, ForeignKey, UniqueConstraint,Enum,Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy import Enum
 from enums import *
 from geoalchemy2 import Geography
+from sqlalchemy import Column, Integer, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 
 def get_utc_now():
     return datetime.now(timezone.utc)
@@ -44,6 +46,7 @@ class DBAppUser(Base):
     deleted_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     verification_code = Column(String, nullable=True)
+    is_onboarding_completed = Column(Boolean, default=False)
     hobbies = relationship("DBHobby", secondary=user_hobby_table,backref="users")
 
 class DBPost(Base):
@@ -144,3 +147,56 @@ class DBUserGeoQuest(Base):
 
     user = relationship("DBAppUser", backref="user_geo_quests")
     geo_quest = relationship("DBGeoQuest", backref="user_geo_quests")
+
+class DBPostReport(Base):
+    __tablename__ = "post_report"
+    id = Column(Uuid,default=uuid.uuid4, primary_key=True, index=True)
+    post_id = Column(Uuid, ForeignKey('post.id',ondelete="CASCADE"), nullable=False)
+    reporter_id = Column(Uuid, ForeignKey('app_user.id', ondelete="CASCADE"), nullable=False)
+    reason = Column(Enum(ReportReason), nullable=False)
+    details = Column(String, nullable=True)
+
+    user = relationship("DBAppUser", backref="post_report")
+    post = relationship("DBPost", backref="post_report")
+
+
+class DBWeeklyStat(Base):
+    __tablename__ = 'weekly_stats'
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(Uuid, ForeignKey('app_user.id', ondelete="CASCADE"), nullable=False)
+    week_start = Column(DateTime(timezone=True), nullable=False)
+    week_end = Column(DateTime(timezone=True), nullable=False)
+    geo_quests_completed = Column(Integer, default=0)
+    mini_quests_completed = Column(Integer, default=0)
+    active_days = Column(Integer, default=0)
+    top_hobby = Column(String, nullable=True)
+    unique_locations = Column(Integer, default=0)
+
+class DBLocalEvents(Base):
+    __tablename__ = 'local_events'
+    id= Column(Uuid, default=uuid.uuid4, primary_key=True, index=True)
+    name = Column(Text,nullable=False,index=True)
+    city = Column(String,nullable=False,index=True)
+    address = Column(Text,nullable=False,index=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    description = Column(Text, nullable=True)
+    external_link = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
+    coordinates = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
+    category = Column(Enum(EventCategory),nullable=False)
+    price = Column(String, nullable=True)
+
+    favorited_by = relationship("DBFavEvent", back_populates="event",cascade="all, delete-orphan")
+
+
+class DBFavEvent(Base):
+    __tablename__ = "fav_events"
+
+    user_id = Column(Uuid, ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True)
+    event_id = Column(Uuid, ForeignKey("local_events.id", ondelete="CASCADE"), primary_key=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+
+    user = relationship("DBAppUser", backref="favorite_events")
+    event = relationship("DBLocalEvents", back_populates="favorited_by")

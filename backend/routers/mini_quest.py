@@ -8,6 +8,10 @@ from auth_utils import get_current_user
 from enums import QuestStatus
 from typing import List
 import uuid
+import random
+from ai_services.quest_generator import generate_quests_by_hobbies
+from datetime import timezone
+from zoneinfo import ZoneInfo
 
 router = APIRouter(
     prefix="/mini-quests",
@@ -21,11 +25,21 @@ async def get_daily_quests(
         db: Session = Depends(get_db)
 ):
     """
-    Генерує або повертає 5 щоденних квестів (2 за хобі, 3 рандомних).
-    Усі видані квести мають початковий статус AVAILABLE.
+    Генерує або повертає 5 щоденних квестів.
+    Пріоритет: 3 ШІ-квести за інтересами, резерв — 2 базові рутинні квести з бази (без хобі).
     """
     now = get_utc_now()
-    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    kyiv_tz = ZoneInfo("Europe/Kiev")
+    now_kyiv = now.astimezone(kyiv_tz)
+    start_of_today_kyiv = now_kyiv.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_today = start_of_today_kyiv.astimezone(timezone.utc)
+
+    db.query(DBUserMiniQuest).filter(
+        DBUserMiniQuest.user_id == user.id,
+        DBUserMiniQuest.created_at < start_of_today,
+        DBUserMiniQuest.status == QuestStatus.AVAILABLE
+    ).delete(synchronize_session=False)
+    db.commit()
 
     todays_quests = db.query(DBUserMiniQuest).options(
         joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
@@ -39,27 +53,80 @@ async def get_daily_quests(
 
     user_with_hobbies = db.query(DBAppUser).options(joinedload(DBAppUser.hobbies)).filter(
         DBAppUser.id == user.id).first()
-    user_hobby_ids = [h.id for h in user_with_hobbies.hobbies] if user_with_hobbies else []
 
-    hobby_quests = []
-    if user_hobby_ids:
-        hobby_quests = db.query(DBMiniQuest).filter(
-            DBMiniQuest.hobbies.any(DBHobby.id.in_(user_hobby_ids))
-        ).order_by(func.random()).limit(2).all()
+    current_hobbies = user_with_hobbies.hobbies if user_with_hobbies else []
+    hobby_names = [h.name for h in current_hobbies]
 
-    exclude_ids = [q.id for q in hobby_quests]
+    ai_quests = []
 
-    standard_limit = 5 - len(hobby_quests)
+    if hobby_names:
+        generated_quests = await generate_quests_by_hobbies(hobby_names)
 
-    query_standard = db.query(DBMiniQuest)
-    if exclude_ids:
-        query_standard = query_standard.filter(~DBMiniQuest.id.in_(exclude_ids))
+        # Перевірка чи сторонній запит не створив вже квести( спроба фіксанути баг)
+        already_created_quests = db.query(DBUserMiniQuest).options(
+            joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
+        ).filter(
+            DBUserMiniQuest.user_id == user.id,
+            DBUserMiniQuest.created_at >= start_of_today
+        ).all()
 
-    standard_quests = query_standard.order_by(func.random()).limit(standard_limit).all()
+        if already_created_quests:
+            return already_created_quests
 
-    daily_quests = hobby_quests + standard_quests
 
-    new_user_quests = []
+        hobby_map = {h.name.lower().strip(): h for h in current_hobbies}
+
+        for q_data in generated_quests[:3]:
+            title = q_data.get("title", "Новий цікавий квест")
+            ai_hobby_name = q_data.get("hobby_name", "").lower().strip()
+
+            matched_hobby = None
+            matched_hobby = hobby_map.get(ai_hobby_name)
+
+            if not matched_hobby:
+                for db_hobby in current_hobbies:
+                    db_name = db_hobby.name.lower().strip()
+                    if ai_hobby_name in db_name or db_name in ai_hobby_name:
+                        matched_hobby = db_hobby
+                        break
+
+            if not matched_hobby and current_hobbies:
+                import random
+                matched_hobby = random.choice(current_hobbies)
+
+            new_quest = DBMiniQuest(
+                title=title,
+                hobbies=[matched_hobby] if matched_hobby else []
+            )
+            db.add(new_quest)
+            db.flush()
+            ai_quests.append(new_quest)
+
+    standard_limit = 5 - len(ai_quests)
+    standard_quests = []
+
+    if standard_limit > 0:
+        routine_query = db.query(DBMiniQuest).filter(~DBMiniQuest.hobbies.any())
+
+        exclude_ids = [q.id for q in ai_quests]
+        if exclude_ids:
+            routine_query = routine_query.filter(~DBMiniQuest.id.in_(exclude_ids))
+
+        standard_quests = routine_query.order_by(func.random()).limit(standard_limit).all()
+
+
+        remaining_limit = standard_limit - len(standard_quests)
+        if remaining_limit > 0:
+            all_exclude = [q.id for q in ai_quests] + [q.id for q in standard_quests]
+            random_fallback = db.query(DBMiniQuest)
+            if all_exclude:
+                random_fallback = random_fallback.filter(~DBMiniQuest.id.in_(all_exclude))
+
+            more_quests = random_fallback.order_by(func.random()).limit(remaining_limit).all()
+            standard_quests.extend(more_quests)
+
+    daily_quests = ai_quests + standard_quests
+
     for quest in daily_quests:
         umq = DBUserMiniQuest(
             user_id=user.id,
@@ -68,19 +135,15 @@ async def get_daily_quests(
             created_at=now
         )
         db.add(umq)
-        new_user_quests.append(umq)
 
     db.commit()
 
-    todays_generated_quests = db.query(DBUserMiniQuest).options(
+    return db.query(DBUserMiniQuest).options(
         joinedload(DBUserMiniQuest.mini_quest).joinedload(DBMiniQuest.hobbies)
     ).filter(
         DBUserMiniQuest.user_id == user.id,
         DBUserMiniQuest.created_at >= start_of_today
     ).all()
-
-    return todays_generated_quests
-
 
 @router.patch("/my-quests/{user_mini_quest_id}/start", response_model=UserMiniQuestResponse)
 async def start_quest(

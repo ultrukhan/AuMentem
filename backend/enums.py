@@ -20,3 +20,25 @@ class QuestEvaluation(str, enum.Enum):
     BETTER = "BETTER"
     WORSE = "WORSE"
     SAME = "SAME"
+
+class ReportReason(str,enum.Enum):
+    SPAM = "SPAM"
+    OFFENSIVE = "OFFENSIVE"
+    SCAM = "SCAM"
+    NUDITY = "NUDITY"
+    VIOLENCE = "VIOLENCE"
+    ILLEGAL_CONTENT = "ILLEGAL_CONTENT"
+    COPYRIGHT = "COPYRIGHT"
+    OTHER = "OTHER"
+
+class EventCategory(str, enum.Enum):
+    SPORT = "SPORT"
+    MUSIC = "MUSIC"
+    ART = "ART"
+    EDUCATION = "EDUCATION"
+    MEETUP = "MEETUP"
+    ENTERTAINMENT = "ENTERTAINMENT"
+    CHARITY = "CHARITY"
+    FOOD = "FOOD"
+    HISTORY = "HISTORY"
+    OTHER = "OTHER"

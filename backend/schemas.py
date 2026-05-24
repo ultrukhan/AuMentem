@@ -1,4 +1,4 @@
-from pydantic import BaseModel,Field,EmailStr, field_validator,model_validator
+from pydantic import BaseModel,ConfigDict,Field,EmailStr, field_validator,model_validator
 from typing import Optional,List
 from uuid import UUID
 from datetime import datetime
@@ -32,7 +32,7 @@ class AppUserCreate(BaseModel):
             raise ValueError('Пароль має містити хоча б одну малу літеру')
         if not re.search(r'\d', value):
             raise ValueError('Пароль має містити хоча б одну цифру')
-        if not re.search(r'[!@#$%^&*(),.?":{}|<>]', value):
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', value):
             raise ValueError('Пароль має містити хоча б один спеціальний символ')
 
         return value
@@ -47,8 +47,11 @@ class AppUserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    is_onboarding_completed : bool
+    hobbies: List[HobbyResponse] = []
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
+
 
 class AppUserPublic(BaseModel):
     id: UUID
@@ -115,10 +118,13 @@ class UserGeoQuestResponse(BaseModel):
 class NearestGeoQuestResponse(BaseModel):
     geo_quest: GeoQuest
     distance_meters: float
+    is_completed_today: bool = False
 
     model_config = {"from_attributes": True}
 
 class QuestCompleteRequest(BaseModel):
+    lat: float
+    lng: float
     photo_url: Optional[str] = None
 
 class MiniQuest(BaseModel):
@@ -210,4 +216,95 @@ class OnlyMessageResponse(BaseModel):
 class SupportRequest(BaseModel):
     message: str = Field(..., min_length=10, description="Текст звернення в підтримку")
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+    @field_validator('email')
+    @classmethod
+    def email_to_lower(cls, value: str):
+        return value.lower()
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_password(cls, value: str):
+        if not re.search(r'[A-Z]', value):
+            raise ValueError('Пароль має містити хоча б одну велику літеру')
+        if not re.search(r'[a-z]', value):
+            raise ValueError('Пароль має містити хоча б одну малу літеру')
+        if not re.search(r'\d', value):
+            raise ValueError('Пароль має містити хоча б одну цифру')
+        if not re.search(r'[!@#$%^&*(),.?":{}|<>_-]', value):
+            raise ValueError('Пароль має містити хоча б один спеціальний символ')
+
+        return value
+
+class PostReportCreate(BaseModel):
+    post_id: UUID
+    reason: ReportReason
+    details: Optional[str] = Field(None, max_length=500, description="Додаткові деталі скарги")
+
+class AlbumItemResponse(BaseModel):
+    id: UUID
+    photo_url: str
+    quest_title: str
+    location_name: str
+    completed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class PaginatedAlbumResponse(BaseModel):
+    total_count: int
+    items: List[AlbumItemResponse]
+    limit: int
+    offset: int
+
+class PaginatedPostResponse(BaseModel):
+    total_count: int
+    items: List[PostResponse]
+    limit: int
+    offset: int
+
+class WeeklyStatResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    week_start: datetime
+    week_end: datetime
+    geo_quests_completed: int
+    mini_quests_completed: int
+    active_days: int
+    top_hobby: Optional[str]
+    unique_locations: int
+
+    model_config = {"from_attributes": True}
+
+
+class LocalEventBase(BaseModel):
+    name: str
+    city: str
+    address: str
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    description: Optional[str] = None
+    external_link: Optional[str] = None
+    image_url: Optional[str] = None
+    category: EventCategory
+    price: Optional[str] = None
+
+class LocalEventCreate(LocalEventBase):
+    pass
+
+class LocalEventResponse(LocalEventBase):
+    id: UUID
+    favorites_count: Optional[int] = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FavEventActionResponse(BaseModel):
+    detail: str
+    is_favorited: bool
 
