@@ -9,7 +9,6 @@ import {
 import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon, Volume2, VolumeX } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Colors, Typography, Radii, Spacing, AuthLayout } from "@/constants/theme";
-import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 import * as SecureStore from "expo-secure-store";
 import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
 import { useSavedTheme } from '@/hooks/useSavedTheme';
@@ -234,7 +233,10 @@ export default function RegisterScreen() {
               </Pressable>
               <Text style={[Typography.nav, { color: c.textMuted, flex: 1, marginLeft: 10, lineHeight: 18 }]}>
                 Я погоджуюсь з{' '}
-                <Text style={{ color: c.accent, textDecorationLine: 'underline' }} onPress={() => { playClickSound(); openPrivacyPolicy(); }}>
+                <Text style={{ color: c.accent, textDecorationLine: 'underline' }} onPress={() => { playClickSound();  router.push({
+      pathname: '/legal', 
+      params: { theme: theme } // передаємо поточну тему
+    }); }}>
                   умовами використання та політикою конфіденційності
                 </Text>
               </Text>

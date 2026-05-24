@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -267,7 +265,6 @@ export default function ProfileScreen() {
   const handleHobbiesSuccess = async () => {
     setShowHobbiesModal(false);
 
-
     const token = await SecureStore.getItemAsync("userToken");
     if (token) {
       const profileRes = await fetch(`${BASE_URL}/auth/me`, {
@@ -322,454 +319,482 @@ export default function ProfileScreen() {
           />
         ) : (
           <FadeInView animationsEnabled={animationsEnabled} style={{ flex: 1 }}>
-        <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={s.scrollContent}
-          >
-            {/* КАРТКА 1: ОСОБИСТІ ДАНІ */}
-            <View
-              style={[
-                s.card,
-                { backgroundColor: c.cardBg, borderColor: c.border },
-                sh.soft,
-              ]}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={s.scrollContent}
             >
-              <Text
-                style={[
-                  Typography.titleMd,
-                  { color: c.textMain, marginBottom: 12 },
-                ]}
-              >
-                Особисті дані
-              </Text>
-
-              <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-                <User color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.textMain }]}
-                  placeholder="Введіть новий нікнейм"
-                  placeholderTextColor={c.textMuted}
-                  value={nickname}
-                  onChangeText={(text) => {
-                    setNickname(text);
-                    if (nickMessage.text)
-                      setNickMessage({ text: "", type: "" });
-                  }}
-                />
-              </View>
-
-              {nickMessage.text ? (
-                <View
-                  style={[
-                    s.messageBox,
-                    {
-                      backgroundColor:
-                        nickMessage.type === "success"
-                          ? "#34C75920"
-                          : "#FF3B3020",
-                    },
-                  ]}
-                >
-                  {nickMessage.type === "success" ? (
-                    <Check color="#34C759" size={18} />
-                  ) : (
-                    <AlertCircle color="#FF3B30" size={18} />
-                  )}
-                  <Text
-                    style={[
-                      s.messageText,
-                      {
-                        color:
-                          nickMessage.type === "success"
-                            ? "#34C759"
-                            : "#FF3B30",
-                      },
-                    ]}
-                  >
-                    {nickMessage.text}
-                  </Text>
-                </View>
-              ) : null}
-
-              <Pressable
-                style={({ pressed }) => [
-                  s.primaryBtn,
-                  { backgroundColor: c.accent, marginTop: 16 },
-                  pressed && s.pressed,
-                  isSavingNick && { opacity: 0.7 },
-                ]}
-                onPress={handleUpdateNickname}
-                disabled={isSavingNick}
-              >
-                {isSavingNick ? (
-                  <ActivityIndicator color="#FFF" />
-                ) : (
-                  <Text style={s.primaryBtnText}>Оновити нікнейм</Text>
-                )}
-              </Pressable>
-            </View>
-
-            {/* КАРТКА 2: БЕЗПЕКА (ЗМІНА ПАРОЛЯ) */}
-            <View
-              style={[
-                s.card,
-                { backgroundColor: c.cardBg, borderColor: c.border },
-                sh.soft,
-              ]}
-            >
-              <Text
-                style={[
-                  Typography.titleMd,
-                  { color: c.textMain, marginBottom: 12 },
-                ]}
-              >
-                Безпека
-              </Text>
-
-              {/* ПОТОЧНИЙ ПАРОЛЬ */}
+              {/* КАРТКА 1: ОСОБИСТІ ДАНІ */}
               <View
                 style={[
-                  s.inputWrapper,
-                  { backgroundColor: c.background, marginBottom: 12 },
+                  s.card,
+                  { backgroundColor: c.cardBg, borderColor: c.border },
+                  sh.soft,
                 ]}
               >
-                <Lock color={c.textMuted} size={20} />
-
-                <View
-                  style={{
-                    flex: 1,
-                    position: "relative",
-                    justifyContent: "center",
-                    height: "100%",
-                  }}
-                >
-                  {!showPassword && oldPassword.length > 0 && (
-                    <View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        { justifyContent: "center" },
-                      ]}
-                      pointerEvents="none"
-                    >
-                      <Text
-                        style={{
-                          ...Typography.body,
-                          color: c.textMain,
-                          fontSize: 16,
-                          letterSpacing: 2,
-                          marginTop: Platform.OS === "ios" ? 4 : 0,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {"•".repeat(oldPassword.length)}
-                      </Text>
-                    </View>
-                  )}
-
-                  <TextInput
-                    style={[
-                      s.input,
-                      { color: c.textMain },
-                      !showPassword &&
-                        oldPassword.length > 0 && {
-                          color: "rgba(255,255,255,0)",
-                        },
-                    ]}
-                    placeholder="Поточний пароль"
-                    placeholderTextColor={c.textMuted}
-                    value={oldPassword}
-                    onChangeText={(t) => {
-                      setOldPassword(t);
-                      if (pwdMessage.text)
-                        setPwdMessage({ text: "", type: "" });
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    caretHidden={!showPassword}
-                    selectionColor={
-                      !showPassword && oldPassword.length > 0
-                        ? "rgba(255,255,255,0)"
-                        : c.accent
-                    }
-                    cursorColor={
-                      !showPassword && oldPassword.length > 0
-                        ? "rgba(255,255,255,0)"
-                        : c.accent
-                    }
-                  />
-                </View>
-
-                <Pressable
-                  onPress={() => {
-                    playClickSound();
-                    setShowPassword(!showPassword);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  {showPassword ? (
-                    <EyeOff color={c.textMuted} size={20} />
-                  ) : (
-                    <Eye color={c.textMuted} size={20} />
-                  )}
-                </Pressable>
-              </View>
-
-              {/* НОВИЙ ПАРОЛЬ */}
-              <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-                <Key color={c.textMuted} size={20} />
-
-                <View
-                  style={{
-                    flex: 1,
-                    position: "relative",
-                    justifyContent: "center",
-                    height: "100%",
-                  }}
-                >
-                  {!showPassword && newPassword.length > 0 && (
-                    <View
-                      style={[
-                        StyleSheet.absoluteFill,
-                        { justifyContent: "center" },
-                      ]}
-                      pointerEvents="none"
-                    >
-                      <Text
-                        style={{
-                          ...Typography.body,
-                          color: c.textMain,
-                          fontSize: 16,
-                          letterSpacing: 2,
-                          marginTop: Platform.OS === "ios" ? 4 : 0,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {"•".repeat(newPassword.length)}
-                      </Text>
-                    </View>
-                  )}
-
-                  <TextInput
-                    style={[
-                      s.input,
-                      { color: c.textMain },
-                      !showPassword &&
-                        newPassword.length > 0 && {
-                          color: "rgba(255,255,255,0)",
-                        },
-                    ]}
-                    placeholder="Новий пароль"
-                    placeholderTextColor={c.textMuted}
-                    value={newPassword}
-                    onChangeText={(t) => {
-                      setNewPassword(t);
-                      if (pwdMessage.text)
-                        setPwdMessage({ text: "", type: "" });
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    caretHidden={!showPassword}
-                    selectionColor={
-                      !showPassword && newPassword.length > 0
-                        ? "rgba(255,255,255,0)"
-                        : c.accent
-                    }
-                    cursorColor={
-                      !showPassword && newPassword.length > 0
-                        ? "rgba(255,255,255,0)"
-                        : c.accent
-                    }
-                  />
-                </View>
-
-                <Pressable
-                  onPress={() => {
-                    playClickSound();
-                    setShowPassword(!showPassword);
-                  }}
-                  style={{ padding: 4 }}
-                >
-                  {showPassword ? (
-                    <EyeOff color={c.textMuted} size={20} />
-                  ) : (
-                    <Eye color={c.textMuted} size={20} />
-                  )}
-                </Pressable>
-              </View>
-
-              {newPassword.length > 0 && !isNewPasswordValid && (
-                <View style={s.requirementsContainer}>
-                  <RequirementItem
-                    text="Мінімум 8 символів"
-                    isValid={hasMinLength}
-                  />
-                  <RequirementItem
-                    text="Велика літера (A-Z)"
-                    isValid={hasUpper}
-                  />
-                  <RequirementItem
-                    text="Мала літера (a-z)"
-                    isValid={hasLower}
-                  />
-                  <RequirementItem text="Цифра (0-9)" isValid={hasNumber} />
-                  <RequirementItem
-                    text="Спецсимвол (!@#$...)"
-                    isValid={hasSpecial}
-                  />
-                </View>
-              )}
-
-              {pwdMessage.text ? (
-                <View
+                <Text
                   style={[
-                    s.messageBox,
-                    {
-                      backgroundColor:
-                        pwdMessage.type === "success"
-                          ? "#34C75920"
-                          : "#FF3B3020",
-                    },
+                    Typography.titleMd,
+                    { color: c.textMain, marginBottom: 12 },
                   ]}
                 >
-                  {pwdMessage.type === "success" ? (
-                    <Check color="#34C759" size={18} />
-                  ) : (
-                    <AlertCircle color="#FF3B30" size={18} />
-                  )}
-                  <Text
+                  Особисті дані
+                </Text>
+
+                <View
+                  style={[s.inputWrapper, { backgroundColor: c.background }]}
+                >
+                  <User color={c.textMuted} size={20} />
+                  <TextInput
+                    style={[s.input, { color: c.textMain }]}
+                    placeholder="Введіть новий нікнейм"
+                    placeholderTextColor={c.textMuted}
+                    value={nickname}
+                    onChangeText={(text) => {
+                      setNickname(text);
+                      if (nickMessage.text)
+                        setNickMessage({ text: "", type: "" });
+                    }}
+                  />
+                </View>
+
+                {nickMessage.text ? (
+                  <View
                     style={[
-                      s.messageText,
+                      s.messageBox,
                       {
-                        color:
-                          pwdMessage.type === "success" ? "#34C759" : "#FF3B30",
+                        backgroundColor:
+                          nickMessage.type === "success"
+                            ? "#34C75920"
+                            : "#FF3B3020",
                       },
                     ]}
                   >
-                    {pwdMessage.text}
-                  </Text>
-                </View>
-              ) : null}
+                    {nickMessage.type === "success" ? (
+                      <Check color="#34C759" size={18} />
+                    ) : (
+                      <AlertCircle color="#FF3B30" size={18} />
+                    )}
+                    <Text
+                      style={[
+                        s.messageText,
+                        {
+                          color:
+                            nickMessage.type === "success"
+                              ? "#34C759"
+                              : "#FF3B30",
+                        },
+                      ]}
+                    >
+                      {nickMessage.text}
+                    </Text>
+                  </View>
+                ) : null}
 
-              <Pressable
-                style={({ pressed }) => [
-                  s.primaryBtn,
-                  { backgroundColor: c.textMain, marginTop: 16 },
-                  (!oldPassword || !isNewPasswordValid) && { opacity: 0.5 },
-                  pressed && s.pressed,
-                  isChangingPwd && { opacity: 0.7 },
+                <Pressable
+                  style={({ pressed }) => [
+                    s.primaryBtn,
+                    { backgroundColor: c.accent, marginTop: 16 },
+                    pressed && s.pressed,
+                    isSavingNick && { opacity: 0.7 },
+                  ]}
+                  onPress={handleUpdateNickname}
+                  disabled={isSavingNick}
+                >
+                  {isSavingNick ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={s.primaryBtnText}>Оновити нікнейм</Text>
+                  )}
+                </Pressable>
+              </View>
+
+              {/* КАРТКА 2: БЕЗПЕКА (ЗМІНА ПАРОЛЯ) */}
+              <View
+                style={[
+                  s.card,
+                  { backgroundColor: c.cardBg, borderColor: c.border },
+                  sh.soft,
                 ]}
-                onPress={handleChangePassword}
-                disabled={isChangingPwd || !oldPassword || !isNewPasswordValid}
               >
-                {isChangingPwd ? (
-                  <ActivityIndicator color={c.background} />
-                ) : (
-                  <Text style={[s.primaryBtnText, { color: c.background }]}>
-                    Змінити пароль
-                  </Text>
-                )}
-              </Pressable>
-            </View>
+                <Text
+                  style={[
+                    Typography.titleMd,
+                    { color: c.textMain, marginBottom: 12 },
+                  ]}
+                >
+                  Безпека
+                </Text>
 
-            {/* КАРТКА 3: ІНШЕ */}
-            <View
-              style={[
-                s.card,
-                { backgroundColor: c.cardBg, borderColor: c.border },
-                sh.soft,
-              ]}
-            >
-         
-              <AnimatedCard
-              animationsEnabled={animationsEnabled}
-              onPress={() => {
-                  playClickSound();
-                  setShowHobbiesModal(true);
-                }}
-                style={({ pressed }) => [s.actionRow, pressed && s.pressed]}
+                {/* ПОТОЧНИЙ ПАРОЛЬ */}
+                <View
+                  style={[
+                    s.inputWrapper,
+                    { backgroundColor: c.background, marginBottom: 12 },
+                  ]}
+                >
+                  <Lock color={c.textMuted} size={20} />
+
+                  <View
+                    style={{
+                      flex: 1,
+                      position: "relative",
+                      justifyContent: "center",
+                      height: "100%",
+                    }}
+                  >
+                    {!showPassword && oldPassword.length > 0 && (
+                      <View
+                        style={[
+                          StyleSheet.absoluteFill,
+                          { justifyContent: "center" },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <Text
+                          style={{
+                            ...Typography.body,
+                            color: c.textMain,
+                            fontSize: 16,
+                            letterSpacing: 2,
+                            marginTop: Platform.OS === "ios" ? 4 : 0,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {"•".repeat(oldPassword.length)}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TextInput
+                      style={[
+                        s.input,
+                        { color: c.textMain },
+                        !showPassword &&
+                          oldPassword.length > 0 && {
+                            color: "rgba(255,255,255,0)",
+                          },
+                      ]}
+                      placeholder="Поточний пароль"
+                      placeholderTextColor={c.textMuted}
+                      value={oldPassword}
+                      onChangeText={(t) => {
+                        setOldPassword(t);
+                        if (pwdMessage.text)
+                          setPwdMessage({ text: "", type: "" });
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      caretHidden={!showPassword}
+                      selectionColor={
+                        !showPassword && oldPassword.length > 0
+                          ? "rgba(255,255,255,0)"
+                          : c.accent
+                      }
+                      cursorColor={
+                        !showPassword && oldPassword.length > 0
+                          ? "rgba(255,255,255,0)"
+                          : c.accent
+                      }
+                    />
+                  </View>
+
+                  <Pressable
+                    onPress={() => {
+                      playClickSound();
+                      setShowPassword(!showPassword);
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    {showPassword ? (
+                      <EyeOff color={c.textMuted} size={20} />
+                    ) : (
+                      <Eye color={c.textMuted} size={20} />
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* НОВИЙ ПАРОЛЬ */}
+                <View
+                  style={[s.inputWrapper, { backgroundColor: c.background }]}
+                >
+                  <Key color={c.textMuted} size={20} />
+
+                  <View
+                    style={{
+                      flex: 1,
+                      position: "relative",
+                      justifyContent: "center",
+                      height: "100%",
+                    }}
+                  >
+                    {!showPassword && newPassword.length > 0 && (
+                      <View
+                        style={[
+                          StyleSheet.absoluteFill,
+                          { justifyContent: "center" },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <Text
+                          style={{
+                            ...Typography.body,
+                            color: c.textMain,
+                            fontSize: 16,
+                            letterSpacing: 2,
+                            marginTop: Platform.OS === "ios" ? 4 : 0,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {"•".repeat(newPassword.length)}
+                        </Text>
+                      </View>
+                    )}
+
+                    <TextInput
+                      style={[
+                        s.input,
+                        { color: c.textMain },
+                        !showPassword &&
+                          newPassword.length > 0 && {
+                            color: "rgba(255,255,255,0)",
+                          },
+                      ]}
+                      placeholder="Новий пароль"
+                      placeholderTextColor={c.textMuted}
+                      value={newPassword}
+                      onChangeText={(t) => {
+                        setNewPassword(t);
+                        if (pwdMessage.text)
+                          setPwdMessage({ text: "", type: "" });
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      caretHidden={!showPassword}
+                      selectionColor={
+                        !showPassword && newPassword.length > 0
+                          ? "rgba(255,255,255,0)"
+                          : c.accent
+                      }
+                      cursorColor={
+                        !showPassword && newPassword.length > 0
+                          ? "rgba(255,255,255,0)"
+                          : c.accent
+                      }
+                    />
+                  </View>
+
+                  <Pressable
+                    onPress={() => {
+                      playClickSound();
+                      setShowPassword(!showPassword);
+                    }}
+                    style={{ padding: 4 }}
+                  >
+                    {showPassword ? (
+                      <EyeOff color={c.textMuted} size={20} />
+                    ) : (
+                      <Eye color={c.textMuted} size={20} />
+                    )}
+                  </Pressable>
+                </View>
+
+                {newPassword.length > 0 && !isNewPasswordValid && (
+                  <View style={s.requirementsContainer}>
+                    <RequirementItem
+                      text="Мінімум 8 символів"
+                      isValid={hasMinLength}
+                    />
+                    <RequirementItem
+                      text="Велика літера (A-Z)"
+                      isValid={hasUpper}
+                    />
+                    <RequirementItem
+                      text="Мала літера (a-z)"
+                      isValid={hasLower}
+                    />
+                    <RequirementItem text="Цифра (0-9)" isValid={hasNumber} />
+                    <RequirementItem
+                      text="Спецсимвол (!@#$...)"
+                      isValid={hasSpecial}
+                    />
+                  </View>
+                )}
+
+                {pwdMessage.text ? (
+                  <View
+                    style={[
+                      s.messageBox,
+                      {
+                        backgroundColor:
+                          pwdMessage.type === "success"
+                            ? "#34C75920"
+                            : "#FF3B3020",
+                      },
+                    ]}
+                  >
+                    {pwdMessage.type === "success" ? (
+                      <Check color="#34C759" size={18} />
+                    ) : (
+                      <AlertCircle color="#FF3B30" size={18} />
+                    )}
+                    <Text
+                      style={[
+                        s.messageText,
+                        {
+                          color:
+                            pwdMessage.type === "success"
+                              ? "#34C759"
+                              : "#FF3B30",
+                        },
+                      ]}
+                    >
+                      {pwdMessage.text}
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={({ pressed }) => [
+                    s.primaryBtn,
+                    { backgroundColor: c.textMain, marginTop: 16 },
+                    (!oldPassword || !isNewPasswordValid) && { opacity: 0.5 },
+                    pressed && s.pressed,
+                    isChangingPwd && { opacity: 0.7 },
+                  ]}
+                  onPress={handleChangePassword}
+                  disabled={
+                    isChangingPwd || !oldPassword || !isNewPasswordValid
+                  }
+                >
+                  {isChangingPwd ? (
+                    <ActivityIndicator color={c.background} />
+                  ) : (
+                    <Text style={[s.primaryBtnText, { color: c.background }]}>
+                      Змінити пароль
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+
+              {/* КАРТКА 3: ІНШЕ */}
+              <View
+                style={[
+                  s.card,
+                  { backgroundColor: c.cardBg, borderColor: c.border },
+                  sh.soft,
+                ]}
               >
+                <AnimatedCard
+                  animationsEnabled={animationsEnabled}
+                  onPress={() => setShowHobbiesModal(true)}
+                  style={s.actionRow}
+                >
+                  <View
+                    style={[
+                      s.rowContainer,
+                      { flex: 1, alignItems: "flex-start" },
+                    ]}
+                  >
+                    <Sparkles
+                      color={c.textMuted}
+                      size={20}
+                      style={{ marginTop: 2 }}
+                    />
+
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text
+                        style={[
+                          Typography.body,
+                          { color: c.textMain, fontWeight: "500" },
+                        ]}
+                      >
+                        Твої інтереси
+                      </Text>
+                      {/* Прибираємо numberOfLines, текст буде переноситися на нові рядки */}
+                      <Text
+                        style={{
+                          color: c.textMuted,
+                          fontSize: 12,
+                          marginTop: 4,
+                        }}
+                      >
+                        {userHobbies.length > 0
+                          ? userHobbies.map((h) => h.name).join(", ")
+                          : "Не обрано"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Кнопка залишається збоку зверху */}
+                  <Text
+                    style={{
+                      color: c.accent,
+                      fontWeight: "600",
+                      fontSize: 14,
+                      marginLeft: 10,
+                      marginTop: 2,
+                    }}
+                  >
+                    Змінити
+                  </Text>
+                </AnimatedCard>
+
+                {/* Роздільник із коректним динамічним кольором */}
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
+                    height: 1,
+                    backgroundColor: c.border,
+                    marginHorizontal: 12,
                   }}
+                />
+
+                <AnimatedCard
+                  animationsEnabled={animationsEnabled}
+                  onPress={handleShareApp}
+                  style={s.actionRow}
                 >
-                  <Sparkles color={c.textMuted} size={20} />
-                  <View>
+                  <View style={s.rowContainer}>
+                    <Share2 color={c.textMuted} size={20} />
                     <Text
                       style={[
                         Typography.body,
-                        { color: c.textMain, fontWeight: "500" },
+                        { color: c.textMain, marginLeft: 12 },
                       ]}
                     >
-                      Твої інтереси
+                      Поділитися
                     </Text>
-                   
                   </View>
-                </View>
-                <Text
-                  style={{ color: c.accent, fontWeight: "600", fontSize: 14 }}
-                >
-                  Змінити
-                </Text>
-              </AnimatedCard>
+                </AnimatedCard>
 
-              <View style={[s.miniDivider, { backgroundColor: c.border }]} />
-
-              <AnimatedCard
-              animationsEnabled={animationsEnabled}
-              onPress={handleShareApp}
-                style={({ pressed }) => [s.actionRow, pressed && s.pressed]}
-              >
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
+                    height: 1,
+                    backgroundColor: c.border,
+                    marginHorizontal: 12,
                   }}
-                >
-                  <Share2 color={c.textMuted} size={20} />
-                  <Text
-                    style={[
-                      Typography.body,
-                      { color: c.textMain, fontWeight: "500" },
-                    ]}
-                  >
-                    Поділитися додатком
-                  </Text>
-                </View>
-              </AnimatedCard>
+                />
 
-              <View style={[s.miniDivider, { backgroundColor: c.border }]} />
-
-              <AnimatedCard
-              animationsEnabled={animationsEnabled}
-              onPress={handleLogout}
-                style={({ pressed }) => [s.actionRow, pressed && s.pressed]}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 12,
-                  }}
+                <AnimatedCard
+                  animationsEnabled={animationsEnabled}
+                  onPress={handleLogout}
+                  style={s.actionRow}
                 >
-                  <LogOut color="#FF3B30" size={20} />
-                  <Text
-                    style={[
-                      Typography.body,
-                      { color: "#FF3B30", fontWeight: "600" },
-                    ]}
-                  >
-                    Вийти з акаунта
-                  </Text>
-                </View>
-              </AnimatedCard>
-            </View>
-          </ScrollView>
+                  <View style={s.rowContainer}>
+                    <LogOut color="#FF3B30" size={20} />
+                    <Text
+                      style={[
+                        Typography.body,
+                        { color: "#FF3B30", marginLeft: 12 },
+                      ]}
+                    >
+                      Вийти
+                    </Text>
+                  </View>
+                </AnimatedCard>
+              </View>
+            </ScrollView>
           </FadeInView>
         )}
 
@@ -777,10 +802,9 @@ export default function ProfileScreen() {
           visible={showHobbiesModal}
           isDark={isDark}
           userId={userId}
-         
           onSuccess={() => {
             setShowHobbiesModal(false);
-            fetchProfileData(); 
+            fetchProfileData();
           }}
           onClose={() => setShowHobbiesModal(false)}
         />
@@ -861,19 +885,34 @@ const s = StyleSheet.create({
     color: "#FFF",
     fontSize: 15,
   },
+
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "center", // було flex-start
+    flex: 1,
+  },
+
+  miniDivider: {
+    height: 1,
+    width: "100%",
+    opacity: 0.08, // замість жирної лінії
+    marginVertical: 4,
+  },
+
+  pressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 12, // Додаємо внутрішній відступ
   },
-  miniDivider: {
-    height: 1,
-    width: "100%",
-    marginVertical: 4,
-  },
-  pressed: {
-    opacity: 0.7,
-    transform: [{ scale: 0.98 }],
+
+  // Додайте цей стиль для контейнера з усіма кнопками
+  actionsContainer: {
+    gap: 0, // Прибираємо проміжки, якщо використовуємо роздільники
   },
 });

@@ -13,7 +13,6 @@ import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound, stopAmbientSound, setAmbientVolume, playAmbientSound } from '@/utils/audio';
 import { BASE_URL } from '@/constants/api';
-import { openPrivacyPolicy } from '@/utils/openPrivacyPolicy';
 import { Toast } from '@/utils/toast';
 import HomeBackground from '@/components/HomeBackground';
 import AnimatedCard from '@/components/AnimatedCard';
@@ -271,7 +270,13 @@ export default function SettingsScreen() {
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ІНФОРМАЦІЯ</Text>
           <View style={s.section}>
             <SettingsLink icon={MessageCircleQuestion} title="Написати в підтримку" isDark={isDark} animationsEnabled={settings.animations} onPress={() => setSupportModalVisible(true)} />
-            <SettingsLink icon={ShieldCheck} title="Умови та Політика" isDark={isDark} animationsEnabled={settings.animations} onPress={openPrivacyPolicy} />
+            <SettingsLink icon={ShieldCheck} title="Умови та Політика" isDark={isDark} animationsEnabled={settings.animations} onPress={() => {
+    // router.push автоматично знайде файл app/legal.tsx
+    router.push({
+      pathname: '/legal', 
+      params: { theme: theme } // передаємо поточну тему
+    });
+  }} />
           </View>
           <View style={s.footerContainer}>
             <Image source={require('@/assets/images/team_icon.png')} style={s.footerIcon} />
