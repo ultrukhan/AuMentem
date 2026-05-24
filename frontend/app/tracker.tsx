@@ -33,9 +33,10 @@ const MOOD_OPTIONS = [
 
 export default function TrackerScreen() {
   const router = useRouter();
-  const { theme: themeParam } = useLocalSearchParams();
+  const { theme: themeParam, canSkip } = useLocalSearchParams();
   const isDark = themeParam === 'dark';
   const themeKey = isDark ? 'dark' : 'light';
+  const showSkip = canSkip === 'true';
   const c = Colors[themeKey];
   const { animationsEnabled } = useAppSettings();
 
@@ -271,6 +272,8 @@ export default function TrackerScreen() {
       <View style={s.header}>
         <Pressable onPress={handleBack} style={s.backBtn}><ArrowLeft color={c.textMain} size={IconSizes.sm} /></Pressable>
         <Text style={[Typography.titleLg, { color: c.textMain, flex: 1, textAlign: 'center', marginRight: 40 }]}>Трекер стану</Text>
+       
+ 
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>

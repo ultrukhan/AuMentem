@@ -115,22 +115,44 @@ export default function HomeScreen() {
     router.push({ pathname: "/tracker", params: { theme } });
   }, [router, theme]);
 
+  // const maybeShowTracker = useCallback(
+  //   async (token: string) => {
+  //     if (trackerCheckInFlight.current || trackerCheckedThisSession.current)
+  //       return;
+  //     trackerCheckInFlight.current = true;
+  //     try {
+  //       const show = await shouldShowTrackerToday(token);
+  //       if (show !== null) {
+  //         trackerCheckedThisSession.current = true;
+  //         if (show) setTimeout(navigateToTracker, 500);
+  //       }
+  //     } finally {
+  //       trackerCheckInFlight.current = false;
+  //     }
+  //   },
+  //   [navigateToTracker],
+  // );
   const maybeShowTracker = useCallback(
     async (token: string) => {
       if (trackerCheckInFlight.current || trackerCheckedThisSession.current)
         return;
+
       trackerCheckInFlight.current = true;
       try {
         const show = await shouldShowTrackerToday(token);
-        if (show !== null) {
+        if (show) {
           trackerCheckedThisSession.current = true;
-          if (show) setTimeout(navigateToTracker, 500);
+          // Передаємо параметр, що це "обов'язковий" трекер
+          router.push({
+            pathname: "/tracker",
+            params: { theme, canSkip: "true" }, // 💥 Додали параметр canSkip
+          });
         }
       } finally {
         trackerCheckInFlight.current = false;
       }
     },
-    [navigateToTracker],
+    [router, theme],
   );
 
   // const finishHobbiesFlow = useCallback(async () => {
@@ -151,12 +173,12 @@ export default function HomeScreen() {
   //   const token = await SecureStore.getItemAsync("userToken");
   //   if (token) await maybeShowTracker(token);
   // }, [maybeShowTracker]);
-const finishHobbiesFlow = useCallback(async () => {
+  const finishHobbiesFlow = useCallback(async () => {
     // Просто ховаємо модалку
     setShowHobbies(false);
-    
+
     // І перевіряємо, чи треба показати трекер настрою
-    const token = await SecureStore.getItemAsync('userToken');
+    const token = await SecureStore.getItemAsync("userToken");
     if (token) {
       await maybeShowTracker(token);
     }
@@ -231,10 +253,10 @@ const finishHobbiesFlow = useCallback(async () => {
     useCallback(() => {
       const loadData = async () => {
         try {
-          const token = await SecureStore.getItemAsync('userToken');
-          if (!token) { 
-            router.replace('/'); 
-            return; 
+          const token = await SecureStore.getItemAsync("userToken");
+          if (!token) {
+            router.replace("/");
+            return;
           }
 
           const response = await fetch(`${BASE_URL}/auth/me`, {
@@ -247,15 +269,18 @@ const finishHobbiesFlow = useCallback(async () => {
 
             // Зберігаємо ID для інших екранів (наприклад, для тваринки)
             const userId = String(data.id);
-            await SecureStore.setItemAsync('currentUserId', userId);
+            await SecureStore.setItemAsync("currentUserId", userId);
 
-            const statusRes = await fetch(`${BASE_URL}/app_user/onboarding-status`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
+            const statusRes = await fetch(
+              `${BASE_URL}/app_user/onboarding-status`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
 
             if (statusRes.ok) {
               const statusData = await statusRes.json();
-              
+
               // Якщо бекенд каже, що треба вибрати хобі — показуємо модалку
               if (statusData.needs_hobby_selection === true) {
                 setShowHobbies(true);
@@ -264,15 +289,14 @@ const finishHobbiesFlow = useCallback(async () => {
                 await maybeShowTracker(token);
               }
             } else {
-               // Якщо сталася помилка сервера, просто пускаємо користувача до додатка
-               await maybeShowTracker(token);
+              // Якщо сталася помилка сервера, просто пускаємо користувача до додатка
+              await maybeShowTracker(token);
             }
-
           } else {
             // Якщо токен протух
-            await SecureStore.deleteItemAsync('userToken');
-            await SecureStore.deleteItemAsync('currentUserId');
-            router.replace('/');
+            await SecureStore.deleteItemAsync("userToken");
+            await SecureStore.deleteItemAsync("currentUserId");
+            router.replace("/");
           }
         } catch {
           // Ігноруємо помилки мережі, щоб додаток не крашився
@@ -282,7 +306,7 @@ const finishHobbiesFlow = useCallback(async () => {
       };
 
       loadData();
-    }, [maybeShowTracker, router])
+    }, [maybeShowTracker, router]),
   );
 
   const getCardStyle = (isWide = false) => [
@@ -361,7 +385,9 @@ const finishHobbiesFlow = useCallback(async () => {
               style={getIconBtnStyle()}
               accessible={true}
               accessibilityRole="button"
-              accessibilityLabel={isDark ? "Увімкнути світлу тему" : "Увімкнути темну тему"}
+              accessibilityLabel={
+                isDark ? "Увімкнути світлу тему" : "Увімкнути темну тему"
+              }
             >
               {isDark ? (
                 <Sun color={c.textMain} size={20} strokeWidth={2} />
