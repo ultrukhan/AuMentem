@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException,Form, Body,Query
 from sqlalchemy.orm import Session, joinedload
 from database import get_db
-from sqlalchemy import or_
+from sqlalchemy import or_,and_
 from models import DBAppUser,DBFavEvent,get_utc_now,DBLocalEvents
 from schemas import LocalEventCreate,LocalEventResponse,LocalEventBase,FavEventActionResponse
 from auth_utils import get_current_user
@@ -17,17 +17,34 @@ router = APIRouter(
 
 @router.get("/", response_model=List[LocalEventResponse])
 async def get_upcoming_events(
-    category: Optional[EventCategory] = Query(None, description="Фільтр за категорією"),
-    city: Optional[str] = Query(None, description="Фільтр за містом"),
-    date_from: Optional[datetime] = Query(None, description="Показати події, що починаються з цієї дати"),
-    only_free: bool = Query(False, description="Показати лише безкоштовні заходи"),
-    db: Session = Depends(get_db)
+        category: Optional[EventCategory] = Query(None, description="Фільтр за категорією"),
+        city: Optional[str] = Query(None, description="Фільтр за містом"),
+        date_from: Optional[datetime] = Query(None, description="Показати події, що починаються з цієї дати"),
+        only_free: bool = Query(False, description="Показати лише безкоштовні заходи"),
+        db: Session = Depends(get_db)
 ):
     """
-    Видає список майбутніх заходів із можливістю гнучкої фільтрації.
+    Видає список заходів із гнучкою фільтрацією та перевіркою часу.
     """
-    query = db.query(DBLocalEvents).filter(DBLocalEvents.start_time >= get_utc_now())
+    current_time = get_utc_now()
+    query = db.query(DBLocalEvents)
 
+    has_link_condition = and_(
+        DBLocalEvents.external_link.isnot(None),
+        DBLocalEvents.start_time >= current_time
+    )
+
+    no_link_condition = and_(
+        DBLocalEvents.external_link.is_(None),
+        or_(
+            DBLocalEvents.end_time >= current_time,
+            and_(
+                DBLocalEvents.end_time.is_(None),
+                DBLocalEvents.start_time >= current_time
+            )
+        )
+    )
+    query = query.filter(or_(has_link_condition, no_link_condition))
     if category:
         query = query.filter(DBLocalEvents.category == category)
 
@@ -45,24 +62,36 @@ async def get_upcoming_events(
                 DBLocalEvents.price == "0"
             )
         )
-
     events = query.order_by(DBLocalEvents.start_time.asc()).all()
 
     return events
 
 @router.get("/my/favorites", response_model=List[LocalEventResponse])
-async def get_my_events(user: DBAppUser = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """Екран 'Мої події' - видає всі збережені заходи поточного юзера"""
-    events = (
+async def get_my_events(
+        show_past: bool = Query(False,
+                                description="Якщо True - поверне історію минулих подій, якщо False - тільки майбутні"),
+        user: DBAppUser = Depends(get_current_user),
+        db: Session = Depends(get_db)):
+    """
+    Екран 'Мої події'.
+    За замовчуванням видає тільки ті збережені заходи, які ще не почалися.
+    """
+    now = get_utc_now()
+
+    query = (
         db.query(DBLocalEvents)
         .join(DBFavEvent, DBLocalEvents.id == DBFavEvent.event_id)
         .filter(DBFavEvent.user_id == user.id)
-        .order_by(DBFavEvent.created_at.desc())
-        .all()
     )
-    return events
 
+    if show_past:
+        query = query.filter(DBLocalEvents.start_time < now)
+        events = query.order_by(DBLocalEvents.start_time.desc()).all()
+    else:
+        query = query.filter(DBLocalEvents.start_time >= now)
+        events = query.order_by(DBLocalEvents.start_time.asc()).all()
+
+    return events
 
 
 @router.post("/{event_id}/favorite", response_model=FavEventActionResponse)

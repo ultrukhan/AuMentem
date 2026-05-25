@@ -46,6 +46,7 @@ class DBAppUser(Base):
     deleted_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), default=get_utc_now)
     verification_code = Column(String, nullable=True)
+    is_onboarding_completed = Column(Boolean, default=False)
     hobbies = relationship("DBHobby", secondary=user_hobby_table,backref="users")
 
 class DBPost(Base):

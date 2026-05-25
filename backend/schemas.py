@@ -47,8 +47,11 @@ class AppUserResponse(BaseModel):
     is_active: bool
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    is_onboarding_completed : bool
+    hobbies: List[HobbyResponse] = []
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
+
 
 class AppUserPublic(BaseModel):
     id: UUID
