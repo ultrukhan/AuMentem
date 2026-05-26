@@ -17,20 +17,32 @@ const setupAudio = async () => {
   } catch {}
 };
 
-const getAudioSettings = async () => {
+let cachedSettings: { music: boolean, musicVolume: number, sfx: boolean, sfxVolume: number } | null = null;
+
+export const refreshAudioSettings = async () => {
   try {
     const saved = await SecureStore.getItemAsync('userSettings');
-    if (!saved) return { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
+    if (!saved) {
+      cachedSettings = { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
+      return cachedSettings;
+    }
     const settings = JSON.parse(saved);
-    return {
+    cachedSettings = {
       music: settings.music !== false,
       musicVolume: settings.musicVolume !== undefined ? settings.musicVolume : 0.5,
       sfx: settings.sfx !== false,
       sfxVolume: settings.sfxVolume !== undefined ? settings.sfxVolume : 0.5,
     };
+    return cachedSettings;
   } catch {
-    return { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
+    cachedSettings = { music: true, musicVolume: 0.5, sfx: true, sfxVolume: 0.5 };
+    return cachedSettings;
   }
+};
+
+const getAudioSettings = async () => {
+  if (cachedSettings) return cachedSettings;
+  return await refreshAudioSettings();
 };
 
 const playOneShot = (asset: number, volume: number) => {

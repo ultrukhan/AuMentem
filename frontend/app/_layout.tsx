@@ -2,9 +2,11 @@ import { Stack } from 'expo-router';
 import { useFonts, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { Platform, AppState } from 'react-native';
+import { Platform, AppState, View, StyleSheet, Appearance } from 'react-native';
 import * as NavigationBar from 'expo-navigation-bar';
 import ToastContainer from '@/components/ToastContainer';
+import OfflineBanner from '@/components/OfflineBanner';
+import { SyncManager } from '@/utils/SyncManager';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,9 +23,7 @@ export default function RootLayout() {
         try {
           await NavigationBar.setVisibilityAsync("hidden");
           await NavigationBar.setBehaviorAsync("overlay-swipe");
-        } catch (e) {
-          console.warn(e);
-        }
+        } catch (e) {}
       };
 
       enforceImmersiveMode();
@@ -50,15 +50,21 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (loaded || error) SplashScreen.hideAsync();
+    if (loaded || error) {
+      SplashScreen.hideAsync();
+      SyncManager.init();
+    }
   }, [loaded, error]);
 
   if (!loaded && !error) return null;
 
+  const bgColor = Appearance.getColorScheme() === 'dark' ? '#020617' : '#FFFDF7';
+
   return (
-    <>
-      <Stack screenOptions={{ headerShown: false }} />
+    <View style={{ flex: 1, backgroundColor: bgColor }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: bgColor }, animation: 'fade' }} />
       <ToastContainer />
-    </>
+      <OfflineBanner />
+    </View>
   );
 }

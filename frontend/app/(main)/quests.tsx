@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, User, Settings, Activity, Footprints, Palette, CheckCircle2, Sparkles, Star, Check, Share, Ghost, Hash, Smile, Meh, Frown, Code, BookOpen, Bike, Camera, Coffee, Heart, Compass, Library, Music, Gamepad2, Dumbbell, Leaf, Film, Brain, PawPrint, Car, PenTool, Globe, Calculator } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '@/constants/api';
 import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, interpolate, Extrapolation, FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
@@ -15,6 +16,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedCard from '@/components/AnimatedCard';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { parseApiError } from '@/utils/apiErrors';
+import { fetchWithCache } from '@/utils/apiWithCache';
+import { SyncManager } from '@/utils/SyncManager';
 const getHobbyIcon = (name: string, color: string, size: number) => {
   if (!name) return <Hash color={color} size={size} />;
   const lower = name.toLowerCase();
@@ -148,13 +151,14 @@ export default function QuestsScreen() {
       if (!token) return;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      const response = await fetch(`${BASE_URL}/mini-quests/daily`, { 
+      const response = await fetchWithCache(`${BASE_URL}/mini-quests/daily`, { 
         headers: { 'Authorization': `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        cacheKey: `quests_daily_${token}`
       });
       clearTimeout(timeoutId);
-      if (response.ok) {
-        const data = await response.json();
+      if (response.ok && response.data) {
+        const data = response.data;
         const priority: Record<string, number> = { 'IN_PROGRESS': 1, 'AVAILABLE': 2, 'COMPLETED': 3 };
         const sorted = data.sort((a: any, b: any) => (priority[a.status] || 99) - (priority[b.status] || 99));
         setQuests(sorted.slice(0, 5));
@@ -179,9 +183,22 @@ export default function QuestsScreen() {
     playClickSound(); setActionLoadingId(questId);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/mini-quests/my-quests/${questId}/${action}`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` } });
-      if (response.ok) {
-        await loadQuests(false);
+      let success = false;
+      try {
+        const response = await fetch(`${BASE_URL}/mini-quests/my-quests/${questId}/${action}`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` } });
+        if (response.ok) success = true;
+      } catch (e) {
+        await SyncManager.enqueueAction(`${BASE_URL}/mini-quests/my-quests/${questId}/${action}`, 'PATCH');
+        success = true;
+        Toast.show({ type: 'info', text1: 'Офлайн', text2: 'Дію збережено. Буде відправлено пізніше.' });
+      }
+
+      if (success) {
+        setQuests(prev => {
+          const newQuests = prev.map(q => q.id === questId ? { ...q, status: action === 'complete' ? 'COMPLETED' : 'IN_PROGRESS' } : q);
+          AsyncStorage.setItem(`quests_daily_${token}`, JSON.stringify(newQuests)).catch(() => {});
+          return newQuests;
+        });
         if (action === 'complete') {
           playSuccessSound();
           let defaultAnonymous = false;
@@ -217,9 +234,22 @@ export default function QuestsScreen() {
     if (!evalQuestId) return; playClickSound(); setEvalModalVisible(false); setActionLoadingId(evalQuestId);
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const response = await fetch(`${BASE_URL}/mini-quests/my-quests/${evalQuestId}/evaluate`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ evaluation }) });
-      if (response.ok) {
-        await loadQuests(false);
+      let success = false;
+      try {
+        const response = await fetch(`${BASE_URL}/mini-quests/my-quests/${evalQuestId}/evaluate`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ evaluation }) });
+        if (response.ok) success = true;
+      } catch (e) {
+        await SyncManager.enqueueAction(`${BASE_URL}/mini-quests/my-quests/${evalQuestId}/evaluate`, 'PATCH', { evaluation });
+        success = true;
+        Toast.show({ type: 'info', text1: 'Офлайн', text2: 'Оцінку збережено локально.' });
+      }
+
+      if (success) {
+        setQuests(prev => {
+          const newQuests = prev.map(q => q.id === evalQuestId ? { ...q, evaluation } : q);
+          AsyncStorage.setItem(`quests_daily_${token}`, JSON.stringify(newQuests)).catch(() => {});
+          return newQuests;
+        });
         Toast.show({ type: 'success', text1: 'Оцінку збережено', text2: 'Дякуємо, що ділишся своїм станом!' });
       } else { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося зберегти оцінку' }); }
     } catch (error) { Toast.show({ type: 'error', text1: 'Помилка мережі', text2: 'Не вдалося зберегти оцінку' }); } finally { setActionLoadingId(null); setEvalQuestId(null); }

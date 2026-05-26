@@ -48,10 +48,14 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 import { useSinglePress } from "@/hooks/useSinglePress";
 import { cardShadow } from "@/utils/shadowStyle";
 import { MotiView } from "moti";
+import { BlurView } from 'expo-blur';
 import EventCover from "@/components/EventCover";
 import EventCardSkeleton from "@/components/EventCardSkeleton";
 import BottomNav from "@/components/BottomNav";
 import { Toast } from '@/utils/toast';
+import { fetchWithCache } from '@/utils/apiWithCache';
+import { SyncManager } from '@/utils/SyncManager';
+import { hasLoadedData, markDataLoaded } from "@/utils/sessionCache";
 
 interface LocalEvent {
   id: string;
@@ -117,12 +121,14 @@ export default function LocalEventsScreen() {
   const [remindEvent, setRemindEvent] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"EXPLORE" | "SAVED">("EXPLORE");
+  const exploreListRef = useRef<FlatList>(null);
+  const savedListRef = useRef<FlatList>(null);
 
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const [savedEvents, setSavedEvents] = useState<LocalEvent[]>([]);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasLoadedData('events'));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listRefreshEpoch, setListRefreshEpoch] = useState(0);
   const hasLoadedOnceRef = useRef(false);
@@ -132,6 +138,7 @@ export default function LocalEventsScreen() {
   const [isTogglingFav, setIsTogglingFav] = useState(false);
 
   const [currentCity, setCurrentCity] = useState("Львів");
+  const [freeOnly, setFreeOnly] = useState(false);
 
   const fetchEventsAndFavorites = useCallback(
     async (options?: { refresh?: boolean }) => {
@@ -145,24 +152,31 @@ export default function LocalEventsScreen() {
         const headers = { Authorization: `Bearer ${token}` };
 
         let url = `${BASE_URL}/local-events/`;
+        const params = [];
         if (currentCity !== "Всі міста") {
-          url += `?city=${encodeURIComponent(currentCity)}`;
+          params.push(`city=${encodeURIComponent(currentCity)}`);
+        }
+        if (freeOnly) {
+          params.push(`free_only=true`);
+        }
+        if (params.length > 0) {
+          url += `?${params.join("&")}`;
         }
 
         const favUrl = `${BASE_URL}/local-events/my/favorites?show_past=${showPast}`;
 
         const [eventsRes, favRes] = await Promise.all([
-          fetch(url, { headers }),
-          fetch(favUrl, { headers }),
+          fetchWithCache(url, { headers, cacheKey: `events_${currentCity}_free${freeOnly}_${token}` }),
+          fetchWithCache(favUrl, { headers, cacheKey: `events_fav_${showPast}_${token}` }),
         ]);
 
-        if (eventsRes.ok) {
-          const eventsData: LocalEvent[] = await eventsRes.json();
+        if (eventsRes.ok && eventsRes.data) {
+          const eventsData: LocalEvent[] = eventsRes.data;
           setEvents(eventsData);
         }
 
-        if (favRes.ok) {
-          const favData: LocalEvent[] = await favRes.json();
+        if (favRes.ok && favRes.data) {
+          const favData: LocalEvent[] = favRes.data;
           setSavedEvents(favData);
           setFavoriteIds(new Set(favData.map((e) => e.id)));
         }
@@ -171,13 +185,14 @@ export default function LocalEventsScreen() {
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
+        markDataLoaded('events');
         hasLoadedOnceRef.current = true;
         if (options?.refresh) {
           setListRefreshEpoch((n) => n + 1);
         }
       }
     },
-    [currentCity, showPast],
+    [currentCity, showPast, freeOnly],
   );
 
   const filteredEvents = useMemo(
@@ -199,28 +214,42 @@ export default function LocalEventsScreen() {
     if (activeTab === "SAVED") {
       fetchEventsAndFavorites({ refresh: true });
     }
-  }, [showPast, activeTab]);
+  }, [activeTab]);
 
   useEffect(() => {
     if (!hasLoadedOnceRef.current) return;
     fetchEventsAndFavorites({ refresh: true });
-  }, [currentCity]);
+  }, [currentCity, freeOnly]);
 
   const handleToggleFavorite = async (event: LocalEvent) => {
     setIsTogglingFav(true);
     try {
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(
-        `${BASE_URL}/local-events/${event.id}/favorite`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      let success = false;
+      let data = { is_favorited: !favoriteIds.has(event.id) };
 
-      if (response.ok) {
-        const data = await response.json();
+      try {
+        const response = await fetch(
+          `${BASE_URL}/local-events/${event.id}/favorite`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
 
+        if (response.ok) {
+          data = await response.json();
+          success = true;
+        } else {
+          Toast.show({ title: "Помилка", message: await parseApiError(response, "Не вдалося оновити статус події") });
+        }
+      } catch (e) {
+        await SyncManager.enqueueAction(`${BASE_URL}/local-events/${event.id}/favorite`, 'POST');
+        success = true;
+        Toast.show({ title: "Офлайн", message: "Дію збережено. Буде відправлено пізніше." });
+      }
+
+      if (success) {
         setFavoriteIds((prev) => {
           const newSet = new Set(prev);
           data.is_favorited ? newSet.add(event.id) : newSet.delete(event.id);
@@ -239,10 +268,28 @@ export default function LocalEventsScreen() {
           setAttendeesCount((prev) =>
             prev !== null ? (data.is_favorited ? prev + 1 : prev - 1) : null,
           );
+          if (data.is_favorited) {
+            setRemindEvent(true);
+          } else {
+            setRemindEvent(false);
+          }
         }
-      } else {
-        Toast.show({ title: "Помилка", message: await parseApiError(response, "Не вдалося оновити статус події"),
-         });
+        
+        if (data.is_favorited) {
+          import('@/utils/notifications').then(({ scheduleEventReminder }) => {
+            scheduleEventReminder(event.name, event.start_time).then((res) => {
+              if (res) {
+                import('@/utils/toast').then(({ Toast }) => {
+                  Toast.show({ title: "Нагадування", message: "Нагадування автоматично встановлено" });
+                });
+              }
+            });
+          });
+        } else {
+          import('@/utils/notifications').then(({ cancelEventReminder }) => {
+            cancelEventReminder(event.name);
+          });
+        }
       }
     } catch (error) {
       Toast.show({ title: "Помилка", message: "Не вдалося оновити статус події" });
@@ -333,6 +380,31 @@ export default function LocalEventsScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.filterScroll}
       >
+        <Pressable
+          style={[
+            s.filterChip,
+            { backgroundColor: c.cardBg, borderColor: c.border },
+            freeOnly && {
+              backgroundColor: c.textMain,
+              borderColor: c.textMain,
+              ...s.badgeShadow,
+            },
+          ]}
+          onPress={() => {
+            playClickSound();
+            setFreeOnly(!freeOnly);
+          }}
+        >
+          <Text
+            style={[
+              s.filterChipText,
+              { color: c.textMuted },
+              freeOnly && { color: c.background },
+            ]}
+          >
+            Безкоштовно
+          </Text>
+        </Pressable>
         {DATE_FILTERS.map((df) => {
           const isActive = dateFilter === df.id;
           return (
@@ -521,27 +593,6 @@ export default function LocalEventsScreen() {
       edges={["top"]}
     >
       <View style={s.screenHeader}>
-        <Pressable
-          onPress={() =>
-            runOnce(() => {
-              playClickSound();
-              if (router.canGoBack()) router.back();
-              else
-                router.replace({
-                  pathname: "/(main)/home",
-                  params: { theme: themeKey },
-                });
-            })
-          }
-          style={({ pressed }) => [
-            s.roundBackBtn,
-            { backgroundColor: c.cardBg, borderColor: c.border },
-            cardShadow(themeKey, "soft"),
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <ArrowLeft color={c.textMain} size={24} strokeWidth={2.5} />
-        </Pressable>
         <Text style={[s.screenTitle, { color: c.textMain }]}>Афіша 📍</Text>
       </View>
 
@@ -558,7 +609,11 @@ export default function LocalEventsScreen() {
           ]}
           onPress={() => {
             playClickSound();
-            setActiveTab("EXPLORE");
+            if (activeTab === "EXPLORE") {
+              exploreListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            } else {
+              setActiveTab("EXPLORE");
+            }
           }}
         >
           <Text
@@ -583,7 +638,11 @@ export default function LocalEventsScreen() {
           ]}
           onPress={() => {
             playClickSound();
-            setActiveTab("SAVED");
+            if (activeTab === "SAVED") {
+              savedListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            } else {
+              setActiveTab("SAVED");
+            }
           }}
         >
           <Text
@@ -607,7 +666,7 @@ export default function LocalEventsScreen() {
   {/* Кнопка "Майбутні" */}
   <Pressable
     onPress={() => { playClickSound(); setShowPast(false); }}
-    style={[
+    style={({ pressed }) => [
       s.miniFilter,
       {
         backgroundColor: !showPast 
@@ -615,6 +674,7 @@ export default function LocalEventsScreen() {
           : (isDark ? "#333333" : "#E5E7EB"),
         borderColor: c.border,
       },
+      pressed && animationsEnabled && { opacity: 0.7 }
     ]}
   >
     <Text style={[
@@ -632,7 +692,7 @@ export default function LocalEventsScreen() {
   {/* Кнопка "Історія" */}
   <Pressable
     onPress={() => { playClickSound(); setShowPast(true); }}
-    style={[
+    style={({ pressed }) => [
       s.miniFilter,
       {
         backgroundColor: showPast 
@@ -640,6 +700,7 @@ export default function LocalEventsScreen() {
           : (isDark ? "#333333" : "#E5E7EB"),
         borderColor: c.border,
       },
+      pressed && animationsEnabled && { opacity: 0.7 }
     ]}
   >
     <Text style={[
@@ -661,6 +722,7 @@ export default function LocalEventsScreen() {
       <View style={s.listArea}>
         {activeTab === "EXPLORE" ? (
           <FlatList
+            ref={exploreListRef}
             style={s.list}
             data={isLoading ? [] : filteredEvents}
             keyExtractor={(item) => item.id}
@@ -707,6 +769,7 @@ export default function LocalEventsScreen() {
           />
         ) : (
           <FlatList
+            ref={savedListRef}
             style={s.list}
             data={isLoading ? [] : savedEvents}
             keyExtractor={(item) => item.id}
@@ -787,7 +850,7 @@ export default function LocalEventsScreen() {
       <Modal
         visible={!!selectedEvent}
         animationType="slide"
-        transparent={false}
+        transparent={true}
       >
         {selectedEvent &&
           (() => {
@@ -796,12 +859,13 @@ export default function LocalEventsScreen() {
 
             return (
               <View
-                style={[s.modalFullScreen, { backgroundColor: c.background }]}
+                style={[s.modalFullScreen, { backgroundColor: 'transparent' }]}
               >
+                <BlurView intensity={isDark ? 80 : 100} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFill} />
                 <ScrollView
                   showsVerticalScrollIndicator={false}
                   bounces={false}
-                  contentContainerStyle={{ paddingBottom: 140 }}
+                  contentContainerStyle={{ paddingBottom: 0 }}
                 >
                   <View style={s.modalImageContainer}>
                     <EventCover
@@ -835,7 +899,7 @@ export default function LocalEventsScreen() {
                   </View>
 
                   <View
-                    style={[s.modalBody, { backgroundColor: c.background }]}
+                    style={[s.modalBody, { backgroundColor: c.background, paddingBottom: 120 }]}
                   >
                     <View
                       style={[
@@ -887,6 +951,21 @@ export default function LocalEventsScreen() {
                           {time}
                         </Text>
                       </View>
+                      {selectedEvent.end_time && (
+                        <View style={s.modalInfoItem}>
+                          <View
+                            style={[
+                              s.modalIconBg,
+                              { backgroundColor: `${c.accent}15` },
+                            ]}
+                          >
+                            <Clock color={c.accent} size={20} />
+                          </View>
+                          <Text style={[s.modalInfoLabel, { color: c.textMain }]}>
+                            До {formatDate(selectedEvent.end_time).time}
+                          </Text>
+                        </View>
+                      )}
                       <View style={s.modalInfoItem}>
                         <View
                           style={[
@@ -923,28 +1002,62 @@ export default function LocalEventsScreen() {
                       </View>
                     )}
 
+                    <Pressable 
+                      onPress={() => { 
+                        playClickSound(); 
+                        const nextRemind = !remindEvent;
+                        setRemindEvent(nextRemind);
+                        if (nextRemind) {
+                          const eventTime = new Date(selectedEvent.start_time).getTime();
+                          if (eventTime < Date.now()) {
+                            import('@/utils/toast').then(({ Toast }) => {
+                              Toast.show({ title: "Упс", message: "Подія вже минула або почалася!" });
+                            });
+                            setRemindEvent(false);
+                            return;
+                          }
+                          import('@/utils/notifications').then(({ scheduleEventReminder }) => {
+                            scheduleEventReminder(selectedEvent.name, selectedEvent.start_time).then(scheduled => {
+                              if (scheduled) {
+                                import('@/utils/toast').then(({ Toast }) => {
+                                  Toast.show({ title: "Готово!", message: "Нагадування успішно встановлено!" });
+                                });
+                              } else {
+                                import('@/utils/toast').then(({ Toast }) => {
+                                  Toast.show({ title: "Помилка", message: "Перевірте дозволи на сповіщення в налаштуваннях." });
+                                });
+                                setRemindEvent(false);
+                              }
+                            });
+                          });
+                        } else {
+                          import('@/utils/notifications').then(({ cancelEventReminder }) => {
+                            cancelEventReminder(selectedEvent.name);
+                          });
+                        }
+                      }}
+                      style={({ pressed }) => [
+                        s.checkboxRow, 
+                        { marginTop: 16, marginBottom: 16, padding: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' },
+                        pressed && animationsEnabled && { opacity: 0.7 }
+                      ]}
+                    >
+                      <View style={[s.checkbox, { borderColor: c.textMuted }, remindEvent && { backgroundColor: c.accent, borderColor: c.accent }]}>
+                        {remindEvent && <Check color="#FFF" size={14} strokeWidth={3} />}
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[Typography.body, { color: c.textMain }]}>Нагадати про захід</Text>
+                        <Text style={[Typography.nav, { color: c.textMuted }]}>Ми надішлемо сповіщення за годину</Text>
+                      </View>
+                      <Bell color={remindEvent ? c.accent : c.textMuted} size={24} />
+                    </Pressable>
+
                     <Text style={[s.modalDescTitle, { color: c.textMain }]}>
                       Про подію
                     </Text>
                     <Text style={[s.modalDescText, { color: c.textMuted }]}>
                       {selectedEvent.description}
                     </Text>
-
-                    {selectedEvent.external_link && (
-                      <Pressable 
-                        onPress={() => { playClickSound(); setRemindEvent(!remindEvent); }}
-                        style={[s.checkboxRow, { marginTop: 24, padding: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}
-                      >
-                        <View style={[s.checkbox, { borderColor: c.textMuted }, remindEvent && { backgroundColor: c.accent, borderColor: c.accent }]}>
-                          {remindEvent && <Check color="#FFF" size={14} strokeWidth={3} />}
-                        </View>
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-                          <Text style={[Typography.body, { color: c.textMain }]}>Нагадати про захід</Text>
-                          <Text style={[Typography.nav, { color: c.textMuted }]}>Ми надішлемо сповіщення за годину</Text>
-                        </View>
-                        <Bell color={remindEvent ? c.accent : c.textMuted} size={24} />
-                      </Pressable>
-                    )}
                   </View>
                 </ScrollView>
 
@@ -965,7 +1078,7 @@ export default function LocalEventsScreen() {
                           ? "rgba(239,68,68,0.2)"
                           : "#FEF2F2",
                       },
-                      pressed && { opacity: 0.7 },
+                      pressed && animationsEnabled && { opacity: 0.7 },
                     ]}
                     onPress={() => {
                       playClickSound();
@@ -992,16 +1105,8 @@ export default function LocalEventsScreen() {
                         },
                       s.lightShadow,
                     ]}
-                    onPress={async () => {
+                    onPress={() => {
                       if (selectedEvent.external_link) {
-                        if (remindEvent) {
-                          const scheduled = await scheduleEventReminder(selectedEvent.name, selectedEvent.start_time);
-                          if (scheduled) {
-                            Toast.success("Готово!", "Нагадування успішно встановлено!");
-                          } else {
-                            Toast.error("Помилка", "Немає дозволу на сповіщення");
-                          }
-                        }
                         openExternalLink(selectedEvent.external_link);
                       }
                     }}

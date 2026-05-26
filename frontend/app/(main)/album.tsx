@@ -21,6 +21,7 @@ import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import { hasLoadedData, markDataLoaded } from "@/utils/sessionCache";
 
 import { Colors, Typography, Radii, Spacing } from "@/constants/theme";
 import { playClickSound } from "@/utils/audio";
@@ -47,13 +48,13 @@ export default function GalleryScreen() {
   const { animationsEnabled } = useAppSettings();
 
   const [photos, setPhotos] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasLoadedData("album"));
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lightboxPhoto, setLightboxPhoto] = useState<any | null>(null);
-  const LIMIT = 10;
+  const [currentLimit, setCurrentLimit] = useState(10);
 
   const fetchAlbum = async (
     currentOffset: number,
@@ -67,7 +68,7 @@ export default function GalleryScreen() {
       if (!token) return;
 
       const response = await fetch(
-        `${BASE_URL}/geo-quests/album?limit=${LIMIT}&offset=${currentOffset}`,
+        `${BASE_URL}/geo-quests/album?offset=${currentOffset}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -82,13 +83,17 @@ export default function GalleryScreen() {
           setPhotos((prev) => [...prev, ...data.items]);
         }
 
-        setHasMore(currentOffset + LIMIT < data.total_count);
+        const backendLimit = data.limit || 20;
+        setCurrentLimit(backendLimit);
+        setHasMore(currentOffset + backendLimit < data.total_count);
       }
     } catch (error) {
+      console.error("Помилка завантаження альбомів:", error);
     } finally {
       setIsLoading(false);
       setIsFetchingMore(false);
       setIsRefreshing(false);
+      markDataLoaded("album");
     }
   };
 
@@ -109,7 +114,7 @@ export default function GalleryScreen() {
 
   const handleLoadMore = () => {
     if (!isLoading && !isFetchingMore && hasMore) {
-      const nextOffset = offset + LIMIT;
+      const nextOffset = offset + currentLimit;
       setOffset(nextOffset);
       fetchAlbum(nextOffset);
     }
@@ -120,7 +125,7 @@ export default function GalleryScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/home");
+      router.replace({ pathname: "/(main)/home", params: { theme: themeKey } });
     }
   };
 
@@ -140,7 +145,7 @@ export default function GalleryScreen() {
         <Animated.View
           entering={
             animationsEnabled
-              ? FadeInDown.delay((index % LIMIT) * 50)
+              ? FadeInDown.delay((index % currentLimit) * 50)
               : undefined
           }
           style={[s.imageWrapper, { borderColor: c.border }]}
@@ -182,17 +187,7 @@ export default function GalleryScreen() {
           style={{ flex: 1 }}
         >
           <View style={s.header}>
-            <Pressable
-              onPress={handleGoBack}
-              style={({ pressed }) => [
-                s.iconBtn,
-                { backgroundColor: c.cardBg, borderColor: c.border },
-                cardShadow(themeKey, "soft"),
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <ArrowLeft color={c.textMain} size={24} strokeWidth={2} />
-            </Pressable>
+            <View style={{ width: 48 }} />
             <View style={s.headerTitleBox}>
               <Text style={[Typography.titleLg, { color: c.textMain }]}>
                 Фотоальбом

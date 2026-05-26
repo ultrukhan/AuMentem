@@ -15,6 +15,8 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import AnimatedCard from '@/components/AnimatedCard';
+import { hasLoadedData, markDataLoaded } from "@/utils/sessionCache";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -40,6 +42,8 @@ import { useAppSettings } from "@/hooks/useAppSettings";
 import { MotiView } from "moti";
 import { Skeleton } from "moti/skeleton";
 import { Toast } from "@/utils/toast";
+import { fetchWithCache } from '@/utils/apiWithCache';
+import { SyncManager } from '@/utils/SyncManager';
 
 interface Reaction {
   reaction_type: "SUPPORT" | "HUG" | "PROUD" | "HEART";
@@ -265,8 +269,14 @@ export default function FeedScreen() {
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasLoadedData('feed'));
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [listRefreshEpoch, setListRefreshEpoch] = useState(0);
+  
+  const [offset, setOffset] = useState(0);
+  const [currentLimit, setCurrentLimit] = useState(15);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const [reportingPostId, setReportingPostId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState<string | null>(null);
@@ -288,33 +298,62 @@ export default function FeedScreen() {
     }
   };
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (reset = false, options?: { refresh?: boolean }) => {
     try {
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(`${BASE_URL}/posts/`, {
+      const currentOffset = reset ? 0 : offset;
+      
+      if (reset) {
+        setIsLoading(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      const response = await fetchWithCache(`${BASE_URL}/posts/?offset=${currentOffset}`, {
         headers: { Authorization: `Bearer ${token}` },
+        cacheKey: `feed_posts_${currentOffset}_${token}`,
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response.ok && response.data) {
+        // Backend returns a paginated object
+        const data = response.data.items || [];
         const sortedData = data.sort(
           (a: Post, b: Post) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
-        setPosts(sortedData);
+        
+        if (reset) {
+          setPosts(sortedData);
+        } else {
+          setPosts(prev => [...prev, ...sortedData]);
+        }
+        
+        const backendLimit = response.data.limit || 15;
+        setCurrentLimit(backendLimit);
+        setOffset(currentOffset + backendLimit);
+        setHasMore(currentOffset + backendLimit < response.data.total_count);
       }
     } catch (error) {
       console.error("Помилка завантаження стрічки:", error);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      markDataLoaded('feed');
+      if (options?.refresh) setListRefreshEpoch(n => n + 1);
+    }
+  };
+
+  const loadMorePosts = () => {
+    if (!isLoadingMore && hasMore) {
+      playClickSound();
+      fetchPosts(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
       fetchCurrentUser();
-      fetchPosts();
+      fetchPosts(true);
     }, []),
   );
 
@@ -355,15 +394,19 @@ export default function FeedScreen() {
 
     try {
       const token = await SecureStore.getItemAsync("userToken");
-      const response = await fetch(`${BASE_URL}/posts/${postId}/react`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reaction_type: reactionType }),
-      });
-      if (!response.ok) fetchPosts();
+      try {
+        await fetch(`${BASE_URL}/posts/${postId}/react`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reaction_type: reactionType }),
+        });
+      } catch (e) {
+        await SyncManager.enqueueAction(`${BASE_URL}/posts/${postId}/react`, 'POST', { reaction_type: reactionType });
+        Toast.show({ title: 'Офлайн', message: 'Реакцію збережено' });
+      }
     } catch (error) {
       fetchPosts();
     }
@@ -677,16 +720,29 @@ export default function FeedScreen() {
           maxToRenderPerBatch={4}
           windowSize={7}
           removeClippedSubviews
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.5}
           contentContainerStyle={s.listContent}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => {
                 setIsRefreshing(true);
-                fetchPosts();
+                fetchPosts(true);
               }}
               tintColor={c.accent}
             />
+          }
+          ListFooterComponent={
+            isLoadingMore ? (
+              <View style={{ padding: 16, alignItems: 'center' }}>
+                <ActivityIndicator color={c.accent} />
+              </View>
+            ) : !hasMore && posts.length > 0 ? (
+              <Text style={{ textAlign: 'center', color: c.textMuted, marginVertical: 16 }}>
+                Це всі пости на даний момент 🎉
+              </Text>
+            ) : null
           }
           ListEmptyComponent={
             <Text

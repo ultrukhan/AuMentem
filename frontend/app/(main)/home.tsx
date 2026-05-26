@@ -8,19 +8,12 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Pressable,
-} from "react-native";
+ Appearance } from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  User,
-  Settings,
-  Moon,
-  Sun,
-  Sparkles,
-  Map,
-  MessageCircleHeart,
-} from "lucide-react-native";
+import { Bell, Heart, Leaf, MapPin, Sparkles, BookOpen, Star, Zap, Coffee, Settings, User, Trophy, BarChart3, Clock, Flame, ChevronRight, Moon, Sun, Volume2, VolumeX, History, Camera, Activity, Calendar, Map, MessageCircleHeart } from "lucide-react-native";
+import NetInfo from '@react-native-community/netinfo';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import BottomNav from "@/components/BottomNav";
@@ -37,18 +30,8 @@ import {
   IconSizes,
 } from "@/constants/theme";
 
-import { useRouter, useFocusEffect } from "expo-router";
-import { runOnJS } from "react-native-reanimated";
-
-import * as SecureStore from "expo-secure-store";
-
-import { BASE_URL } from "@/constants/api";
-
-import HobbiesModal from "@/components/HobbiesModal";
-
-import { BarChart3 } from "lucide-react-native";
-
-import Animated, {
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
+import Animated, { runOnJS ,
   useAnimatedStyle,
   withTiming,
   useSharedValue,
@@ -57,24 +40,35 @@ import Animated, {
   cancelAnimation,
   useAnimatedReaction,
 } from "react-native-reanimated";
+
+import * as SecureStore from "expo-secure-store";
+
+import { BASE_URL } from "@/constants/api";
+
+import HobbiesModal from "@/components/HobbiesModal";
+
+
+
+
 import Svg, { Path } from "react-native-svg";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { playClickSound, playAmbientSound } from "@/utils/audio";
 
 import { useAppSettings } from "@/hooks/useAppSettings";
-
 import { useSinglePress } from "@/hooks/useSinglePress";
+import { hasLoadedData, markDataLoaded } from "@/utils/sessionCache";
 
 import { cardShadow } from "@/utils/shadowStyle";
 
 import { shouldShowTrackerToday } from "@/utils/trackerApi";
 
 import HomeBackground from "@/components/HomeBackground";
-import { Appearance } from "react-native";
+
 
 export default function HomeScreen() {
-  const [isDark, setIsDark] = useState(Appearance.getColorScheme() === "dark");
+  const { theme: paramTheme } = useLocalSearchParams();
+  const [isDark, setIsDark] = useState(paramTheme ? paramTheme === 'dark' : (Appearance.getColorScheme() === "dark"));
 
   const router = useRouter();
 
@@ -85,8 +79,8 @@ export default function HomeScreen() {
   const runOnce = useSinglePress();
 
   const [userProfile, setUserProfile] = useState<any>(null);
-
-  const [isLoading, setIsLoading] = useState(true);
+  const [cachedNickname, setCachedNickname] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(!hasLoadedData('home'));
 
   const [showHobbies, setShowHobbies] = useState(false);
 
@@ -100,12 +94,15 @@ export default function HomeScreen() {
   useEffect(() => {
     const loadTheme = async () => {
       const savedTheme = await SecureStore.getItemAsync("userTheme");
-
-      if (savedTheme) setIsDark(savedTheme === "dark");
+      if (savedTheme) {
+        setIsDark(savedTheme === "dark");
+        router.setParams({ theme: savedTheme });
+      }
     };
-
-    loadTheme();
-  }, []);
+    if (!paramTheme) {
+      loadTheme();
+    }
+  }, [paramTheme]);
 
   useEffect(() => {
     playAmbientSound(0, isDark);
@@ -115,37 +112,28 @@ export default function HomeScreen() {
     router.push({ pathname: "/tracker", params: { theme } });
   }, [router, theme]);
 
-  // const maybeShowTracker = useCallback(
-  //   async (token: string) => {
-  //     if (trackerCheckInFlight.current || trackerCheckedThisSession.current)
-  //       return;
-  //     trackerCheckInFlight.current = true;
-  //     try {
-  //       const show = await shouldShowTrackerToday(token);
-  //       if (show !== null) {
-  //         trackerCheckedThisSession.current = true;
-  //         if (show) setTimeout(navigateToTracker, 500);
-  //       }
-  //     } finally {
-  //       trackerCheckInFlight.current = false;
-  //     }
-  //   },
-  //   [navigateToTracker],
-  // );
+
   const maybeShowTracker = useCallback(
-    async (token: string) => {
+    async (token: string, userId: string) => {
       if (trackerCheckInFlight.current || trackerCheckedThisSession.current)
         return;
 
       trackerCheckInFlight.current = true;
       try {
+        const todayStr = new Date().toDateString();
+        const lastSeen = await SecureStore.getItemAsync(`last_tracker_date_${userId}`);
+        if (lastSeen === todayStr) {
+          trackerCheckedThisSession.current = true;
+          return;
+        }
+
         const show = await shouldShowTrackerToday(token);
         if (show) {
           trackerCheckedThisSession.current = true;
-          // Передаємо параметр, що це "обов'язковий" трекер
+          await SecureStore.setItemAsync(`last_tracker_date_${userId}`, todayStr);
           router.push({
             pathname: "/tracker",
-            params: { theme, canSkip: "true" }, // 💥 Додали параметр canSkip
+            params: { theme, canSkip: "true" }, 
           });
         }
       } finally {
@@ -155,32 +143,13 @@ export default function HomeScreen() {
     [router, theme],
   );
 
-  // const finishHobbiesFlow = useCallback(async () => {
 
-  //   setShowHobbies(false);
-
-  //   const token = await SecureStore.getItemAsync('userToken');
-
-  //   if (token) await maybeShowTracker(token);
-
-  // }, [maybeShowTracker]);
-
-  // const finishHobbiesFlow = useCallback(async () => {
-  //   setShowHobbies(false);
-
-  //   await SecureStore.setItemAsync("has_hobbies", "true");
-
-  //   const token = await SecureStore.getItemAsync("userToken");
-  //   if (token) await maybeShowTracker(token);
-  // }, [maybeShowTracker]);
   const finishHobbiesFlow = useCallback(async () => {
-    // Просто ховаємо модалку
     setShowHobbies(false);
-
-    // І перевіряємо, чи треба показати трекер настрою
     const token = await SecureStore.getItemAsync("userToken");
-    if (token) {
-      await maybeShowTracker(token);
+    const userId = await SecureStore.getItemAsync("currentUserId");
+    if (token && userId) {
+      await maybeShowTracker(token, userId);
     }
   }, [maybeShowTracker]);
   const toggleTheme = async () => {
@@ -193,62 +162,7 @@ export default function HomeScreen() {
     await SecureStore.setItemAsync("userTheme", newTheme ? "dark" : "light");
   };
 
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     const loadData = async () => {
-  //       try {
-  //         const token = await SecureStore.getItemAsync("userToken");
 
-  //         if (!token) {
-  //           router.replace("/");
-
-  //           return;
-  //         }
-
-  //         const response = await fetch(`${BASE_URL}/auth/me`, {
-  //           headers: { Authorization: `Bearer ${token}` },
-  //         });
-
-  //         if (response.ok) {
-  //           const data = await response.json();
-
-  //           setUserProfile(data);
-
-  //           // const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-  //           // const savedHasHobbies = await SecureStore.getItemAsync('has_hobbies');
-  //           // const hasHobbies = (data.hobbies && data.hobbies.length > 0) || savedHasHobbies === 'true';
-
-  //           // if (isFirstLogin === 'true' || !hasHobbies) {
-  //           //   setShowHobbies(true);
-  //           //   if (isFirstLogin === 'true') await SecureStore.deleteItemAsync('isFirstLogin');
-  //           // } else {
-  //           //   await maybeShowTracker(token);
-  //           // }
-  //          const userId = String(data.id);
-  //           await SecureStore.setItemAsync('currentUserId', userId);
-
-  //           if (data.needs_hobby_selection === true) {
-  //             setShowHobbies(true);
-  //           } else {
-  //             // Якщо хобі вже є, просто перевіряємо чи треба трекер
-  //             await maybeShowTracker(token);
-  //           }
-  //         } else {
-  //           await SecureStore.deleteItemAsync("userToken");
-  //           await SecureStore.deleteItemAsync("currentUserId");
-  //           await SecureStore.deleteItemAsync("has_hobbies");
-  //           await SecureStore.deleteItemAsync("user_saved_hobbies");
-  //           router.replace("/");
-  //         }
-  //       } catch {
-  //       } finally {
-  //         setIsLoading(false);
-  //       }
-  //     };
-
-  //     loadData();
-  //   }, [maybeShowTracker, router]),
-  // );
   useFocusEffect(
     useCallback(() => {
       const loadData = async () => {
@@ -259,6 +173,11 @@ export default function HomeScreen() {
             return;
           }
 
+          if (hasLoadedData('home')) {
+            const nick = await SecureStore.getItemAsync("cachedNickname");
+            if (nick) setCachedNickname(nick);
+          }
+
           const response = await fetch(`${BASE_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -266,33 +185,23 @@ export default function HomeScreen() {
           if (response.ok) {
             const data = await response.json();
             setUserProfile(data);
+            setCachedNickname(data.nickname);
+            await SecureStore.setItemAsync("cachedNickname", data.nickname);
+            markDataLoaded('home');
 
-            // Зберігаємо ID для інших екранів (наприклад, для тваринки)
+            // Зберігаємо ID для інших екранів
             const userId = String(data.id);
             await SecureStore.setItemAsync("currentUserId", userId);
 
-            const statusRes = await fetch(
-              `${BASE_URL}/app_user/onboarding-status`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              },
-            );
-
-            if (statusRes.ok) {
-              const statusData = await statusRes.json();
-
-              // Якщо бекенд каже, що треба вибрати хобі — показуємо модалку
-              if (statusData.needs_hobby_selection === true) {
-                setShowHobbies(true);
-              } else {
-                // Якщо хобі вже вибрані (або пропущені) — йдемо далі
-                await maybeShowTracker(token);
-              }
+            // Check if is_onboarding_completed is false, but strictly enforce ONCE locally
+            const localHobbiesFlag = await SecureStore.getItemAsync(`hobbies_shown_${userId}`);
+            if (data.is_onboarding_completed === false && !localHobbiesFlag) {
+              setShowHobbies(true);
+              await SecureStore.setItemAsync(`hobbies_shown_${userId}`, "true");
             } else {
-              // Якщо сталася помилка сервера, просто пускаємо користувача до додатка
-              await maybeShowTracker(token);
+              await maybeShowTracker(token, userId);
             }
-          } else {
+          } else if (response.status === 401) {
             // Якщо токен протух
             await SecureStore.deleteItemAsync("userToken");
             await SecureStore.deleteItemAsync("currentUserId");
@@ -306,6 +215,20 @@ export default function HomeScreen() {
       };
 
       loadData();
+
+      const unsubscribe = NetInfo.addEventListener(state => {
+        if (state.isConnected) {
+          loadData();
+        }
+      });
+      
+      SecureStore.getItemAsync("cachedNickname").then(name => {
+        if (name) setCachedNickname(name);
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }, [maybeShowTracker, router]),
   );
 
@@ -372,7 +295,7 @@ export default function HomeScreen() {
                   style={[Typography.titleMd, { color: c.textMain }]}
                   numberOfLines={1}
                 >
-                  {userProfile?.nickname || "Мандрівник"}
+                  {userProfile?.nickname || cachedNickname || "Мандрівник"}
                 </Text>
               )}
             </View>

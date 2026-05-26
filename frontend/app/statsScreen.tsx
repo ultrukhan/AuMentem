@@ -10,6 +10,17 @@ import {
 } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
+import { BASE_URL } from '@/constants/api';
+import { playClickSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { useSinglePress } from '@/hooks/useSinglePress';
+import { cardShadow } from '@/utils/shadowStyle';
+import AnimatedCard from '@/components/AnimatedCard';
+import FadeInView from '@/components/FadeInView';
+import { Skeleton } from 'moti/skeleton';
+import { MotiView } from 'moti';
+
 const CatPath = "M290.59 192c-20.18 0-106.82 1.98-162.59 85.95V192c0-52.94-43.06-96-96-96-17.67 0-32 14.33-32 32s14.33 32 32 32c17.64 0 32 14.36 32 32v256c0 35.3 28.7 64 64 64h176c8.84 0 16-7.16 16-16v-16c0-17.67-14.33-32-32-32h-32l128-96v144c0 8.84 7.16 16 16 16h32c8.84 0 16-7.16 16-16V289.86c-10.29 2.67-20.89 4.54-32 4.54-61.81 0-113.52-44.05-125.41-102.4zM448 96h-64l-64-64v134.4c0 53.02 42.98 96 96 96s96-42.98 96-96V32l-64 64zm-72 80c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16zm80 0c-8.84 0-16-7.16-16-16s7.16-16 16-16 16 7.16 16 16-7.16 16-16 16z";
 const DogPath = "M298.06,224,448,277.55V496a16,16,0,0,1-16,16H368a16,16,0,0,1-16-16V384H192V496a16,16,0,0,1-16,16H112a16,16,0,0,1-16-16V282.09C58.84,268.84,32,233.66,32,192a32,32,0,0,1,64,0,32.06,32.06,0,0,0,32,32ZM544,112v32a64,64,0,0,1-64,64H448v35.58L320,197.87V48c0-14.25,17.22-21.39,27.31-11.31L374.59,64h53.63c10.91,0,23.75,7.92,28.62,17.69L464,96h64A16,16,0,0,1,544,112Zm-112,0a16,16,0,1,0-16,16A16,16,0,0,0,432,112Z";
 const BirdPath = "M544 32h-16.36C513.04 12.68 490.09 0 464 0c-44.18 0-80 35.82-80 80v20.98L12.09 393.57A30.216 30.216 0 0 0 0 417.74c0 22.46 23.64 37.07 43.73 27.03L165.27 384h96.49l44.41 120.1c2.27 6.23 9.15 9.44 15.38 7.17l22.55-8.21c6.23-2.27 9.44-9.15 7.17-15.38L312.94 384H352c1.91 0 3.76-.23 5.66-.29l44.51 120.38c2.27 6.23 9.15 9.44 15.38 7.17l22.55-8.21c6.23-2.27 9.44-9.15 7.17-15.38l-41.24-111.53C485.74 352.8 544 279.26 544 192v-80l96-16c0-35.35-42.98-64-96-64zm-80 72c-13.25 0-24-10.75-24-24 0-13.26 10.75-24 24-24s24 10.74 24 24c0 13.25-10.75 24-24 24z";
@@ -23,17 +34,6 @@ const PetIcon = ({ type, color, size }: { type: number, color: string, size: num
     </Svg>
   );
 };
-
-import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
-import { BASE_URL } from '@/constants/api';
-import { playClickSound } from '@/utils/audio';
-import { useAppSettings } from '@/hooks/useAppSettings';
-import { useSinglePress } from '@/hooks/useSinglePress';
-import { cardShadow } from '@/utils/shadowStyle';
-import AnimatedCard from '@/components/AnimatedCard';
-import FadeInView from '@/components/FadeInView';
-import { Skeleton } from 'moti/skeleton';
-import { MotiView } from 'moti';
 
 interface WeeklyStat {
   id: string;

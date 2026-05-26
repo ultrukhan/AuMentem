@@ -5,10 +5,11 @@ import { BASE_URL } from '@/constants/api';
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, 
-  Platform, SafeAreaView, ActivityIndicator, ScrollView, Image, Keyboard, Appearance 
+  Platform, ActivityIndicator, ScrollView, Image, Keyboard, Appearance 
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
 import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
@@ -20,10 +21,12 @@ import { useSinglePress } from '@/hooks/useSinglePress';
 
 export default function AuthScreen() {
   const router = useRouter();
+  const { theme: paramTheme } = useLocalSearchParams();
   const runOnce = useSinglePress();
   const { animationsEnabled } = useAppSettings();
 
   const [themeReady, setThemeReady] = useState(false);
+  const [isCheckingToken, setIsCheckingToken] = useState(true);
   const [isDark, setIsDark] = useState(Appearance.getColorScheme() === 'dark');
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
@@ -33,7 +36,6 @@ export default function AuthScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
-  const [splashStage, setSplashStage] = useState<'brand' | 'app' | 'done'>('brand');
 
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
@@ -91,7 +93,11 @@ export default function AuthScreen() {
       const savedTheme = await SecureStore.getItemAsync('userTheme');
       const savedSettings = await SecureStore.getItemAsync('userSettings');
       if (!cancelled) {
-        setIsDark(savedTheme === 'dark');
+        if (paramTheme === 'dark' || paramTheme === 'light') {
+          setIsDark(paramTheme === 'dark');
+        } else {
+          setIsDark(savedTheme === 'dark');
+        }
         if (savedSettings) {
           try {
             const parsed = JSON.parse(savedSettings);
@@ -100,14 +106,6 @@ export default function AuthScreen() {
         }
         setThemeReady(true);
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      if (cancelled) return;
-
-      setSplashStage('app');
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
 
       if (cancelled) return;
 
@@ -120,9 +118,9 @@ export default function AuthScreen() {
           if (response.ok) {
             const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
             if (isFirstLogin === 'true') {
-              router.replace('/into');
+              router.replace({ pathname: '/into', params: { theme: isDark ? 'dark' : 'light' } });
             } else {
-              router.replace('/(main)/home');
+              router.replace({ pathname: '/(main)/home', params: { theme: isDark ? 'dark' : 'light' } });
             }
             return;
           }
@@ -130,10 +128,21 @@ export default function AuthScreen() {
           await SecureStore.deleteItemAsync('currentUserId');
         }
       } catch {
-        // ignore
+        // Offline: if we have a token but network failed, proceed anyway
+        if (await SecureStore.getItemAsync('userToken')) {
+          const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+          const savedT = await SecureStore.getItemAsync('userTheme');
+          const offlineTheme = savedT || (isDark ? 'dark' : 'light');
+          if (isFirstLogin === 'true') {
+            router.replace({ pathname: '/into', params: { theme: offlineTheme } });
+          } else {
+            router.replace({ pathname: '/(main)/home', params: { theme: offlineTheme } });
+          }
+          return;
+        }
       }
-
-      if (!cancelled) setSplashStage('done');
+      // If we reach here, there's no valid token, so we show the login screen
+      setIsCheckingToken(false);
     };
 
     bootstrap();
@@ -177,9 +186,9 @@ export default function AuthScreen() {
       const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
 
       if (isFirstLogin === 'true') {
-        router.replace('/into');
+        router.replace({ pathname: '/into', params: { theme: isDark ? 'dark' : 'light' } });
       } else {
-        router.replace('/(main)/home');
+        router.replace({ pathname: '/(main)/home', params: { theme: isDark ? 'dark' : 'light' } });
       }
 
     } catch {
@@ -189,29 +198,13 @@ export default function AuthScreen() {
     }
   };
 
-  if (!themeReady) {
-    return null;
-  }
-
-  if (splashStage === 'brand') {
+  if (!themeReady || isCheckingToken) {
+    const splashBg = isDark ? '#111827' : '#F9FAFB';
     return (
-      <SafeAreaView style={[s.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={s.splashLogoFrame}>
-          <Image source={teamLogo} style={s.splashLogo} resizeMode="contain" />
-        </View>
-        <Text style={[Typography.titleXl, { color: c.textMain, marginTop: 20 }]}>AuMentem</Text>
-      </SafeAreaView>
-    );
-  }
-
-  if (splashStage === 'app') {
-    return (
-      <SafeAreaView style={[s.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={s.splashLogoFrame}>
-          <Image source={appIcon} style={s.splashLogo} resizeMode="cover" />
-        </View>
-        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 20 }} />
-      </SafeAreaView>
+      <View style={{ flex: 1, backgroundColor: splashBg, alignItems: 'center', justifyContent: 'center' }}>
+        <Image source={teamLogo} style={{ width: 120, height: 120, borderRadius: 28 }} resizeMode="contain" />
+        <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 24 }} />
+      </View>
     );
   }
 
@@ -346,7 +339,8 @@ const s = StyleSheet.create({
 
 // import React, { useState, useEffect } from 'react';
 
-// import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator, ScrollView, Image, Keyboard, Appearance } from 'react-native';
+// import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, Image, Keyboard, Appearance } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from 'lucide-react-native';
 

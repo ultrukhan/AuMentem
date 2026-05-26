@@ -28,6 +28,7 @@ import { cardShadow } from '@/utils/shadowStyle';
 import { parseApiError } from '@/utils/apiErrors';
 import { playClickSound } from '@/utils/audio';
 import { Toast } from '@/utils/toast';
+import { fetchWithCache } from '@/utils/apiWithCache';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DEFAULT_REGION = {
@@ -180,6 +181,7 @@ export default function GeoQuestsScreen() {
   }, []);
 
   useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -188,17 +190,23 @@ export default function GeoQuestsScreen() {
           return;
         }
 
-        const loc = await Location.getCurrentPositionAsync({});
-        setUserLocation(loc.coords);
-        await fetchNearestQuests(loc.coords.latitude, loc.coords.longitude);
+        const initialLoc = await Location.getCurrentPositionAsync({});
+        setUserLocation(initialLoc.coords);
+        await fetchNearestQuests(initialLoc.coords.latitude, initialLoc.coords.longitude);
 
-        // Smoothly zoom in on the user's location dot once coordinates are resolved
         mapRef.current?.animateToRegion({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
+          latitude: initialLoc.coords.latitude,
+          longitude: initialLoc.coords.longitude,
           latitudeDelta: 0.008,
           longitudeDelta: 0.008,
         }, 1000);
+
+        subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 5 },
+          (newLoc) => {
+            setUserLocation(newLoc.coords);
+          }
+        );
 
         const saved = await SecureStore.getItemAsync('activeQuest');
         if (saved) {
@@ -215,16 +223,23 @@ export default function GeoQuestsScreen() {
         setLocationReady(true);
       }
     })();
+    
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
   }, []);
 
   const fetchNearestQuests = async (lat: number, lng: number) => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
-      const res = await fetch(`${BASE_URL}/geo-quests/nearest?lat=${lat}&lng=${lng}&limit=5`, {
+      const res = await fetchWithCache(`${BASE_URL}/geo-quests/nearest?lat=${lat}&lng=${lng}`, {
         headers: { Authorization: `Bearer ${token}` },
+        cacheKey: `nearest_quests_${token}`,
       });
       let fetchedQuests = [];
-      if (res.ok) fetchedQuests = await res.json();
+      if (res.ok && res.data) fetchedQuests = res.data;
       setNearestQuests(fetchedQuests);
       if (fetchedQuests.length > 0) setSelectedQuest(fetchedQuests[0].geo_quest);
     } catch (e) {}
@@ -377,28 +392,35 @@ export default function GeoQuestsScreen() {
     try {
       let currentLat = userLocation?.latitude;
       let currentLng = userLocation?.longitude;
-      
       if (!currentLat || !currentLng) {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         currentLat = loc.coords.latitude;
         currentLng = loc.coords.longitude;
       }
 
-      const targetLat = selectedQuest?.place?.coordinates?.lat;
-      const targetLng = selectedQuest?.place?.coordinates?.lng;
-      if (targetLat && targetLng && currentLat && currentLng) {
-        const dist = calculateDistance(currentLat, currentLng, targetLat, targetLng);
-        if (dist > 50) {
-          Toast.show({ title: 'Не вийшло', message: `Ти занадто далеко від цілі! Відстань: ${Math.round(dist)}м. Підійди ближче.` });
-          setIsCompleting(false);
-          return;
-        }
-      }
-
       const token = await SecureStore.getItemAsync('userToken');
       let finalPhotoUrl = null;
 
       if (saveToAlbum) {
+        const sigRes = await fetch(`${BASE_URL}/geo-quests/generate-upload-signature`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_geo_quest_id: activeUserQuestId,
+            lat: currentLat,
+            lng: currentLng,
+          }),
+        });
+
+        if (!sigRes.ok) {
+          const errorMsg = await parseApiError(sigRes, "Підійдіть ближче до цілі.");
+          Toast.show({ title: 'Задалеко', message: errorMsg });
+          setIsCompleting(false);
+          return;
+        }
+
+        const sigData = await sigRes.json();
+
         const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
         if (!permissionResult.granted) {
           Toast.show({ title: 'Помилка', message: 'Додаток потребує дозволу для роботи з камерою.' });
@@ -419,25 +441,6 @@ export default function GeoQuestsScreen() {
         }
 
         const imageUri = result.assets[0].uri;
-
-        const sigRes = await fetch(`${BASE_URL}/geo-quests/generate-upload-signature`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_geo_quest_id: activeUserQuestId,
-            lat: currentLat,
-            lng: currentLng,
-          }),
-        });
-
-        if (!sigRes.ok) {
-          const errorText = await sigRes.text();
-          Toast.show({ title: 'Помилка Сервера', message: `Бекенд відмовив у підписі: ${errorText}` });
-          setIsCompleting(false);
-          return;
-        }
-
-        const sigData = await sigRes.json();
         const formData = new FormData();
         formData.append('file', { uri: imageUri, type: 'image/jpeg', name: 'proof.jpg' } as any);
         formData.append('api_key', sigData.api_key);

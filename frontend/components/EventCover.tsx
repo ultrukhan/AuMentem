@@ -38,11 +38,6 @@ export default function EventCover({ imageUrl, theme, style, large = false, cate
       <View style={[styles.iconCircle, { backgroundColor: `${c.accent}25` }]}>
         <CalendarDays color={c.accent} size={large ? 48 : 32} strokeWidth={1.5} />
       </View>
-      {category ? (
-        <View style={[styles.categoryPill, { backgroundColor: c.cardBg, borderColor: c.border }]}>
-          <Sparkles color={c.accent} size={14} />
-        </View>
-      ) : null}
     </LinearGradient>
   );
 }

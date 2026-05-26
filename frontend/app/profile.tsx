@@ -45,15 +45,16 @@ import FadeInView from "@/components/FadeInView";
 import AnimatedCard from "@/components/AnimatedCard";
 
 import HobbiesModal from "@/components/HobbiesModal";
+import { hasLoadedData, markDataLoaded } from "@/utils/sessionCache";
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const { theme: themeParam } = useLocalSearchParams();
   const isDark = themeParam === "dark";
-  const theme = isDark ? "dark" : "light";
-  const c = Colors[theme];
-  const sh = Shadows[theme];
+  const currentTheme = isDark ? "dark" : "light";
+  const c = Colors[currentTheme];
+  const sh = Shadows[currentTheme];
   const { animationsEnabled } = useAppSettings();
 
   const [userId, setUserId] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function ProfileScreen() {
   const [isChangingPwd, setIsChangingPwd] = useState(false);
   const [pwdMessage, setPwdMessage] = useState({ text: "", type: "" });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!hasLoadedData('profile'));
   const [showHobbiesModal, setShowHobbiesModal] = useState(false);
 
   const hasMinLength = newPassword.length >= 8;
@@ -119,6 +120,7 @@ export default function ProfileScreen() {
       console.error("Помилка завантаження:", error);
     } finally {
       setIsLoading(false);
+      markDataLoaded('profile');
     }
   };
   useEffect(() => {
@@ -135,8 +137,9 @@ export default function ProfileScreen() {
       await SecureStore.deleteItemAsync("lastCookieText");
       await SecureStore.deleteItemAsync("lastNotificationDate");
       await SecureStore.deleteItemAsync("selectedPetType");
+      import('@/utils/sessionCache').then(({ clearSessionCache }) => clearSessionCache());
 
-      router.replace("/");
+      router.replace({ pathname: "/", params: { theme: currentTheme } });
     } catch (error) {
       console.error("Помилка при виході:", error);
     }
@@ -798,13 +801,11 @@ export default function ProfileScreen() {
           </FadeInView>
         )}
 
-        <HobbiesModal
-          visible={showHobbiesModal}
-          isDark={isDark}
+        <HobbiesModal 
+          visible={showHobbiesModal} 
           userId={userId}
-          onSuccess={() => {
+          onSuccess={async () => {
             setShowHobbiesModal(false);
-            fetchProfileData();
           }}
           onClose={() => setShowHobbiesModal(false)}
         />

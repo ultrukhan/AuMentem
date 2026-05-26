@@ -1,11 +1,10 @@
-
-
 import { BASE_URL } from "@/constants/api";
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, 
-  Platform, SafeAreaView, ActivityIndicator, Modal, ScrollView, Image, Keyboard
+  Platform, ActivityIndicator, Modal, ScrollView, Image, Keyboard
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon, Volume2, VolumeX } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { Colors, Typography, Radii, Spacing, AuthLayout } from "@/constants/theme";
@@ -43,6 +42,7 @@ export default function RegisterScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -149,8 +149,12 @@ export default function RegisterScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           ref={scrollViewRef}
-          scrollEnabled={keyboardVisible}
-          contentContainerStyle={[s.scrollContent, !keyboardVisible && s.scrollContentCentered]}
+          scrollEnabled={true}
+          contentContainerStyle={[
+            s.scrollContent, 
+            !keyboardVisible && s.scrollContentCentered, 
+            { paddingBottom: Math.max(insets.bottom + 40, keyboardVisible ? 60 : 40) }
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={keyboardVisible}

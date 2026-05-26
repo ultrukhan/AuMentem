@@ -10,11 +10,11 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router'; // Додали хук для теми
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Mail } from 'lucide-react-native';
 import { Colors, Typography, Spacing, Radii } from '@/constants/theme';
 
-export default function LegalScreen() { // 💥 Змінили назву на LegalScreen
+export default function LegalScreen() { 
   const router = useRouter();
   const { theme } = useLocalSearchParams();
   const isDark = theme === 'dark';
@@ -45,9 +45,9 @@ export default function LegalScreen() { // 💥 Змінили назву на L
         <Section title="Політика конфіденційності" text="Ваші дані захищені. Ми використовуємо геолокацію виключно для відображення квестів поруч з вами. Ми не передаємо дані третім особам. Ви маєте повне право видалити свій акаунт разом з усіма даними в налаштуваннях." isDark={isDark} />
 
         <View style={[s.footer, { borderColor: c.border }]}>
-           <Pressable style={s.contactBtn} onPress={() => Linking.openURL('mailto:support@aumentem.com')}>
+           <Pressable style={s.contactBtn} onPress={() => Linking.openURL('mailto:am.altera.noreply@gmail.com')}>
               <Mail color={c.accent} size={20} />
-              <Text style={{ color: c.accent, marginLeft: 8 }}>support@aumentem.com</Text>
+              <Text style={{ color: c.accent, marginLeft: 8 }}>am.altera.noreply@gmail.com</Text>
            </Pressable>
            <Text style={s.copyright}>© 2026 AuMentem Inc. All rights reserved.</Text>
         </View>

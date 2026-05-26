@@ -56,6 +56,9 @@ export default function IntroScreen() {
       (slidesRef.current as any).scrollToIndex({ index: currentIndex + 1 });
     } else {
       playClickSound();
+      import('expo-secure-store').then(SecureStore => {
+        SecureStore.deleteItemAsync('isFirstLogin');
+      });
       router.replace('/(main)/home');
     }
   };
@@ -71,7 +74,7 @@ export default function IntroScreen() {
   );
 
   return (
-    <SafeAreaView style={s.container}>
+    <SafeAreaView style={[s.container, { backgroundColor: SLIDES[currentIndex].color }]} edges={['top', 'bottom']}>
       <FlatList
         data={SLIDES}
         renderItem={renderItem}

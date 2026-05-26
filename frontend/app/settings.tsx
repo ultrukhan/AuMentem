@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Music, Volume2, Sparkles, Ghost, MessageCircleQuestion, ShieldCheck, X, Send, Bell } from 'lucide-react-native';
 import * as SecureStore from 'expo-secure-store';
-import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 
@@ -107,6 +107,7 @@ export default function SettingsScreen() {
   const [isSupportModalVisible, setSupportModalVisible] = useState(false);
   const [isPreviewModalVisible, setPreviewModalVisible] = useState(false);
   const [supportMessage, setSupportMessage] = useState('');
+  const [isTestingNotif, setIsTestingNotif] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -124,6 +125,7 @@ export default function SettingsScreen() {
     
     try {
       await SecureStore.setItemAsync('userSettings', JSON.stringify(newSettings));
+      import('@/utils/audio').then(({ refreshAudioSettings }) => refreshAudioSettings());
       
       if (!isSlider && !(key === 'sfx' && value === false)) {
         playClickSound(); 
@@ -261,10 +263,56 @@ export default function SettingsScreen() {
               onValueChange={(val: boolean) => {
                 updateSetting('notificationsEnabled', val);
                 if (!val) {
-                  Notifications.cancelAllScheduledNotificationsAsync();
+                  if (Constants.appOwnership !== 'expo') {
+                    try {
+                      const Notifications = require('expo-notifications');
+                      Notifications.cancelAllScheduledNotificationsAsync();
+                    } catch (e) {}
+                  }
                 }
               }}
             />
+            {settings.notificationsEnabled && (
+              <SettingsLink 
+                icon={Bell} 
+                title="Тестове сповіщення" 
+                isDark={isDark} 
+                animationsEnabled={settings.animations} 
+                onPress={async () => {
+                  if (isTestingNotif) return;
+                  setIsTestingNotif(true);
+                  playClickSound();
+                  try {
+                    const { requestNotificationPermissions } = await import('@/utils/notifications');
+                    const hasPermission = await requestNotificationPermissions();
+                    if (!hasPermission) {
+                      import('@/utils/toast').then(({ Toast }) => {
+                        Toast.show({ title: 'Помилка', message: 'Дозвольте сповіщення в налаштуваннях телефону' });
+                      });
+                      setIsTestingNotif(false);
+                      return;
+                    }
+                    const Notifications = require('expo-notifications');
+                    await Notifications.scheduleNotificationAsync({
+                      content: {
+                        title: 'Тестове сповіщення! 🔔',
+                        body: 'Якщо ви це бачите — сповіщення працюють!',
+                        sound: true,
+                      },
+                      trigger: { seconds: 3 },
+                    });
+                    import('@/utils/toast').then(({ Toast }) => {
+                      Toast.show({ title: 'Тест', message: 'Тестове сповіщення прийде через 3 секунди' });
+                    });
+                  } catch (e) {
+                    import('@/utils/toast').then(({ Toast }) => {
+                      Toast.show({ title: 'Помилка', message: 'Не вдалося надіслати сповіщення' });
+                    });
+                  }
+                  setTimeout(() => setIsTestingNotif(false), 2000);
+                }} 
+              />
+            )}
           </View>
 
           <Text style={[Typography.muted, s.sectionTitle, { color: c.textMuted }]}>ІНФОРМАЦІЯ</Text>

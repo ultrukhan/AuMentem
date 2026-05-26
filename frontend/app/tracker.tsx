@@ -91,6 +91,7 @@ export default function TrackerScreen() {
   };
 
   const autoSaveToCapsule = async () => {
+    if (isAutoSaving) return;
     playClickSound();
     setIsAutoSaving(true);
     try {
@@ -114,7 +115,7 @@ export default function TrackerScreen() {
   };
 
   const handleSaveState = async () => {
-    if (!selectedState) return;
+    if (!selectedState || isSaving) return;
     playClickSound();
     setIsSaving(true);
     try {
@@ -277,11 +278,11 @@ export default function TrackerScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-        <Animated.View style={[s.titleContainer, getAnimatedStyle(fadeAnimTitle)]}>
+        <View style={s.titleContainer}>
           <View style={[s.iconBox, { backgroundColor: c.iconBg }]}><Activity color={c.iconColor} size={28} /></View>
           <Text style={[Typography.titleXl, { color: c.textMain, textAlign: 'center', marginTop: 16 }]}>Як ти зараз?</Text>
           <Text style={[Typography.body, { color: c.textMuted, textAlign: 'center', marginTop: 8 }]}>Твій стан — понад усе. Обери варіант, що підходить.</Text>
-        </Animated.View>
+        </View>
 
         <Animated.View style={[s.optionsContainer, getAnimatedStyle(fadeAnimCards)]}>
           {MOOD_OPTIONS.map((mood) => {
