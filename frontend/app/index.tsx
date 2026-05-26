@@ -1,159 +1,308 @@
-import { BASE_URL } from '@/constants/api';
-import React, { useState } from 'react';
-import { 
-  View, Text, TextInput, Pressable, StyleSheet, 
-  KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator
-} from 'react-native';
-import { User, Lock, Sparkles, ArrowRight } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
-import * as SecureStore from 'expo-secure-store'; 
 
-import { Colors, Typography, Radii, Shadows } from '@/constants/theme';
+
+
+import { BASE_URL } from '@/constants/api';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, 
+  Platform, ActivityIndicator, ScrollView, Image, Keyboard, Appearance 
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
+import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { parseApiError } from '@/utils/apiErrors';
+import AnimatedCard from '@/components/AnimatedCard';
+import FadeInView from '@/components/FadeInView';
+import { useSinglePress } from '@/hooks/useSinglePress';
 
 export default function AuthScreen() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(false); 
-  
- const [nickname, setNickname] = useState('');
+  const { theme: paramTheme } = useLocalSearchParams();
+  const runOnce = useSinglePress();
+  const { animationsEnabled } = useAppSettings();
+
+  const [themeReady, setThemeReady] = useState(false);
+  const [isCheckingToken, setIsCheckingToken] = useState(true);
+  const [isDark, setIsDark] = useState(Appearance.getColorScheme() === 'dark');
+  const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
-  const sh = Shadows[theme];
+
+  const teamLogo = require('@/assets/images/team_icon.png');
+  const appIcon = require('@/assets/images/icon.jpg');
+
+  const toggleTheme = async () => {
+    playClickSound();
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    await SecureStore.setItemAsync('userTheme', newTheme ? 'dark' : 'light');
+  };
+
+  const toggleMute = async () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    
+    try {
+      const saved = await SecureStore.getItemAsync('userSettings');
+      let current = saved ? JSON.parse(saved) : {};
+      current.music = !newMuted;
+      current.sfx = !newMuted;
+      current.musicVolume = newMuted ? 0 : 0.5;
+      current.sfxVolume = newMuted ? 0 : 0.5;
+      await SecureStore.setItemAsync('userSettings', JSON.stringify(current));
+    } catch {}
+    
+    if (newMuted) {
+      stopAmbientSound();
+    } else {
+      setTimeout(() => playClickSound(), 50);
+      playAmbientSound(0, isDark);
+    }
+  };
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const savedTheme = await SecureStore.getItemAsync('userTheme');
+      const savedSettings = await SecureStore.getItemAsync('userSettings');
+      if (!cancelled) {
+        if (paramTheme === 'dark' || paramTheme === 'light') {
+          setIsDark(paramTheme === 'dark');
+        } else {
+          setIsDark(savedTheme === 'dark');
+        }
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setIsMuted(parsed.music === false && parsed.sfx === false);
+          } catch {}
+        }
+        setThemeReady(true);
+      }
+
+      if (cancelled) return;
+
+      try {
+        const token = await SecureStore.getItemAsync('userToken');
+        if (token) {
+          const response = await fetch(`${BASE_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+            if (isFirstLogin === 'true') {
+              router.replace({ pathname: '/into', params: { theme: isDark ? 'dark' : 'light' } });
+            } else {
+              router.replace({ pathname: '/(main)/home', params: { theme: isDark ? 'dark' : 'light' } });
+            }
+            return;
+          }
+          await SecureStore.deleteItemAsync('userToken');
+          await SecureStore.deleteItemAsync('currentUserId');
+        }
+      } catch {
+        // Offline: if we have a token but network failed, proceed anyway
+        if (await SecureStore.getItemAsync('userToken')) {
+          const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+          const savedT = await SecureStore.getItemAsync('userTheme');
+          const offlineTheme = savedT || (isDark ? 'dark' : 'light');
+          if (isFirstLogin === 'true') {
+            router.replace({ pathname: '/into', params: { theme: offlineTheme } });
+          } else {
+            router.replace({ pathname: '/(main)/home', params: { theme: offlineTheme } });
+          }
+          return;
+        }
+      }
+      // If we reach here, there's no valid token, so we show the login screen
+      setIsCheckingToken(false);
+    };
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const handleLogin = async () => {
-    if (!nickname || !password) {
-      setErrorMessage('Введіть нікнейм та пароль');
-      return;
-    }
+    playClickSound();
+
+    if (!nickname || !password) return setErrorMessage('Введіть нікнейм та пароль');
 
     setIsLoading(true);
     setErrorMessage('');
 
     try {
       const formBody = new URLSearchParams();
-      formBody.append('username', nickname); 
+      formBody.append('username', nickname);
       formBody.append('password', password);
 
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formBody.toString(),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        const detail = errorData.detail || 'Неправильний нікнейм або пароль';
-        setErrorMessage(typeof detail === 'string' ? detail : 'Помилка авторизації');
-        return;
+        return setErrorMessage(await parseApiError(response, 'Помилка авторизації'));
       }
 
       const data = await response.json();
-      
+
+      // Очищаємо старі хобі перед збереженням нового юзера (для чистого мультиакаунту)
+      await SecureStore.deleteItemAsync('has_hobbies');
+      await SecureStore.deleteItemAsync('user_saved_hobbies');
+
       await SecureStore.setItemAsync('userToken', data.access_token);
-      console.log("Успішний вхід! Токен збережено.");
 
-      router.replace('/(main)/home'); 
+      const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
 
-    } catch (error) {
-      console.error("Помилка мережі:", error);
+      if (isFirstLogin === 'true') {
+        router.replace({ pathname: '/into', params: { theme: isDark ? 'dark' : 'light' } });
+      } else {
+        router.replace({ pathname: '/(main)/home', params: { theme: isDark ? 'dark' : 'light' } });
+      }
+
+    } catch {
       setErrorMessage('Не вдалося з\'єднатися з сервером. Перевірте підключення.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  if (!themeReady || isCheckingToken) {
+    const splashBg = isDark ? '#111827' : '#F9FAFB';
+    return (
+      <View style={{ flex: 1, backgroundColor: splashBg, alignItems: 'center', justifyContent: 'center' }}>
+        <Image source={teamLogo} style={{ width: 120, height: 120, borderRadius: 28 }} resizeMode="contain" />
+        <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 24 }} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={[s.container, { backgroundColor: c.background }]}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={s.content}>
-          
-          <View style={s.header}>
-            <View style={[s.iconGlow, { backgroundColor: c.iconBg }, sh.glow]}>
-              <Sparkles color={c.iconColor} size={40} strokeWidth={2} />
-            </View>
-            <Text style={[s.mainTitle, { color: c.text }]}>AuMentem</Text>
-            <Text style={[s.subtitle, { color: c.textMuted }]}>
-              Твій простір для відновлення 🌿
-            </Text>
-          </View>
+      <Pressable style={s.soundToggle} onPress={toggleMute}>
+        {isMuted ? <VolumeX color={c.textMain} size={24} /> : <Volume2 color={c.textMain} size={24} />}
+      </Pressable>
 
-          <View style={[s.card, { backgroundColor: c.card, borderColor: c.border }, sh.soft]}>
+      <Pressable style={s.themeToggle} onPress={toggleTheme}>
+        {isDark ? <Sun color={c.textMain} size={24} /> : <Moon color={c.textMain} size={24} />}
+      </Pressable>
+
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView 
+          ref={scrollViewRef}
+          scrollEnabled={keyboardVisible}
+          contentContainerStyle={[s.scrollContent, !keyboardVisible && { flexGrow: 1, justifyContent: 'center' }]} 
+          keyboardShouldPersistTaps="handled" 
+          showsVerticalScrollIndicator={false} 
+          bounces={keyboardVisible}
+        >
+
+          <FadeInView animationsEnabled={animationsEnabled} style={s.header}>
+            <Image source={appIcon} style={s.headerIcon} resizeMode="cover" />
+            <Text style={[s.mainTitle, { color: c.textMain }]}>Altera</Text>
+            <Text style={[s.subtitle, { color: c.textMuted }]}>Твій простір для відновлення 🌿</Text>
+          </FadeInView>
+
+          <FadeInView animationsEnabled={animationsEnabled} delay={80} style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }]}>
             <View style={s.inputGroup}>
-              
-         <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-                <User color={c.textMuted} size={20} /> 
-                <TextInput
-                  style={[s.input, { color: c.text }]}
-                  placeholder="Твій нікнейм"
-                  placeholderTextColor={c.textMuted}
-                  autoCapitalize="none"
-                  value={nickname} 
-                  onChangeText={setNickname}
-                />
-              </View>
 
               <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
-                <Lock color={c.textMuted} size={20} />
-                <TextInput
-                  style={[s.input, { color: c.text }]}
-                  placeholder="Пароль"
-                  placeholderTextColor={c.textMuted}
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                />
+                <User color={c.textMuted} size={20} />
+                <TextInput style={[s.input, { color: c.textMain }]} placeholder="Твій нікнейм" placeholderTextColor={c.textMuted} autoCapitalize="none" value={nickname} onChangeText={setNickname} />
               </View>
+
+              {/* ЗУМ-БЕЗПЕЧНИЙ ПАРОЛЬ */}
+              <View style={[s.inputWrapper, { backgroundColor: c.background }]}>
+                <Lock color={c.textMuted} size={20} />
+                
+                <View style={{ flex: 1, position: 'relative', justifyContent: 'center', height: '100%' }}>
+                  {!showPassword && password.length > 0 && (
+                    <View style={[StyleSheet.absoluteFill, { justifyContent: 'center' }]} pointerEvents="none">
+                      <Text 
+                        style={{ ...Typography.body, color: c.textMain, fontSize: 16, letterSpacing: 2, marginTop: Platform.OS === 'ios' ? 4 : 0 }} 
+                        numberOfLines={1}
+                      >
+                        {"•".repeat(password.length)}
+                      </Text>
+                    </View>
+                  )}
+
+                  <TextInput
+                    style={[
+                      s.input,
+                      { color: c.textMain },
+                      !showPassword && password.length > 0 && { color: 'rgba(255,255,255,0)' }
+                    ]}
+                    placeholder="Пароль"
+                    placeholderTextColor={c.textMuted}
+                    value={password}
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    caretHidden={!showPassword}
+                    selectionColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
+                    cursorColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
+                  />
+                </View>
+                
+                <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                  {showPassword ? <EyeOff color={c.textMuted} size={20} /> : <Eye color={c.textMuted} size={20} />}
+                </Pressable>
+              </View>
+
             </View>
 
-            {errorMessage ? (
-              <Text style={s.errorText}>{errorMessage}</Text>
-            ) : null}
+            {errorMessage ? <Text style={s.errorText}>{errorMessage}</Text> : null}
 
-            <Pressable style={s.forgotBtn}>
+            <Pressable style={s.forgotBtn} onPress={() => runOnce(() => { playClickSound(); router.push('/forgot-password'); })}>
               <Text style={[s.forgotText, { color: c.accent }]}>Забули пароль?</Text>
             </Pressable>
-          </View>
 
-          <View style={s.footer}>
-            <Pressable 
-              style={({ pressed }) => [
-                s.primaryBtn, 
-                { backgroundColor: c.accent },
-                pressed && s.btnPressed,
-                isLoading && { opacity: 0.7 }
-              ]}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <>
-                  <Text style={s.primaryBtnText}>Увійти</Text>
-                  <ArrowRight color="#FFF" size={20} strokeWidth={3} />
-                </>
-              )}
-            </Pressable>
+          </FadeInView>
 
-            <Pressable 
-              style={({ pressed }) => [s.secondaryBtn, pressed && s.btnPressed]}
-              onPress={() => router.push('/register')}
-            >
-              <Text style={[s.secondaryBtnText, { color: c.text }]}>
-                Ще немає акаунту? <Text style={{ color: c.accent }}>Створити</Text>
-              </Text>
-            </Pressable>
-          </View>
+          <FadeInView animationsEnabled={animationsEnabled} delay={160} style={s.footer}>
+            <AnimatedCard animationsEnabled={animationsEnabled} style={[s.primaryBtn, { backgroundColor: c.accent }, isLoading && { opacity: 0.7 }]} onPress={handleLogin} disabled={isLoading}>
+              {isLoading ? <ActivityIndicator color="#FFF" /> : <><Text style={s.primaryBtnText}>Увійти</Text><ArrowRight color="#FFF" size={20} strokeWidth={3} /></>}
+            </AnimatedCard>
 
-        </View>
+            <AnimatedCard animationsEnabled={animationsEnabled} style={s.secondaryBtn} onPress={() => runOnce(() => { playClickSound(); router.push('/register'); })}>
+              <Text style={[s.secondaryBtnText, { color: c.textMain }]}>Ще немає акаунту? <Text style={{ color: c.accent }}>Створити</Text></Text>
+            </AnimatedCard>
+          </FadeInView>
+
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -161,87 +310,139 @@ export default function AuthScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24, 
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40, 
-  },
-  iconGlow: {
-    padding: 16,
-    borderRadius: Radii.lg, 
-    marginBottom: 20,
-  },
-  mainTitle: {
-    ...Typography.titleXl,
-    marginBottom: 4,
-  },
-  subtitle: {
-    ...Typography.body,
-    textAlign: 'center',
-  },
-  card: {
-    borderRadius: Radii.lg, 
-    padding: 20, 
-    borderWidth: 1,
-    marginBottom: 32,
-  },
+  themeToggle: { position: 'absolute', top: 50, right: 24, zIndex: 10, padding: 8 },
+  soundToggle: { position: 'absolute', top: 50, right: 72, zIndex: 10, padding: 8 },
+  splashLogoFrame: { width: 120, height: 120, borderRadius: 28, overflow: 'hidden' },
+  splashLogo: { width: '100%', height: '100%' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, justifyContent: 'center', paddingVertical: AuthLayout.scrollPaddingVertical },
+  header: { alignItems: 'center', marginBottom: AuthLayout.headerMarginBottom, marginTop: AuthLayout.headerMarginTop },
+  headerIcon: { width: AuthLayout.headerIconSize, height: AuthLayout.headerIconSize, borderRadius: AuthLayout.headerIconRadius, marginBottom: 20 },
+  mainTitle: { ...Typography.titleXl, marginBottom: 4 },
+  subtitle: { ...Typography.body, textAlign: 'center' },
+  card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: 32 },
   inputGroup: { gap: 12 },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: Radii.md, 
-    paddingHorizontal: 16,
-    height: 56,
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    ...Typography.body,
-  },
-  errorText: {
-    color: '#FF3B30', 
-    marginTop: 12,
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  forgotBtn: {
-    alignSelf: 'flex-end',
-    marginTop: 16,
-  },
-  forgotText: {
-    ...Typography.muted,
-    fontWeight: '700',
-  },
+  inputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
+  input: { flex: 1, ...Typography.body },
+  errorText: { color: '#FF3B30', marginTop: 12, textAlign: 'center', fontSize: 14, fontWeight: '500' },
+  forgotBtn: { alignSelf: 'flex-end', marginTop: 16, paddingHorizontal: 4 },
+  forgotText: { ...Typography.muted, fontWeight: '700' },
   footer: { gap: 16 },
-  primaryBtn: {
-    flexDirection: 'row',
-    height: 60,
-    borderRadius: Radii.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  primaryBtnText: {
-    ...Typography.titleMd,
-    color: '#FFF',
-    fontSize: 18,
-  },
-  secondaryBtn: {
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryBtnText: {
-    ...Typography.body,
-    fontSize: 15,
-  },
-  btnPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.98 }],
-  },
+  primaryBtn: { flexDirection: 'row', height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  primaryBtnText: { ...Typography.titleMd, color: '#FFF', fontSize: 18 },
+  secondaryBtn: { height: 50, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtnText: { ...Typography.body, fontSize: 15 },
 });
+
+/*
+
+// import { BASE_URL } from '@/constants/api';
+
+// import React, { useState, useEffect } from 'react';
+
+// import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, Image, Keyboard, Appearance } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+// import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from 'lucide-react-native';
+
+// import { useRouter } from 'expo-router';
+
+// import * as SecureStore from 'expo-secure-store';
+
+// import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
+
+// import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
+
+// import { useAppSettings } from '@/hooks/useAppSettings';
+
+// import { parseApiError } from '@/utils/apiErrors';
+
+// import AnimatedCard from '@/components/AnimatedCard';
+
+// import FadeInView from '@/components/FadeInView';
+
+// import { useSinglePress } from '@/hooks/useSinglePress';
+
+// export default function AuthScreen() {
+
+//   const router = useRouter();
+
+//   const runOnce = useSinglePress();
+
+//   const { animationsEnabled } = useAppSettings();
+
+//   const [themeReady, setThemeReady] = useState(false);
+
+//   const [isDark, setIsDark] = useState(Appearance.getColorScheme() === 'dark');
+
+//   const [nickname, setNickname] = useState('');
+
+//   const [password, setPassword] = useState('');
+
+//   const [showPassword, setShowPassword] = useState(false);
+
+//   const [isLoading, setIsLoading] = useState(false);
+
+//   const [errorMessage, setErrorMessage] = useState('');
+
+//   const [isMuted, setIsMuted] = useState(false);
+
+//   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+//   const scrollViewRef = React.useRef<ScrollView>(null);
+
+//   const [splashStage, setSplashStage] = useState<'brand' | 'app' | 'done'>('brand');
+
+//   const theme = isDark ? 'dark' : 'light';
+
+//   const c = Colors[theme];
+
+//   const teamLogo = require('@/assets/images/team_icon.png');
+
+//   c
+//   container: { flex: 1 },
+
+//   themeToggle: { position: 'absolute', top: 50, right: 24, zIndex: 10, padding: 8 },
+
+//   soundToggle: { position: 'absolute', top: 50, right: 72, zIndex: 10, padding: 8 },
+
+//   splashLogoFrame: { width: 120, height: 120, borderRadius: 28, overflow: 'hidden' },
+
+//   splashLogo: { width: '100%', height: '100%' },
+
+//   scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.screenX, justifyContent: 'center', paddingVertical: AuthLayout.scrollPaddingVertical },
+
+//   header: { alignItems: 'center', marginBottom: AuthLayout.headerMarginBottom, marginTop: AuthLayout.headerMarginTop },
+
+//   headerIcon: { width: AuthLayout.headerIconSize, height: AuthLayout.headerIconSize, borderRadius: AuthLayout.headerIconRadius, marginBottom: 20 },
+
+//   mainTitle: { ...Typography.titleXl, marginBottom: 4 },
+
+//   subtitle: { ...Typography.body, textAlign: 'center' },
+
+//   card: { borderRadius: Radii.lg, padding: Spacing.cardP, borderWidth: 1, marginBottom: 32 },
+
+//   inputGroup: { gap: 12 },
+
+//   inputWrapper: { flexDirection: 'row', alignItems: 'center', borderRadius: Radii.md, paddingHorizontal: 16, height: 56, gap: 12 },
+
+//   input: { flex: 1, ...Typography.body },
+
+//   errorText: { color: '#FF3B30', marginTop: 12, textAlign: 'center', fontSize: 14, fontWeight: '500' },
+
+//   forgotBtn: { alignSelf: 'flex-end', marginTop: 16, paddingHorizontal: 4 },
+
+//   forgotText: { ...Typography.muted, fontWeight: '700' },
+
+//   footer: { gap: 16 },
+
+//   primaryBtn: { flexDirection: 'row', height: 60, borderRadius: Radii.full, alignItems: 'center', justifyContent: 'center', gap: 8 },
+
+//   primaryBtnText: { ...Typography.titleMd, color: '#FFF', fontSize: 18 },
+
+//   secondaryBtn: { height: 50, alignItems: 'center', justifyContent: 'center' },
+
+//   secondaryBtnText: { ...Typography.body, fontSize: 15 },
+
+// });
+
+*/

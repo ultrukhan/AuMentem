@@ -1,44 +1,76 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Home, Image as ImageIcon, CalendarHeart } from 'lucide-react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { Colors, Typography, Shadows, Radii } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
+import { cardShadow } from '@/utils/shadowStyle';
+import { playClickSound } from '@/utils/audio';
+import { useAppSettings } from '@/hooks/useAppSettings';
+import { useSinglePress } from '@/hooks/useSinglePress';
 
-export default function BottomNav() {
+interface BottomNavProps {
+  isDark?: boolean;
+  theme?: 'light' | 'dark';
+}
+
+export default function BottomNav({ isDark = false, theme: themeProp }: BottomNavProps) {
   const router = useRouter();
-  const pathname = usePathname(); // Щоб знати, на якому ми екрані
-  
-  const isDark = false; // Тимчасово світла тема
-  const theme = isDark ? 'dark' : 'light';
-  const c = Colors[theme];
-  const sh = Shadows[theme];
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const { animationsEnabled } = useAppSettings();
+  const runOnce = useSinglePress();
+
+  const themeKey = themeProp ?? (isDark ? 'dark' : 'light');
+  const c = Colors[themeKey];
 
   const tabs = [
-    { name: 'Головна', path: '/home', Icon: Home },
-    { name: 'Альбом', path: '/album', Icon: ImageIcon },
-    { name: 'Локальні', path: '/local', Icon: CalendarHeart },
+    { name: 'Головна', path: '/(main)/home' as const, match: 'home', Icon: Home },
+    { name: 'Альбом', path: '/(main)/album' as const, match: 'album', Icon: ImageIcon },
+    { name: 'Локальні', path: '/localEventsScreen' as const, match: 'localEvents', Icon: CalendarHeart },
   ];
 
   return (
-    <View style={styles.container}>
-      <BlurView 
-        intensity={isDark ? 80 : 60} 
-        tint={isDark ? 'dark' : 'light'} 
-        style={[styles.navBar, { borderColor: c.border }, sh.nav]}
+    <View style={[styles.container, cardShadow(themeKey, 'nav'), { bottom: Math.max(insets.bottom + 12, Spacing.screenBot) }]}>
+      <BlurView
+        intensity={isDark ? 32 : 48}
+        tint={isDark ? 'dark' : 'light'}
+        style={[
+          styles.navBar,
+          {
+            backgroundColor: c.navBg,
+            borderColor: c.border,
+          },
+        ]}
       >
         {tabs.map((tab) => {
-          const active = pathname.includes(tab.path);
+          const active = pathname.includes(tab.match);
           const color = active ? c.navIconActive : c.navIconInactive;
-          
+
           return (
-            <Pressable 
+            <Pressable
               key={tab.name}
-              onPress={() => router.replace(tab.path as any)}
-              style={styles.navItem}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={`Перейти на вкладку ${tab.name}`}
+              onPress={() => {
+                if (active) return;
+                runOnce(() => {
+                  playClickSound();
+                  router.replace({ pathname: tab.path, params: { theme: themeKey } });
+                });
+              }}
+              style={({ pressed }) => [
+                styles.navItem,
+                pressed && !active && styles.pressed,
+                pressed && animationsEnabled && !active && { transform: [{ scale: 0.95 }] },
+              ]}
             >
               <tab.Icon color={color} size={24} strokeWidth={active ? 2.5 : 2} />
-              <Text style={[Typography.nav, { color, marginTop: 4 }]}>{tab.name}</Text>
+              <Text style={[Typography.nav, { color, marginTop: 4 }]} numberOfLines={1}>
+                {tab.name}
+              </Text>
             </Pressable>
           );
         })}
@@ -50,23 +82,27 @@ export default function BottomNav() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 30 : 20,
-    left: 24,
-    right: 24,
-    zIndex: 100, // Щоб меню завжди було поверх котика
+    left: Spacing.screenX,
+    right: Spacing.screenX,
+    zIndex: 100,
   },
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: Radii.full,
+    paddingHorizontal: Spacing.navPx,
+    paddingVertical: Spacing.navPy,
+    borderRadius: Radii.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
   navItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 60,
+    flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 4,
+  },
+  pressed: {
+    opacity: 0.8,
   },
 });

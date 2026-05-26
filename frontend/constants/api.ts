@@ -1,2 +1,2 @@
 // frontend/constants/api.ts
-export const BASE_URL = 'http://192.168.0.105:8000';
+export const BASE_URL = 'https://altera-v8cl.onrender.com';

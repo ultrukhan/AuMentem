@@ -1,0 +1,65 @@
+import React from 'react';
+import { View, StyleSheet, ViewStyle, StyleProp } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { CalendarDays, Sparkles } from 'lucide-react-native';
+import { Colors } from '@/constants/theme';
+
+type ThemeKey = 'light' | 'dark';
+
+type EventCoverProps = {
+  imageUrl?: string | null;
+  theme: ThemeKey;
+  style?: StyleProp<ViewStyle>;
+  large?: boolean;
+  category?: string;
+};
+
+export default function EventCover({ imageUrl, theme, style, large = false, category }: EventCoverProps) {
+  const c = Colors[theme];
+  const hasImage = !!imageUrl?.trim();
+
+  if (hasImage) {
+    return (
+      <View style={[styles.wrap, style]}>
+        <Image source={{ uri: imageUrl! }} style={styles.image} contentFit="cover" transition={200} />
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)']} style={styles.overlay} />
+      </View>
+    );
+  }
+
+  return (
+    <LinearGradient
+      colors={theme === 'dark' ? ['#1e3a5f', '#0f172a'] : ['#FEF3C7', '#FDE68A', '#FBBF24']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.wrap, styles.placeholder, style]}
+    >
+      <View style={[styles.iconCircle, { backgroundColor: `${c.accent}25` }]}>
+        <CalendarDays color={c.accent} size={large ? 48 : 32} strokeWidth={1.5} />
+      </View>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { width: '100%', overflow: 'hidden' },
+  image: { width: '100%', height: '100%' },
+  overlay: { ...StyleSheet.absoluteFillObject },
+  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+});

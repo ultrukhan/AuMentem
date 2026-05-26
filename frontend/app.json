@@ -1,25 +1,42 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
-    "version": "1.0.0",
+    "name": "Altera",
+    "slug": "altera",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aumentem.altera",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#B5C4A1",
+        "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.aumentem.altera",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCBTzbO6epXlpCXq7ClnOqQy-Tvi4B0L0c"
+        }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "output": "static",
@@ -30,20 +47,49 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#F9FAFB",
           "dark": {
-            "backgroundColor": "#000000"
+            "image": "./assets/images/icon.png",
+            "backgroundColor": "#111827"
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Дозвольте додатку використовувати вашу геолокацію для проходження геоквестів."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Додаток потребує доступу до фотографій для завантаження доказів виконання квестів.",
+          "cameraPermission": "Додаток потребує доступу до камери для створення фотографій на місці квесту."
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3f6b705b-e49c-4e50-ace0-85a448ce303f"
+      }
+    },
+    "owner": "coofy"
   }
 }
