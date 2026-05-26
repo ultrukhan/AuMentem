@@ -57,7 +57,7 @@ async def get_upcoming_events(
     if only_free:
         query = query.filter(
             or_(
-                DBLocalEvents.price.ilike("%безкоштовно%"),
+                DBLocalEvents.price.ilike("%Безкоштовно%"),
                 DBLocalEvents.price.ilike("%вільний%"),
                 DBLocalEvents.price == "0"
             )
