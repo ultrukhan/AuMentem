@@ -49,7 +49,7 @@ We are committed to continuous improvement and look forward to implementing thes
 | :--- | :--- | :--- |
 | **Ulyana** | Backend (Python, FastAPI) | [@ultrukhan](https://github.com/ultrukhan) |
 | **Nazar** | Team Lead, Backend | [@NazikKRV](https://github.com/NazikKRV) |
-| **Oleksiy** | Data Architect | [@sayday16]((https://github.com/sayday16)) |
+| **Oleksiy** | Data Architect | [@sayday16](https://github.com/sayday16) |
 | **Anna** | Frontend (React Native, Expo) | [@Ann00012](https://github.com/Ann00012) |
 | **Arsen** | Frontend / UX Design | [@Coofich](https://github.com/Coofich) |
 | **Sviatoslav** | QA | [@svyatoslavbr](https://github.com/svyatoslavbr) |
