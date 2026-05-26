@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException,Form, Body,Query
 from sqlalchemy.orm import Session, joinedload
 from database import get_db
-from sqlalchemy import or_
+from sqlalchemy import or_,and_
 from models import DBAppUser,DBFavEvent,get_utc_now,DBLocalEvents
 from schemas import LocalEventCreate,LocalEventResponse,LocalEventBase,FavEventActionResponse
 from auth_utils import get_current_user
@@ -17,17 +17,34 @@ router = APIRouter(
 
 @router.get("/", response_model=List[LocalEventResponse])
 async def get_upcoming_events(
-    category: Optional[EventCategory] = Query(None, description="Фільтр за категорією"),
-    city: Optional[str] = Query(None, description="Фільтр за містом"),
-    date_from: Optional[datetime] = Query(None, description="Показати події, що починаються з цієї дати"),
-    only_free: bool = Query(False, description="Показати лише безкоштовні заходи"),
-    db: Session = Depends(get_db)
+        category: Optional[EventCategory] = Query(None, description="Фільтр за категорією"),
+        city: Optional[str] = Query(None, description="Фільтр за містом"),
+        date_from: Optional[datetime] = Query(None, description="Показати події, що починаються з цієї дати"),
+        only_free: bool = Query(False, description="Показати лише безкоштовні заходи"),
+        db: Session = Depends(get_db)
 ):
     """
-    Видає список майбутніх заходів із можливістю гнучкої фільтрації.
+    Видає список заходів із гнучкою фільтрацією та перевіркою часу.
     """
-    query = db.query(DBLocalEvents).filter(DBLocalEvents.start_time >= get_utc_now())
+    current_time = get_utc_now()
+    query = db.query(DBLocalEvents)
 
+    has_link_condition = and_(
+        DBLocalEvents.external_link.isnot(None),
+        DBLocalEvents.start_time >= current_time
+    )
+
+    no_link_condition = and_(
+        DBLocalEvents.external_link.is_(None),
+        or_(
+            DBLocalEvents.end_time >= current_time,
+            and_(
+                DBLocalEvents.end_time.is_(None),
+                DBLocalEvents.start_time >= current_time
+            )
+        )
+    )
+    query = query.filter(or_(has_link_condition, no_link_condition))
     if category:
         query = query.filter(DBLocalEvents.category == category)
 
@@ -45,11 +62,9 @@ async def get_upcoming_events(
                 DBLocalEvents.price == "0"
             )
         )
-
     events = query.order_by(DBLocalEvents.start_time.asc()).all()
 
     return events
-
 
 @router.get("/my/favorites", response_model=List[LocalEventResponse])
 async def get_my_events(
