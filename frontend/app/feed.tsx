@@ -344,7 +344,6 @@ export default function FeedScreen() {
 
   const loadMorePosts = () => {
     if (!isLoadingMore && hasMore) {
-      playClickSound();
       fetchPosts(false);
     }
   };

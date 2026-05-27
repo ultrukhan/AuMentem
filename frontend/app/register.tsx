@@ -95,7 +95,7 @@ export default function RegisterScreen() {
   }, []);
 
   const c = Colors[theme];
-  const appIcon = require('@/assets/images/icon.jpg');
+  const appIcon = require('@/assets/images/icon.png');
 
   const reqLength = password.length >= 8;
   const reqUpper = /[A-Z]/.test(password);
