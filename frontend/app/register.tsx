@@ -184,22 +184,10 @@ export default function RegisterScreen() {
                 <Lock color={c.textMuted} size={20} />
                 
                 <View style={{ flex: 1, position: 'relative', justifyContent: 'center', height: '100%' }}>
-                  {!showPassword && password.length > 0 && (
-                    <View style={[StyleSheet.absoluteFill, { justifyContent: 'center' }]} pointerEvents="none">
-                      <Text 
-                        style={{ ...Typography.body, color: c.textMain, fontSize: 16, letterSpacing: 2, marginTop: Platform.OS === 'ios' ? 4 : 0 }} 
-                        numberOfLines={1}
-                      >
-                        {"•".repeat(password.length)}
-                      </Text>
-                    </View>
-                  )}
-
                   <TextInput
                     style={[
                       s.input,
-                      { color: c.textMain },
-                      !showPassword && password.length > 0 && { color: 'rgba(255,255,255,0)' }
+                      { color: c.textMain }
                     ]}
                     placeholder="Пароль"
                     placeholderTextColor={c.textMuted}
@@ -208,9 +196,9 @@ export default function RegisterScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     spellCheck={false}
-                    caretHidden={!showPassword}
-                    selectionColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
-                    cursorColor={(!showPassword && password.length > 0) ? 'rgba(255,255,255,0)' : c.accent}
+                    secureTextEntry={!showPassword}
+                    selectionColor={c.accent}
+                    cursorColor={c.accent}
                   />
                 </View>
                 
