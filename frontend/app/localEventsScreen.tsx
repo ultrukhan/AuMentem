@@ -37,9 +37,6 @@ import {
   Bell,
   Check,
 } from "lucide-react-native";
-
-import { scheduleEventReminder } from "@/utils/notifications";
-
 import { Colors, Typography, Radii, Spacing } from "@/constants/theme";
 import { BASE_URL } from "@/constants/api";
 import { playClickSound } from "@/utils/audio";
@@ -118,8 +115,6 @@ export default function LocalEventsScreen() {
   const { animationsEnabled } = useAppSettings();
   const runOnce = useSinglePress();
   const [showPast, setShowPast] = useState(false);
-  const [remindEvent, setRemindEvent] = useState(false);
-
   const [activeTab, setActiveTab] = useState<"EXPLORE" | "SAVED">("EXPLORE");
   const exploreListRef = useRef<FlatList>(null);
   const savedListRef = useRef<FlatList>(null);
@@ -157,7 +152,7 @@ export default function LocalEventsScreen() {
           params.push(`city=${encodeURIComponent(currentCity)}`);
         }
         if (freeOnly) {
-          params.push(`free_only=true`);
+          params.push(`only_free=true`);
         }
         if (params.length > 0) {
           url += `?${params.join("&")}`;
@@ -268,27 +263,6 @@ export default function LocalEventsScreen() {
           setAttendeesCount((prev) =>
             prev !== null ? (data.is_favorited ? prev + 1 : prev - 1) : null,
           );
-          if (data.is_favorited) {
-            setRemindEvent(true);
-          } else {
-            setRemindEvent(false);
-          }
-        }
-        
-        if (data.is_favorited) {
-          import('@/utils/notifications').then(({ scheduleEventReminder }) => {
-            scheduleEventReminder(event.name, event.start_time).then((res) => {
-              if (res) {
-                import('@/utils/toast').then(({ Toast }) => {
-                  Toast.show({ title: "Нагадування", message: "Нагадування автоматично встановлено" });
-                });
-              }
-            });
-          });
-        } else {
-          import('@/utils/notifications').then(({ cancelEventReminder }) => {
-            cancelEventReminder(event.name);
-          });
         }
       }
     } catch (error) {
@@ -301,7 +275,6 @@ export default function LocalEventsScreen() {
   const openEventDetails = async (event: LocalEvent) => {
     setSelectedEvent(event);
     setAttendeesCount(null);
-    setRemindEvent(false);
     try {
       const token = await SecureStore.getItemAsync("userToken");
       const response = await fetch(
@@ -1002,55 +975,7 @@ export default function LocalEventsScreen() {
                       </View>
                     )}
 
-                    <Pressable 
-                      onPress={() => { 
-                        playClickSound(); 
-                        const nextRemind = !remindEvent;
-                        setRemindEvent(nextRemind);
-                        if (nextRemind) {
-                          const eventTime = new Date(selectedEvent.start_time).getTime();
-                          if (eventTime < Date.now()) {
-                            import('@/utils/toast').then(({ Toast }) => {
-                              Toast.show({ title: "Упс", message: "Подія вже минула або почалася!" });
-                            });
-                            setRemindEvent(false);
-                            return;
-                          }
-                          import('@/utils/notifications').then(({ scheduleEventReminder }) => {
-                            scheduleEventReminder(selectedEvent.name, selectedEvent.start_time).then(scheduled => {
-                              if (scheduled) {
-                                import('@/utils/toast').then(({ Toast }) => {
-                                  Toast.show({ title: "Готово!", message: "Нагадування успішно встановлено!" });
-                                });
-                              } else {
-                                import('@/utils/toast').then(({ Toast }) => {
-                                  Toast.show({ title: "Помилка", message: "Перевірте дозволи на сповіщення в налаштуваннях." });
-                                });
-                                setRemindEvent(false);
-                              }
-                            });
-                          });
-                        } else {
-                          import('@/utils/notifications').then(({ cancelEventReminder }) => {
-                            cancelEventReminder(selectedEvent.name);
-                          });
-                        }
-                      }}
-                      style={({ pressed }) => [
-                        s.checkboxRow, 
-                        { marginTop: 16, marginBottom: 16, padding: 12, backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' },
-                        pressed && animationsEnabled && { opacity: 0.7 }
-                      ]}
-                    >
-                      <View style={[s.checkbox, { borderColor: c.textMuted }, remindEvent && { backgroundColor: c.accent, borderColor: c.accent }]}>
-                        {remindEvent && <Check color="#FFF" size={14} strokeWidth={3} />}
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={[Typography.body, { color: c.textMain }]}>Нагадати про захід</Text>
-                        <Text style={[Typography.nav, { color: c.textMuted }]}>Ми надішлемо сповіщення за годину</Text>
-                      </View>
-                      <Bell color={remindEvent ? c.accent : c.textMuted} size={24} />
-                    </Pressable>
+
 
                     <Text style={[s.modalDescTitle, { color: c.textMain }]}>
                       Про подію

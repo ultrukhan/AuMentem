@@ -52,10 +52,7 @@ export default function TrackerScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      playAmbientSound(0, isDark);
-      return () => {
-        stopAmbientSound();
-      };
+      // Background music is handled globally
     }, [isDark])
   );
 

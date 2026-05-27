@@ -2,7 +2,9 @@ import { Audio } from 'expo-av';
 import * as SecureStore from 'expo-secure-store';
 
 let ambientSoundInstance: Audio.Sound | null = null;
+let currentAmbientTheme: 'dark' | 'light' | null = null;
 let audioModeReady = false;
+let playbackGeneration = 0;
 
 const setupAudio = async () => {
   if (audioModeReady) return;
@@ -81,8 +83,24 @@ export const playAmbientSound = async (durationSeconds: number = 0, isDark: bool
   if (!music) return;
 
   await setupAudio();
+  
+  const requestedTheme = isDark ? 'dark' : 'light';
+  if (ambientSoundInstance && currentAmbientTheme === requestedTheme) {
+    try {
+      const status = await ambientSoundInstance.getStatusAsync();
+      if (status.isLoaded) {
+        await ambientSoundInstance.setVolumeAsync(musicVolume);
+        if (!status.isPlaying) await ambientSoundInstance.playAsync();
+        return;
+      }
+    } catch {}
+  }
+
   try {
     await stopAmbientSound();
+    
+    playbackGeneration++;
+    const currentGeneration = playbackGeneration;
 
     const soundFile = isDark
       ? require('../assets/sounds/bgm_dark.mp3')
@@ -92,7 +110,14 @@ export const playAmbientSound = async (durationSeconds: number = 0, isDark: bool
       soundFile,
       { isLooping: true, volume: musicVolume }
     );
+    
+    if (currentGeneration !== playbackGeneration) {
+      await sound.unloadAsync();
+      return;
+    }
+
     ambientSoundInstance = sound;
+    currentAmbientTheme = requestedTheme;
     await ambientSoundInstance.playAsync();
 
     if (durationSeconds > 0) {
@@ -112,11 +137,13 @@ export const setAmbientVolume = async (volume: number) => {
 };
 
 export const stopAmbientSound = async () => {
+  playbackGeneration++;
   if (ambientSoundInstance) {
     try {
       await ambientSoundInstance.stopAsync();
       await ambientSoundInstance.unloadAsync();
       ambientSoundInstance = null;
+      currentAmbientTheme = null;
     } catch {}
   }
 };

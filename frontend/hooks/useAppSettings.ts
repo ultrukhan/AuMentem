@@ -8,7 +8,6 @@ export type AppSettings = {
   music: boolean;
   ambientOrbsEnabled: boolean;
   petEnabled: boolean;
-  notificationsEnabled: boolean;
 };
 
 const DEFAULTS: AppSettings = {
@@ -17,7 +16,6 @@ const DEFAULTS: AppSettings = {
   music: true,
   ambientOrbsEnabled: true,
   petEnabled: true,
-  notificationsEnabled: true,
 };
 
 export function useAppSettings() {
@@ -34,7 +32,6 @@ export function useAppSettings() {
         music: parsed.music !== false,
         ambientOrbsEnabled: parsed.ambientOrbsEnabled !== false,
         petEnabled: parsed.petEnabled !== false,
-        notificationsEnabled: parsed.notificationsEnabled !== false,
       });
     } catch {
       // keep defaults
@@ -53,7 +50,6 @@ export function useAppSettings() {
     musicEnabled: settings.music,
     ambientOrbsEnabled: settings.ambientOrbsEnabled,
     petEnabled: settings.petEnabled,
-    notificationsEnabled: settings.notificationsEnabled,
     reload,
   };
 }

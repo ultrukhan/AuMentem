@@ -173,10 +173,8 @@ export default function HomeScreen() {
             return;
           }
 
-          if (hasLoadedData('home')) {
-            const nick = await SecureStore.getItemAsync("cachedNickname");
-            if (nick) setCachedNickname(nick);
-          }
+          const nick = await SecureStore.getItemAsync("cachedNickname");
+          if (nick) setCachedNickname(nick);
 
           const response = await fetch(`${BASE_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -284,7 +282,7 @@ export default function HomeScreen() {
                 З поверненням,
               </Text>
 
-              {isLoading ? (
+              {isLoading || (!userProfile && !cachedNickname) ? (
                 <ActivityIndicator
                   size="small"
                   color={c.accent}

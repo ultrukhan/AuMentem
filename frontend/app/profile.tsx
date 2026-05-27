@@ -39,7 +39,7 @@ import {
   IconSizes,
 } from "@/constants/theme";
 import { BASE_URL } from "@/constants/api";
-import { playClickSound } from "@/utils/audio";
+import { playClickSound, stopAmbientSound } from "@/utils/audio";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import FadeInView from "@/components/FadeInView";
 import AnimatedCard from "@/components/AnimatedCard";
@@ -128,6 +128,7 @@ export default function ProfileScreen() {
   }, []);
   const handleLogout = async () => {
     playClickSound();
+    stopAmbientSound();
     try {
       await SecureStore.deleteItemAsync("userToken");
       await SecureStore.deleteItemAsync("currentUserId");
