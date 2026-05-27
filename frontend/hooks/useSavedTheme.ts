@@ -27,6 +27,7 @@ export function useSavedTheme(): {
     const newTheme = !isDark;
     setIsDark(newTheme);
     await SecureStore.setItemAsync('userTheme', newTheme ? 'dark' : 'light');
+    import('@/utils/audio').then(({ playAmbientSound }) => playAmbientSound(0, newTheme));
   };
 
   const theme: 'light' | 'dark' = isDark ? 'dark' : 'light';

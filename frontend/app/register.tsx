@@ -9,7 +9,7 @@ import { Mail, Lock, Sparkles, ArrowRight, User, Eye, EyeOff, Check, Sun, Moon, 
 import { useRouter } from "expo-router";
 import { Colors, Typography, Radii, Spacing, AuthLayout } from "@/constants/theme";
 import * as SecureStore from "expo-secure-store";
-import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
+import { playClickSound, stopAmbientSound, playAmbientSound, refreshAudioSettings } from '@/utils/audio';
 import { useSavedTheme } from '@/hooks/useSavedTheme';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { parseApiError } from '@/utils/apiErrors';
@@ -69,6 +69,7 @@ export default function RegisterScreen() {
       current.musicVolume = newMuted ? 0 : 0.5;
       current.sfxVolume = newMuted ? 0 : 0.5;
       await SecureStore.setItemAsync('userSettings', JSON.stringify(current));
+      await refreshAudioSettings();
     } catch {}
     
     if (newMuted) {

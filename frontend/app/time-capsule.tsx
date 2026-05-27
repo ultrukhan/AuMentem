@@ -38,10 +38,7 @@ export default function TimeCapsuleScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      playAmbientSound(0, isDark);
-      return () => {
-        stopAmbientSound();
-      };
+      // Background music is handled globally
     }, [isDark])
   );
 

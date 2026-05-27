@@ -10,7 +10,7 @@ import { Colors, Typography, Radii, Spacing } from '@/constants/theme';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, withRepeat, interpolate, Extrapolation, FadeInDown, FadeIn, FadeOut } from 'react-native-reanimated';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import ConfettiCannon from 'react-native-confetti-cannon';
-import Toast from 'react-native-toast-message';
+import { Toast } from '@/utils/toast';
 import { playClickSound, playSuccessSound } from '@/utils/audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import AnimatedCard from '@/components/AnimatedCard';
@@ -163,7 +163,7 @@ export default function QuestsScreen() {
         const sorted = data.sort((a: any, b: any) => (priority[a.status] || 99) - (priority[b.status] || 99));
         setQuests(sorted.slice(0, 5));
       }
-    } catch (error) { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося завантажити квести' }); } finally {
+    } catch (error) { Toast.error('Помилка', 'Не вдалося завантажити квести'); } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
@@ -190,7 +190,7 @@ export default function QuestsScreen() {
       } catch (e) {
         await SyncManager.enqueueAction(`${BASE_URL}/mini-quests/my-quests/${questId}/${action}`, 'PATCH');
         success = true;
-        Toast.show({ type: 'info', text1: 'Офлайн', text2: 'Дію збережено. Буде відправлено пізніше.' });
+        Toast.info('Офлайн', 'Дію збережено. Буде відправлено пізніше.');
       }
 
       if (success) {
@@ -212,8 +212,8 @@ export default function QuestsScreen() {
             setQuestToShare(questId); setIsAnonymous(defaultAnonymous); setShareModalVisible(true);
           }
         }
-      } else { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося оновити статус' }); }
-    } catch (error) { Toast.show({ type: 'error', text1: 'Помилка мережі', text2: 'Перевір підключення до інтернету' }); } finally { setActionLoadingId(null); }
+      } else { Toast.error('Помилка', 'Не вдалося оновити статус'); }
+    } catch (error) { Toast.error('Помилка мережі', 'Перевір підключення до інтернету'); } finally { setActionLoadingId(null); }
   };
 
   const handleShareQuest = async () => {
@@ -223,9 +223,9 @@ export default function QuestsScreen() {
       const response = await fetch(`${BASE_URL}/posts/`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ user_mini_quest_id: questToShare, is_anonymous: isAnonymous }) });
       if (response.ok) {
         setShareModalVisible(false); setQuestToShare(null);
-        Toast.show({ type: 'success', text1: 'Супер! 🎉', text2: 'Твій успіх вже у стрічці підтримки.' });
-      } else { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося опублікувати пост' }); }
-    } catch (error) { Toast.show({ type: 'error', text1: 'Помилка мережі', text2: 'Перевір підключення до інтернету' }); } finally { setIsSharing(false); }
+        Toast.success('Супер! 🎉', 'Твій успіх вже у стрічці підтримки.');
+      } else { Toast.error('Помилка', 'Не вдалося опублікувати пост'); }
+    } catch (error) { Toast.error('Помилка мережі', 'Перевір підключення до інтернету'); } finally { setIsSharing(false); }
   };
 
   const promptEvaluation = (questId: string) => { playClickSound(); setEvalQuestId(questId); setEvalModalVisible(true); };
@@ -241,7 +241,7 @@ export default function QuestsScreen() {
       } catch (e) {
         await SyncManager.enqueueAction(`${BASE_URL}/mini-quests/my-quests/${evalQuestId}/evaluate`, 'PATCH', { evaluation });
         success = true;
-        Toast.show({ type: 'info', text1: 'Офлайн', text2: 'Оцінку збережено локально.' });
+        Toast.info('Офлайн', 'Оцінку збережено локально.');
       }
 
       if (success) {
@@ -250,9 +250,9 @@ export default function QuestsScreen() {
           AsyncStorage.setItem(`quests_daily_${token}`, JSON.stringify(newQuests)).catch(() => {});
           return newQuests;
         });
-        Toast.show({ type: 'success', text1: 'Оцінку збережено', text2: 'Дякуємо, що ділишся своїм станом!' });
-      } else { Toast.show({ type: 'error', text1: 'Помилка', text2: 'Не вдалося зберегти оцінку' }); }
-    } catch (error) { Toast.show({ type: 'error', text1: 'Помилка мережі', text2: 'Не вдалося зберегти оцінку' }); } finally { setActionLoadingId(null); setEvalQuestId(null); }
+        Toast.success('Оцінку збережено', 'Дякуємо, що ділишся своїм станом!');
+      } else { Toast.error('Помилка', 'Не вдалося зберегти оцінку'); }
+    } catch (error) { Toast.error('Помилка мережі', 'Не вдалося зберегти оцінку'); } finally { setActionLoadingId(null); setEvalQuestId(null); }
   };
 
 
@@ -415,7 +415,7 @@ export default function QuestsScreen() {
           {showConfetti && animationsEnabled && <ConfettiCannon count={100} origin={{x: -10, y: 0}} autoStart={true} fadeOut={true} fallSpeed={2500} />}
         </Animated.View>
       </SafeAreaView>
-      <Toast />
+
     </AnimatedBackground>
   );
 }

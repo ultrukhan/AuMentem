@@ -309,15 +309,16 @@ export default function FeedScreen() {
         setIsLoadingMore(true);
       }
 
-      const response = await fetchWithCache(`${BASE_URL}/posts/?offset=${currentOffset}`, {
+      const limit = 15;
+      const response = await fetchWithCache(`${BASE_URL}/posts/?limit=${limit}&offset=${currentOffset}`, {
         headers: { Authorization: `Bearer ${token}` },
         cacheKey: `feed_posts_${currentOffset}_${token}`,
       });
 
       if (response.ok && response.data) {
-        // Backend returns a paginated object
-        const data = response.data.items || [];
-        const sortedData = data.sort(
+        // Backend returns PaginatedPostResponse { items, total_count, limit, offset }
+        const responseData = response.data.items ? response.data.items : [];
+        const sortedData = responseData.sort(
           (a: Post, b: Post) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         );
@@ -325,13 +326,11 @@ export default function FeedScreen() {
         if (reset) {
           setPosts(sortedData);
         } else {
-          setPosts(prev => [...prev, ...sortedData]);
+          setPosts((prev) => [...prev, ...sortedData]);
         }
         
-        const backendLimit = response.data.limit || 15;
-        setCurrentLimit(backendLimit);
-        setOffset(currentOffset + backendLimit);
-        setHasMore(currentOffset + backendLimit < response.data.total_count);
+        setOffset(currentOffset + limit);
+        setHasMore(responseData.length === limit);
       }
     } catch (error) {
       console.error("Помилка завантаження стрічки:", error);

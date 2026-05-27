@@ -12,7 +12,7 @@ import { User, Lock, ArrowRight, Eye, EyeOff, Sun, Moon, Volume2, VolumeX } from
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Colors, Typography, Radii, Spacing, AuthLayout } from '@/constants/theme';
-import { playClickSound, stopAmbientSound, playAmbientSound } from '@/utils/audio';
+import { playClickSound, stopAmbientSound, playAmbientSound, refreshAudioSettings } from '@/utils/audio';
 import { useAppSettings } from '@/hooks/useAppSettings';
 import { parseApiError } from '@/utils/apiErrors';
 import AnimatedCard from '@/components/AnimatedCard';
@@ -36,18 +36,20 @@ export default function AuthScreen() {
   const [isMuted, setIsMuted] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = React.useRef<ScrollView>(null);
+  const [splashStage, setSplashStage] = useState<'brand' | 'app' | 'done'>('brand');
 
   const theme = isDark ? 'dark' : 'light';
   const c = Colors[theme];
 
   const teamLogo = require('@/assets/images/team_icon.png');
-  const appIcon = require('@/assets/images/icon.jpg');
+  const appIcon = require('@/assets/images/icon.png');
 
   const toggleTheme = async () => {
     playClickSound();
     const newTheme = !isDark;
     setIsDark(newTheme);
     await SecureStore.setItemAsync('userTheme', newTheme ? 'dark' : 'light');
+    playAmbientSound(0, newTheme);
   };
 
   const toggleMute = async () => {
@@ -62,6 +64,7 @@ export default function AuthScreen() {
       current.musicVolume = newMuted ? 0 : 0.5;
       current.sfxVolume = newMuted ? 0 : 0.5;
       await SecureStore.setItemAsync('userSettings', JSON.stringify(current));
+      await refreshAudioSettings();
     } catch {}
     
     if (newMuted) {
@@ -87,17 +90,28 @@ export default function AuthScreen() {
   }, []);
 
   useEffect(() => {
+    if (!isCheckingToken && !isMuted) {
+      playAmbientSound(0, isDark);
+    }
+  }, [isCheckingToken]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const bootstrap = async () => {
       const savedTheme = await SecureStore.getItemAsync('userTheme');
       const savedSettings = await SecureStore.getItemAsync('userSettings');
       if (!cancelled) {
+        let actualTheme: 'dark' | 'light';
         if (paramTheme === 'dark' || paramTheme === 'light') {
-          setIsDark(paramTheme === 'dark');
+          actualTheme = paramTheme as 'dark' | 'light';
+        } else if (savedTheme === 'dark' || savedTheme === 'light') {
+          actualTheme = savedTheme;
         } else {
-          setIsDark(savedTheme === 'dark');
+          actualTheme = Appearance.getColorScheme() === 'dark' ? 'dark' : 'light';
         }
+        
+        setIsDark(actualTheme === 'dark');
         if (savedSettings) {
           try {
             const parsed = JSON.parse(savedSettings);
@@ -107,40 +121,54 @@ export default function AuthScreen() {
         setThemeReady(true);
       }
 
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
       if (cancelled) return;
 
       try {
         const token = await SecureStore.getItemAsync('userToken');
         if (token) {
-          const response = await fetch(`${BASE_URL}/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (response.ok) {
-            const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-            if (isFirstLogin === 'true') {
-              router.replace({ pathname: '/into', params: { theme: isDark ? 'dark' : 'light' } });
-            } else {
-              router.replace({ pathname: '/(main)/home', params: { theme: isDark ? 'dark' : 'light' } });
+          setSplashStage('app');
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          if (cancelled) return;
+
+          try {
+            const response = await fetch(`${BASE_URL}/auth/me`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (response.ok) {
+              const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+              const targetTheme = (paramTheme === 'dark' || paramTheme === 'light') 
+                ? paramTheme 
+                : (savedTheme === 'dark' || savedTheme === 'light') ? savedTheme : (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
+              
+              if (isFirstLogin === 'true') {
+                router.replace({ pathname: '/into', params: { theme: targetTheme } });
+              } else {
+                router.replace({ pathname: '/(main)/home', params: { theme: targetTheme } });
+              }
+              return;
             }
-            return;
+            await SecureStore.deleteItemAsync('userToken');
+            await SecureStore.deleteItemAsync('currentUserId');
+          } catch {
+            // Offline: if we have a token but network failed, proceed anyway
+            if (await SecureStore.getItemAsync('userToken')) {
+              const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
+              const savedT = await SecureStore.getItemAsync('userTheme');
+              const offlineTheme = savedT === 'dark' || savedT === 'light' ? savedT : (Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
+              if (isFirstLogin === 'true') {
+                router.replace({ pathname: '/into', params: { theme: offlineTheme } });
+              } else {
+                router.replace({ pathname: '/(main)/home', params: { theme: offlineTheme } });
+              }
+              return;
+            }
           }
-          await SecureStore.deleteItemAsync('userToken');
-          await SecureStore.deleteItemAsync('currentUserId');
         }
-      } catch {
-        // Offline: if we have a token but network failed, proceed anyway
-        if (await SecureStore.getItemAsync('userToken')) {
-          const isFirstLogin = await SecureStore.getItemAsync('isFirstLogin');
-          const savedT = await SecureStore.getItemAsync('userTheme');
-          const offlineTheme = savedT || (isDark ? 'dark' : 'light');
-          if (isFirstLogin === 'true') {
-            router.replace({ pathname: '/into', params: { theme: offlineTheme } });
-          } else {
-            router.replace({ pathname: '/(main)/home', params: { theme: offlineTheme } });
-          }
-          return;
-        }
-      }
+      } catch {}
+
+      if (!cancelled) setSplashStage('done');
       // If we reach here, there's no valid token, so we show the login screen
       setIsCheckingToken(false);
     };
@@ -198,13 +226,29 @@ export default function AuthScreen() {
     }
   };
 
-  if (!themeReady || isCheckingToken) {
-    const splashBg = isDark ? '#111827' : '#F9FAFB';
+  if (!themeReady) {
+    return null;
+  }
+
+  if (splashStage === 'brand') {
     return (
-      <View style={{ flex: 1, backgroundColor: splashBg, alignItems: 'center', justifyContent: 'center' }}>
-        <Image source={teamLogo} style={{ width: 120, height: 120, borderRadius: 28 }} resizeMode="contain" />
-        <ActivityIndicator size="large" color="#8B5CF6" style={{ marginTop: 24 }} />
-      </View>
+      <SafeAreaView style={[s.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={s.splashLogoFrame}>
+          <Image source={teamLogo} style={s.splashLogo} resizeMode="contain" />
+        </View>
+        <Text style={[Typography.titleXl, { color: c.textMain, marginTop: 20 }]}>AuMentem</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (splashStage === 'app') {
+    return (
+      <SafeAreaView style={[s.container, { backgroundColor: c.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <View style={s.splashLogoFrame}>
+          <Image source={appIcon} style={s.splashLogo} resizeMode="contain" />
+        </View>
+        <ActivityIndicator size="large" color={c.accent} style={{ marginTop: 20 }} />
+      </SafeAreaView>
     );
   }
 
