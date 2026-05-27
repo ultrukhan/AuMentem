@@ -2,7 +2,7 @@
   "expo": {
     "name": "Altera",
     "slug": "altera",
-    "version": "1.7.0-demo",
+    "version": "1.7.0-release",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "altera",

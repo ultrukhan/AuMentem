@@ -446,37 +446,10 @@ export default function ProfileScreen() {
                       height: "100%",
                     }}
                   >
-                    {!showPassword && oldPassword.length > 0 && (
-                      <View
-                        style={[
-                          StyleSheet.absoluteFill,
-                          { justifyContent: "center" },
-                        ]}
-                        pointerEvents="none"
-                      >
-                        <Text
-                          style={{
-                            ...Typography.body,
-                            color: c.textMain,
-                            fontSize: 16,
-                            letterSpacing: 2,
-                            marginTop: Platform.OS === "ios" ? 4 : 0,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {"•".repeat(oldPassword.length)}
-                        </Text>
-                      </View>
-                    )}
-
                     <TextInput
                       style={[
                         s.input,
-                        { color: c.textMain },
-                        !showPassword &&
-                          oldPassword.length > 0 && {
-                            color: "rgba(255,255,255,0)",
-                          },
+                        { color: c.textMain }
                       ]}
                       placeholder="Поточний пароль"
                       placeholderTextColor={c.textMuted}
@@ -489,17 +462,9 @@ export default function ProfileScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       spellCheck={false}
-                      caretHidden={!showPassword}
-                      selectionColor={
-                        !showPassword && oldPassword.length > 0
-                          ? "rgba(255,255,255,0)"
-                          : c.accent
-                      }
-                      cursorColor={
-                        !showPassword && oldPassword.length > 0
-                          ? "rgba(255,255,255,0)"
-                          : c.accent
-                      }
+                      secureTextEntry={!showPassword}
+                      selectionColor={c.accent}
+                      cursorColor={c.accent}
                     />
                   </View>
 
@@ -532,37 +497,10 @@ export default function ProfileScreen() {
                       height: "100%",
                     }}
                   >
-                    {!showPassword && newPassword.length > 0 && (
-                      <View
-                        style={[
-                          StyleSheet.absoluteFill,
-                          { justifyContent: "center" },
-                        ]}
-                        pointerEvents="none"
-                      >
-                        <Text
-                          style={{
-                            ...Typography.body,
-                            color: c.textMain,
-                            fontSize: 16,
-                            letterSpacing: 2,
-                            marginTop: Platform.OS === "ios" ? 4 : 0,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {"•".repeat(newPassword.length)}
-                        </Text>
-                      </View>
-                    )}
-
                     <TextInput
                       style={[
                         s.input,
-                        { color: c.textMain },
-                        !showPassword &&
-                          newPassword.length > 0 && {
-                            color: "rgba(255,255,255,0)",
-                          },
+                        { color: c.textMain }
                       ]}
                       placeholder="Новий пароль"
                       placeholderTextColor={c.textMuted}
@@ -575,17 +513,9 @@ export default function ProfileScreen() {
                       autoCapitalize="none"
                       autoCorrect={false}
                       spellCheck={false}
-                      caretHidden={!showPassword}
-                      selectionColor={
-                        !showPassword && newPassword.length > 0
-                          ? "rgba(255,255,255,0)"
-                          : c.accent
-                      }
-                      cursorColor={
-                        !showPassword && newPassword.length > 0
-                          ? "rgba(255,255,255,0)"
-                          : c.accent
-                      }
+                      secureTextEntry={!showPassword}
+                      selectionColor={c.accent}
+                      cursorColor={c.accent}
                     />
                   </View>
 
