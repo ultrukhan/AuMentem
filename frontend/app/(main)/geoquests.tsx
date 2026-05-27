@@ -376,10 +376,46 @@ export default function GeoQuestsScreen() {
       setIsLoading(false);
     }
   };
+  const handleCompletePress = async () => {
+    if (!activeUserQuestId) return;
+    setIsCompleting(true);
 
-  const handleCompletePress = () => {
-    setFinishModalVisible(true);
+    try {
+      let currentLat = userLocation?.latitude;
+      let currentLng = userLocation?.longitude;
+      if (!currentLat || !currentLng) {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        currentLat = loc.coords.latitude;
+        currentLng = loc.coords.longitude;
+      }
+
+      const token = await SecureStore.getItemAsync('userToken');
+      
+      const sigRes = await fetch(`${BASE_URL}/geo-quests/generate-upload-signature`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_geo_quest_id: activeUserQuestId,
+          lat: currentLat,
+          lng: currentLng,
+        }),
+      });
+
+      if (!sigRes.ok) {
+        let errorMsg = await parseApiError(sigRes, "Підійдіть ближче до цілі!");
+        errorMsg = errorMsg.replace("Підпис не згенеровано.", "Підійдіть ближче.");
+        Toast.show({ title: 'Не вийшло', message: errorMsg });
+        return;
+      }
+      
+      setFinishModalVisible(true);
+    } catch (e) {
+      Toast.show({ title: 'Помилка', message: 'Не вдалося перевірити відстань' });
+    } finally {
+      setIsCompleting(false);
+    }
   };
+
 
   const handleConfirmFinish = () => {
     processQuestCompletion();
@@ -413,8 +449,9 @@ export default function GeoQuestsScreen() {
         });
 
         if (!sigRes.ok) {
-          const errorMsg = await parseApiError(sigRes, "Підійдіть ближче до цілі.");
-          Toast.show({ title: 'Задалеко', message: errorMsg });
+          let errorMsg = await parseApiError(sigRes, "Підійдіть ближче до цілі!");
+          errorMsg = errorMsg.replace("Підпис не згенеровано.", "Підійдіть ближче.");
+          Toast.show({ title: 'Не вийшло', message: errorMsg });
           setIsCompleting(false);
           return;
         }

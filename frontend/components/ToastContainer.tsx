@@ -37,8 +37,13 @@ export default function ToastContainer() {
       }, config.duration || 3000);
     });
 
+    const themeSub = DeviceEventEmitter.addListener('THEME_CHANGED', (dark: boolean) => {
+      setIsDark(dark);
+    });
+
     return () => {
       subscription.remove();
+      themeSub.remove();
     };
   }, []);
 

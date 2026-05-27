@@ -95,7 +95,7 @@ export default function RegisterScreen() {
   }, []);
 
   const c = Colors[theme];
-  const appIcon = require('@/assets/images/icon.jpg');
+  const appIcon = require('@/assets/images/icon.png');
 
   const reqLength = password.length >= 8;
   const reqUpper = /[A-Z]/.test(password);
@@ -144,7 +144,7 @@ export default function RegisterScreen() {
       </Pressable>
 
       <Pressable style={s.themeToggle} onPress={toggleTheme}>
-        {isDark ? <Sun color={c.textMain} size={24} /> : <Moon color={c.textMain} size={24} />}
+        {isDark ? <Moon color={c.textMain} size={24} /> : <Sun color={c.textMain} size={24} />}
       </Pressable>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>

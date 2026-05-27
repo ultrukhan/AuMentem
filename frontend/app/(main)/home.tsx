@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   useWindowDimensions,
   Pressable,
- Appearance } from "react-native";
+  Appearance,
+  DeviceEventEmitter
+} from "react-native";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -158,7 +160,7 @@ export default function HomeScreen() {
     const newTheme = !isDark;
 
     setIsDark(newTheme);
-
+    DeviceEventEmitter.emit('THEME_CHANGED', newTheme);
     await SecureStore.setItemAsync("userTheme", newTheme ? "dark" : "light");
   };
 
@@ -193,9 +195,11 @@ export default function HomeScreen() {
 
             // Check if is_onboarding_completed is false, but strictly enforce ONCE locally
             const localHobbiesFlag = await SecureStore.getItemAsync(`hobbies_shown_${userId}`);
-            if (data.is_onboarding_completed === false && !localHobbiesFlag) {
-              setShowHobbies(true);
-              await SecureStore.setItemAsync(`hobbies_shown_${userId}`, "true");
+            if (data.is_onboarding_completed === false) {
+              if (!localHobbiesFlag) {
+                setShowHobbies(true);
+                await SecureStore.setItemAsync(`hobbies_shown_${userId}`, "true");
+              }
             } else {
               await maybeShowTracker(token, userId);
             }
@@ -311,9 +315,9 @@ export default function HomeScreen() {
               }
             >
               {isDark ? (
-                <Sun color={c.textMain} size={20} strokeWidth={2} />
-              ) : (
                 <Moon color={c.textMain} size={20} strokeWidth={2} />
+              ) : (
+                <Sun color={c.textMain} size={20} strokeWidth={2} />
               )}
             </AnimatedCard>
 

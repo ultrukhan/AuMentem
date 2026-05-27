@@ -231,8 +231,8 @@ export default function ProfileScreen() {
     try {
       const shareMessage =
         completedQuests > 0
-          ? `Привіт! Це ${nickname} 👋 Я прокачую своє ментальне здоров'я в AuMentem і маю вже ${completedQuests} виконаних квестів! 🌟 Долучайся, давай покращувати себе разом: https://aumentem.app 🚀`
-          : `Привіт! Це ${nickname} 👋 Я починаю свій шлях в AuMentem — крутому додатку для ментального здоров'я та цікавих квестів! 🌟 Приєднуйся до мене: https://aumentem.app 🚀`;
+          ? `Привіт! Це ${nickname} 👋 Я прокачую своє ментальне здоров'я в AuMentem і маю вже ${completedQuests} виконаних квестів! 🌟 Долучайся, давай покращувати себе разом: https://expo.dev/artifacts/eas/ciMjL6FL67y7mbD4nTxVCF.apk 🚀`
+          : `Привіт! Це ${nickname} 👋 Я починаю свій шлях в AuMentem — крутому додатку для ментального здоров'я та цікавих квестів! 🌟 Приєднуйся до мене: https://expo.dev/artifacts/eas/ciMjL6FL67y7mbD4nTxVCF.apk 🚀`;
 
       await Share.share({ message: shareMessage });
     } catch (error) {

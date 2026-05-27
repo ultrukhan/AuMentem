@@ -258,6 +258,82 @@ const FeedSkeleton = ({ isDark }: { isDark: boolean }) => {
   );
 };
 
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("uk-UA", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const PostItem = React.memo(({ item, index, myUserId, c, themeKey, isDark, animationsEnabled, onDelete, onReport, onReact }: any) => {
+  const authorName = item.is_anonymous || !item.user ? "Таємний мандрівник" : item.user.nickname;
+  const questTitle = item.user_mini_quest?.mini_quest?.title || item.user_geo_quest?.geo_quest?.title || "Завдання виконано";
+  const isGeo = !!item.user_geo_quest;
+  const photoUrl = item.user_geo_quest?.photo_proof_url;
+  const isMyPost = item.user_id === myUserId;
+
+  const card = (
+    <View style={[s.card, { backgroundColor: c.cardBg, borderColor: c.border }, cardShadow(themeKey, "soft")]}>
+      <View style={s.cardHeader}>
+        <View style={s.authorInfo}>
+          <View style={[s.avatar, { backgroundColor: item.is_anonymous || !item.user ? c.border : c.accent + "20" }]}>
+            {item.is_anonymous || !item.user ? (
+              <Ghost color={c.textMuted} size={20} />
+            ) : (
+              <Text style={{ color: c.accent, fontWeight: "bold", fontSize: 16 }}>{authorName.charAt(0).toUpperCase()}</Text>
+            )}
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[Typography.titleMd, { color: c.textMain, fontSize: 15 }]} numberOfLines={1}>{authorName}</Text>
+            <Text style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]} numberOfLines={1}>{formatDate(item.created_at)}</Text>
+          </View>
+        </View>
+
+        {isMyPost ? (
+          <Pressable onPress={() => onDelete(item.id)} style={({ pressed }) => [s.actionBtn, { backgroundColor: isDark ? "#FF3B3015" : "#FF3B3010" }, pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] }]}>
+            <Trash2 color="#FF3B30" size={18} />
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => { playClickSound(); onReport(item.id); }} style={({ pressed }) => [s.actionBtn, { backgroundColor: c.border }, pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] }]}>
+            <Flag color={c.textMuted} size={18} />
+          </Pressable>
+        )}
+      </View>
+
+      <View style={[s.questBadge, { backgroundColor: isGeo ? "#3B82F615" : c.accent + "15" }]}>
+        {isGeo ? <MapPin color="#3B82F6" size={16} /> : <Sparkles color={c.accent} size={16} />}
+        <Text style={[Typography.body, { color: c.textMain, marginLeft: 8, flex: 1 }]}>Досягнення: <Text style={{ fontWeight: "600" }}>{questTitle}</Text></Text>
+      </View>
+
+      {photoUrl && <Image source={{ uri: photoUrl }} style={s.postImage} contentFit="cover" transition={200} />}
+
+      <View style={[s.cardFooter, { borderTopColor: c.border }]}>
+        <View style={s.reactionsRow}>
+          {REACTION_OPTIONS.map((reaction) => {
+            const count = item.reactions?.filter((r: any) => r.reaction_type === reaction.type).length || 0;
+            const isActive = item.reactions?.some((r: any) => (r.user_id === myUserId || r.user_id === "me") && r.reaction_type === reaction.type) || false;
+            return <ReactionButton key={reaction.type} reaction={reaction} count={count} isActive={isActive} c={c} onPress={() => onReact(item.id, reaction.type)} />;
+          })}
+        </View>
+      </View>
+    </View>
+  );
+
+  if (!animationsEnabled || index > 5) return card;
+  return (
+    <MotiView from={{ opacity: 0, translateY: 16 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: "timing", duration: 400, delay: Math.min(index * 60, 300) }}>
+      {card}
+    </MotiView>
+  );
+}, (prevProps, nextProps) => {
+  if (prevProps.isDark !== nextProps.isDark) return false;
+  if (prevProps.item.reactions?.length !== nextProps.item.reactions?.length) return false;
+  return prevProps.item.id === nextProps.item.id;
+});
+
 export default function FeedScreen() {
   const router = useRouter();
   const { theme: themeParam } = useLocalSearchParams();
@@ -269,7 +345,7 @@ export default function FeedScreen() {
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(!hasLoadedData('feed'));
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [listRefreshEpoch, setListRefreshEpoch] = useState(0);
   
@@ -303,20 +379,20 @@ export default function FeedScreen() {
       const token = await SecureStore.getItemAsync("userToken");
       const currentOffset = reset ? 0 : offset;
       
-      if (reset) {
+      if (reset && !options?.refresh) {
         setIsLoading(true);
-      } else {
+      } else if (!reset) {
         setIsLoadingMore(true);
       }
 
-      const limit = 15;
-      const response = await fetchWithCache(`${BASE_URL}/posts/?limit=${limit}&offset=${currentOffset}`, {
+      const response = await fetchWithCache(`${BASE_URL}/posts/?offset=${currentOffset}`, {
         headers: { Authorization: `Bearer ${token}` },
         cacheKey: `feed_posts_${currentOffset}_${token}`,
       });
 
       if (response.ok && response.data) {
         // Backend returns PaginatedPostResponse { items, total_count, limit, offset }
+        const backendLimit = response.data.limit || 15;
         const responseData = response.data.items ? response.data.items : [];
         const sortedData = responseData.sort(
           (a: Post, b: Post) =>
@@ -326,16 +402,21 @@ export default function FeedScreen() {
         if (reset) {
           setPosts(sortedData);
         } else {
-          setPosts((prev) => [...prev, ...sortedData]);
+          setPosts((prev) => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const newPosts = sortedData.filter((p: Post) => !existingIds.has(p.id));
+            return [...prev, ...newPosts];
+          });
         }
         
-        setOffset(currentOffset + limit);
-        setHasMore(responseData.length === limit);
+        setOffset(currentOffset + backendLimit);
+        setHasMore(responseData.length >= backendLimit);
       }
     } catch (error) {
       console.error("Помилка завантаження стрічки:", error);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
       setIsRefreshing(false);
       markDataLoaded('feed');
       if (options?.refresh) setListRefreshEpoch(n => n + 1);
@@ -344,7 +425,6 @@ export default function FeedScreen() {
 
   const loadMorePosts = () => {
     if (!isLoadingMore && hasMore) {
-      playClickSound();
       fetchPosts(false);
     }
   };
@@ -356,21 +436,18 @@ export default function FeedScreen() {
     }, []),
   );
 
-  const handleReact = async (postId: string, reactionType: string) => {
+  const handleReact = useCallback(async (postId: string, reactionType: string) => {
     playClickSound();
-
-    const post = posts.find((p) => p.id === postId);
-    if (!post) return;
-
-    const isRemoving = post.reactions?.some(
-      (r) =>
-        (r.user_id === myUserId || r.user_id === "me") &&
-        r.reaction_type === reactionType,
-    );
 
     setPosts((currentPosts) =>
       currentPosts.map((p) => {
         if (p.id === postId) {
+          const isRemoving = p.reactions?.some(
+            (r) =>
+              (r.user_id === myUserId || r.user_id === "me") &&
+              r.reaction_type === reactionType,
+          ) || false;
+
           let updatedReactions = [...(p.reactions || [])];
           if (isRemoving) {
             const indexToRemove = updatedReactions.findIndex(
@@ -409,9 +486,9 @@ export default function FeedScreen() {
     } catch (error) {
       fetchPosts();
     }
-  };
+  }, [myUserId]);
 
-  const handleDeletePost = (postId: string) => {
+  const handleDeletePost = useCallback((postId: string) => {
     playClickSound();
     Alert.alert(
       "Видалити пост?",
@@ -447,7 +524,7 @@ export default function FeedScreen() {
         },
       ],
     );
-  };
+  }, []);
 
   const submitReport = async () => {
     if (!reportReason || !reportingPostId) return;
@@ -502,185 +579,22 @@ export default function FeedScreen() {
     setReportDetails("");
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("uk-UA", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const renderPost = ({ item, index }: { item: Post; index: number }) => {
-    const authorName =
-      item.is_anonymous || !item.user
-        ? "Таємний мандрівник"
-        : item.user.nickname;
-
-    const questTitle =
-      item.user_mini_quest?.mini_quest?.title ||
-      item.user_geo_quest?.geo_quest?.title ||
-      "Завдання виконано";
-
-    const isGeo = !!item.user_geo_quest;
-    const photoUrl = item.user_geo_quest?.photo_proof_url;
-
-    const isMyPost = item.user_id === myUserId;
-
-    const card = (
-      <View
-        style={[
-          s.card,
-          { backgroundColor: c.cardBg, borderColor: c.border },
-          cardShadow(themeKey, "soft"),
-        ]}
-      >
-        <View style={s.cardHeader}>
-          <View style={s.authorInfo}>
-            <View
-              style={[
-                s.avatar,
-                {
-                  backgroundColor:
-                    item.is_anonymous || !item.user
-                      ? c.border
-                      : c.accent + "20",
-                },
-              ]}
-            >
-              {item.is_anonymous || !item.user ? (
-                <Ghost color={c.textMuted} size={20} />
-              ) : (
-                <Text
-                  style={{ color: c.accent, fontWeight: "bold", fontSize: 16 }}
-                >
-                  {authorName.charAt(0).toUpperCase()}
-                </Text>
-              )}
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                style={[
-                  Typography.titleMd,
-                  { color: c.textMain, fontSize: 15 },
-                ]}
-                numberOfLines={1}
-              >
-                {authorName}
-              </Text>
-              <Text
-                style={[Typography.muted, { color: c.textMuted, fontSize: 12 }]}
-                numberOfLines={1}
-              >
-                {formatDate(item.created_at)}
-              </Text>
-            </View>
-          </View>
-
-          {isMyPost ? (
-            <Pressable
-              onPress={() => handleDeletePost(item.id)}
-              style={({ pressed }) => [
-                s.actionBtn,
-                { backgroundColor: isDark ? "#FF3B3015" : "#FF3B3010" },
-                pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] },
-              ]}
-            >
-              <Trash2 color="#FF3B30" size={18} />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => {
-                playClickSound();
-                setReportingPostId(item.id);
-              }}
-              style={({ pressed }) => [
-                s.actionBtn,
-                { backgroundColor: c.border },
-                pressed && { opacity: 0.6, transform: [{ scale: 0.95 }] },
-              ]}
-            >
-              <Flag color={c.textMuted} size={18} />
-            </Pressable>
-          )}
-        </View>
-
-        <View
-          style={[
-            s.questBadge,
-            { backgroundColor: isGeo ? "#3B82F615" : c.accent + "15" },
-          ]}
-        >
-          {isGeo ? (
-            <MapPin color="#3B82F6" size={16} />
-          ) : (
-            <Sparkles color={c.accent} size={16} />
-          )}
-          <Text
-            style={[
-              Typography.body,
-              { color: c.textMain, marginLeft: 8, flex: 1 },
-            ]}
-          >
-            Досягнення: <Text style={{ fontWeight: "600" }}>{questTitle}</Text>
-          </Text>
-        </View>
-
-        {photoUrl && (
-          <Image
-            source={{ uri: photoUrl }}
-            style={s.postImage}
-            contentFit="cover"
-            transition={200}
-          />
-        )}
-
-        <View style={[s.cardFooter, { borderTopColor: c.border }]}>
-          <View style={s.reactionsRow}>
-            {REACTION_OPTIONS.map((reaction) => {
-              const count =
-                item.reactions?.filter((r) => r.reaction_type === reaction.type)
-                  .length || 0;
-              const isActive =
-                item.reactions?.some(
-                  (r) =>
-                    (r.user_id === myUserId || r.user_id === "me") &&
-                    r.reaction_type === reaction.type,
-                ) || false;
-
-              return (
-                <ReactionButton
-                  key={reaction.type}
-                  reaction={reaction}
-                  count={count}
-                  isActive={isActive}
-                  c={c}
-                  onPress={() => handleReact(item.id, reaction.type)}
-                />
-              );
-            })}
-          </View>
-        </View>
-      </View>
-    );
-
-    if (!animationsEnabled) return card;
-
+  const renderPost = useCallback(({ item, index }: { item: Post; index: number }) => {
     return (
-      <MotiView
-        from={{ opacity: 0, translateY: 16 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{
-          type: "timing",
-          duration: 400,
-          delay: Math.min(index * 60, 300),
-        }}
-      >
-        {card}
-      </MotiView>
+      <PostItem
+        item={item}
+        index={index}
+        myUserId={myUserId}
+        c={c}
+        themeKey={themeKey}
+        isDark={isDark}
+        animationsEnabled={animationsEnabled}
+        onDelete={handleDeletePost}
+        onReport={setReportingPostId}
+        onReact={handleReact}
+      />
     );
-  };
+  }, [myUserId, c, themeKey, isDark, animationsEnabled, handleDeletePost, handleReact]);
 
   return (
     <SafeAreaView
@@ -715,19 +629,19 @@ export default function FeedScreen() {
           data={posts}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
-          initialNumToRender={4}
-          maxToRenderPerBatch={4}
-          windowSize={7}
-          removeClippedSubviews
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={21}
+          updateCellsBatchingPeriod={50}
           onEndReached={loadMorePosts}
-          onEndReachedThreshold={0.5}
+          onEndReachedThreshold={2.0}
           contentContainerStyle={s.listContent}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => {
                 setIsRefreshing(true);
-                fetchPosts(true);
+                fetchPosts(true, { refresh: true });
               }}
               tintColor={c.accent}
             />
@@ -737,22 +651,24 @@ export default function FeedScreen() {
               <View style={{ padding: 16, alignItems: 'center' }}>
                 <ActivityIndicator color={c.accent} />
               </View>
-            ) : !hasMore && posts.length > 0 ? (
+            ) : !hasMore && posts.length > 0 && !isRefreshing && offset > 0 ? (
               <Text style={{ textAlign: 'center', color: c.textMuted, marginVertical: 16 }}>
                 Це всі пости на даний момент 🎉
               </Text>
             ) : null
           }
           ListEmptyComponent={
-            <Text
-              style={[
-                Typography.body,
-                { color: c.textMuted, textAlign: "center", marginTop: 40 },
-              ]}
-            >
-              Стрічка поки порожня. Створи перший привід для гордості в цій
-              стрічці! 🌟
-            </Text>
+            posts.length === 0 ? (
+              <Text
+                style={[
+                  Typography.body,
+                  { color: c.textMuted, textAlign: "center", marginTop: 40 },
+                ]}
+              >
+                Стрічка поки порожня. Створи перший привід для гордості в цій
+                стрічці! 🌟
+              </Text>
+            ) : null
           }
         />
       )}
